@@ -101,7 +101,9 @@
       "title": "Standard",
       "company": "System",
       "version": "*",
-      "placeholder": "Standard"
+      "placeholder": "Standard",
+      "namespace": "Standard",
+      "qualified_only": false
     },
     "_doc": [
       "Библиотеки-зависимости; режимы (modes.*.libraries) и library.libraries ссылаются на них по ключу.",
