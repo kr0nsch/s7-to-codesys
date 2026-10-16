@@ -1,0 +1,59 @@
+// Фикстура s7conv: конструкции, которые конвертер не переводит или переводит с пометкой.
+FUNCTION_BLOCK "FB_Legacy"
+{ S7_Optimized_Access := 'FALSE' }
+VERSION : 0.1
+   VAR_INPUT
+      anyIn : Variant;
+      stamp : DTL;
+      time : Time;
+   END_VAR
+   VAR
+      raw : Word;
+      bits AT raw : Array[0..15] of Bool;
+      counter {InstructionName := 'CTU_INT'; LibVersion := '1.0'} : CTU_INT;
+      txt : WString[10];
+      ch : Char;
+      flags : Byte;
+      acc : TONR_TIME;
+   END_VAR
+   VAR DB_SPECIFIC
+      keep : Int;
+   END_VAR
+
+BEGIN
+	#counter(CU := #raw.%X0, R := #raw.%X1, PV := 10);
+	IF #counter.Q THEN
+	    GOTO done;
+	END_IF;
+	#raw := PEEK_WORD(area := 16#84, dbNumber := 1, byteOffset := 0);
+	#flags := #raw.%B1;
+	#keep := #keep + 1 ENO => #ok;
+	#txt := WSTRING#'abc';
+	#ch := 'A';
+	#keep := ROUND(2.5) + TRUNC(1.5);
+	%DB1.DBX0.0 := TRUE;
+	#time := T#-5s;
+	#raw := SHL(IN := #raw, N := 2) OR W#16#00FF;
+	#keep := LIMIT(MN := 0, IN := #keep, MX := 100);
+	#keep := MAX(IN1 := 1, IN2 := 2, IN3 := 3);
+	#raw := DWORD_TO_WORD(REAL_TO_DWORD(1.0));
+	#keep := #keep ** 2;
+	done: #keep := 0;
+	"Unknown_DB".value := 1;
+	#keep := := 2;
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK "FB_Broken"
+VERSION : 0.1
+   VAR_INPUT
+      a : Int
+   END_VAR
+BEGIN
+	#a := 1;
+END_FUNCTION_BLOCK
+
+ORGANIZATION_BLOCK "Hardware interrupt"
+VERSION : 0.1
+BEGIN
+	"FB_Legacy_DB"();
+END_ORGANIZATION_BLOCK

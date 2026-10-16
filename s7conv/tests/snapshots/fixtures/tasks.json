@@ -1,0 +1,88 @@
+{
+  "generator": "s7conv 0.1.0",
+  "tasks": [
+    {
+      "name": "MainTask",
+      "type": "cyclic",
+      "interval_ms": 10,
+      "priority": 15,
+      "pous": [
+        "PRG_Startup",
+        "PRG_Main"
+      ],
+      "sources": [
+        "Startup (OB100)",
+        "Main (OB1)"
+      ]
+    },
+    {
+      "name": "Task_100ms",
+      "type": "cyclic",
+      "interval_ms": 100,
+      "priority": 1,
+      "pous": [
+        "PRG_Cyclic_interrupt_100ms"
+      ],
+      "sources": [
+        "Cyclic interrupt 100ms (OB?)"
+      ]
+    }
+  ],
+  "obs": [
+    {
+      "name": "Main",
+      "program": "PRG_Main",
+      "number": 1,
+      "number_origin": "стандартное имя TIA",
+      "kind": "main",
+      "task": "MainTask",
+      "interval_ms": null,
+      "interval_origin": null,
+      "file": "s7conv/tests/fixtures/main.scl",
+      "line": 2,
+      "notes": []
+    },
+    {
+      "name": "Cyclic interrupt 100ms",
+      "program": "PRG_Cyclic_interrupt_100ms",
+      "number": null,
+      "number_origin": "",
+      "kind": "cyclic",
+      "task": "Task_100ms",
+      "interval_ms": 100,
+      "interval_origin": "подсказка в имени/комментарии",
+      "file": "s7conv/tests/fixtures/main.scl",
+      "line": 25,
+      "notes": []
+    },
+    {
+      "name": "Startup",
+      "program": "PRG_Startup",
+      "number": 100,
+      "number_origin": "стандартное имя TIA",
+      "kind": "startup",
+      "task": "MainTask",
+      "interval_ms": null,
+      "interval_origin": null,
+      "file": "s7conv/tests/fixtures/main.scl",
+      "line": 34,
+      "notes": []
+    },
+    {
+      "name": "Hardware interrupt",
+      "program": "PRG_Hardware_interrupt",
+      "number": null,
+      "number_origin": "",
+      "kind": "event",
+      "task": null,
+      "interval_ms": null,
+      "interval_origin": null,
+      "file": "s7conv/tests/fixtures/unsupported.scl",
+      "line": 55,
+      "notes": []
+    }
+  ],
+  "manual": [
+    "PRG_Hardware_interrupt: Hardware interrupt (OB?) — задача по событию не создаётся автоматически, настроить вручную"
+  ]
+}

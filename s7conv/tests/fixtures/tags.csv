@@ -1,0 +1,6 @@
+Name;Path;Data Type;Logical Address;Comment
+Start_PB;Default tag table;Bool;%I0.0;Кнопка «Пуск»
+Stop_PB;Default tag table;Bool;%I0.1;Кнопка «Стоп» (NC)
+Motor_Run;Default tag table;Bool;%Q0.0;Пускатель двигателя
+Horn;Default tag table;Bool;%Q0.1;Сирена
+Level_Raw;Default tag table;Int;%IW64;Уровень, сырое значение

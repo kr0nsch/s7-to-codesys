@@ -1,0 +1,111 @@
+// Фикстура s7conv: двигатель с пуском по фронту, задержкой контроля обратной связи и режимами.
+// Написано с нуля для тестов конвертера, формат — внешний источник TIA Portal.
+TYPE "UDT_MotorCmd"
+VERSION : 0.1
+   STRUCT
+      start : Bool;   // команда «пуск» (импульс)
+      stop : Bool;   // команда «стоп» (импульс)
+      mode : Int := 1;   // 0 — выведен, 1 — авто, 2 — ручной
+      name : String[16];
+   END_STRUCT;
+
+END_TYPE
+
+FUNCTION_BLOCK "FB_Motor"
+TITLE = Motor with feedback supervision
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : Engineer
+FAMILY : Drives
+VERSION : 1.2
+// Пуск по фронту команды, контроль обратной связи через FeedbackTime.
+   VAR_INPUT
+      cmd : "UDT_MotorCmd";
+      feedback : Bool;   // контактор включён
+      feedbackTime : Time := T#3S;
+   END_VAR
+
+   VAR_OUTPUT
+      run : Bool;
+      fault : Bool;
+      runTime : Time;
+   END_VAR
+
+   VAR_IN_OUT
+      ack : Bool;
+   END_VAR
+
+   VAR
+      startEdge {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+      fbTimer {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : TON_TIME;
+      starts : DInt;
+      stat : Struct
+         lastMode : Int;
+         history : Array[0..3] of Bool;
+      END_STRUCT;
+   END_VAR
+   VAR RETAIN
+      operatingHours : Real;
+   END_VAR
+
+   VAR_TEMP
+      i : Int;
+   END_VAR
+
+   VAR CONSTANT
+      MAX_STARTS : DInt := 1000;
+   END_VAR
+
+
+BEGIN
+	REGION Edge detection
+	    #startEdge(CLK := #cmd.start);
+	END_REGION
+
+	REGION Mode handling
+	    CASE #cmd.mode OF
+	        0:  // выведен из работы
+	            #run := FALSE;
+	        1, 2:
+	            IF #startEdge.Q AND NOT #fault THEN
+	                #run := TRUE;
+	                #starts += 1;
+	            ELSIF #cmd.stop THEN
+	                #run := FALSE;
+	            END_IF;
+	        ELSE
+	            #run := FALSE;
+	    END_CASE;
+	END_REGION
+
+	// Контроль обратной связи
+	#fbTimer(IN := #run AND NOT #feedback,
+	         PT := #feedbackTime,
+	         ET => #runTime);
+	IF #fbTimer.Q THEN
+	    #fault := TRUE;
+	    #run := FALSE;
+	END_IF;
+	IF #ack THEN
+	    #fault := FALSE;
+	    #ack := FALSE;
+	END_IF;
+
+	FOR #i := 3 TO 1 BY -1 DO
+	    #stat.history[#i] := #stat.history[#i - 1];
+	END_FOR;
+	#stat.history[0] := #run;
+	#stat.lastMode := #cmd.mode;
+	IF #starts > #MAX_STARTS THEN
+	    #starts := 0;
+	END_IF;
+END_FUNCTION_BLOCK
+
+DATA_BLOCK "Motor1_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"FB_Motor"
+
+BEGIN
+
+END_DATA_BLOCK

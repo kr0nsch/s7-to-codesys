@@ -1,0 +1,310 @@
+"""Сборка корпуса samples/scl/ в раскладку репозитория — команда `s7conv build-corpus`.
+
+Один источник всего, что в репозитории получено из корпуса и сценариев:
+
+- `src/{DUTs,GVLs,POUs}/Converted/` — результат конвертера с настройками CORPUS_OPTIONS (папка проекта
+  CODESYS `Converted`; таймеры S7Compat с подменяемым временем; периоды и номера OB — `ob_config.json`
+  корпуса). Рукописные объекты поддержки (`src/*/S7Compat`: F_NormX, F_ScaleX, таймеры) не
+  генерируются — сборка только проверяет, что нужные на месте;
+- `docs/CONVERSION_REPORT.md` — отчёт конвертации (и `build/report.html` при записи);
+- `tools/codesys/config.json` — задачи из OB (`modes.normal.tasks`); остальной текст файла не меняется;
+- `tests/POUs/Scenarios/` и `tests/POUs/PRG_Tests/` — тесты сценариев и программа запуска (testgen).
+
+`--check` ничего не пишет и возвращает код 1, если файлы репозитория отличаются от результата:
+так CI и pytest проверяют, что закоммиченный результат воспроизводится из корпуса.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from s7conv import mapping as M
+from s7conv import pipeline as P
+from s7conv import report as R
+from s7conv import testgen as TG
+from s7conv.emitter import ConversionResult, Options
+from s7conv.layout import REPO_ROOT, SUPPORT_FOLDER, L
+
+CORPUS_REL = "samples/scl"
+SCENARIOS_REL = "scenarios"
+FOLDER = "Converted"
+REPORT_REL = "docs/CONVERSION_REPORT.md"
+REPORT_HTML_REL = "build/report.html"
+CONFIG_REL = "tools/codesys/config.json"
+COMMAND = "s7conv build-corpus"
+
+# Каталоги, которыми сборка владеет целиком: лишние файлы в них удаляются (--check сообщает о них)
+MANAGED_DIRS = (
+    *(f"src/{cat}/{FOLDER}" for cat in L.CATEGORIES),
+    f"tests/POUs/{TG.SCENARIO_FOLDER}",
+    f"tests/POUs/{TG.PRG_TESTS}",
+)
+
+
+class CorpusError(Exception):
+    """Сборку корпуса нельзя выполнить: нет поддержки, конфликт имён, неверный config.json (код 2)."""
+
+
+def corpus_options(corpus: Path = REPO_ROOT / CORPUS_REL) -> Options:
+    """Настройки конвертера для корпуса: одни и те же для src/, отчёта и тестов сценариев."""
+    ob_path = corpus / P.OB_CONFIG_NAME
+    return Options(
+        folder=(FOLDER,),
+        timers=M.S7COMPAT,
+        f_trig=M.STANDARD,
+        ob_config=P.load_ob_config(str(ob_path)) if ob_path.is_file() else {},
+    )
+
+
+@dataclass
+class CorpusBuild:
+    files: dict[str, str]  # путь от корня -> текст
+    result: ConversionResult
+    tests: TG.TestsBuild
+    html: str
+    warnings: list[str] = field(default_factory=list)
+
+
+def _object_files(objects: list[L.StObject], subdir: str) -> dict[str, str]:
+    files: dict[str, str] = {}
+    for obj in objects:
+        for rel, text in L.object_files(obj, subdir):
+            files[rel] = L.normalize_text(text)
+    return files
+
+
+def _managed(rel: str) -> bool:
+    return any(rel == d or rel.startswith(d + "/") for d in MANAGED_DIRS)
+
+
+def _hand_written(root: Path) -> list[L.StObject]:
+    """Объекты src/, которые сборка не генерирует (рукописные)."""
+    if not (root / "src").is_dir():
+        return []
+    scan = L.scan(str(root), "src")
+    return [o for o in scan.objects if not _managed(o.rel_dir("src"))]
+
+
+def _check_hand_written(root: Path, result: ConversionResult) -> None:
+    hand = _hand_written(root)
+    names = {o.name.lower(): o for o in hand}
+    missing = [n for n in sorted(result.support) if n.lower() not in names]
+    if missing:
+        raise CorpusError(
+            f"нет рукописных объектов поддержки {', '.join(missing)} (ожидаются в src/*/{SUPPORT_FOLDER})"
+        )
+    clash = sorted(o.name for o in result.objects if o.name.lower() in names)
+    if clash:
+        raise CorpusError(f"имена сгенерированных объектов совпадают с рукописными в src/: {', '.join(clash)}")
+
+
+def config_tasks(result: ConversionResult) -> list[dict[str, Any]]:
+    """Задачи для tools/codesys/config.json (формат modes.<режим>.tasks: name, interval_ms, priority, pous)."""
+    tasks: list[dict[str, Any]] = []
+    for task in result.tasks:
+        if task.type != "cyclic" or task.interval_ms is None:
+            raise CorpusError(f"задача {task.name}: tools/codesys создаёт только циклические задачи с периодом")
+        tasks.append({"name": task.name, "interval_ms": task.interval_ms, "priority": task.priority, "pous": task.pous})
+    return tasks
+
+
+def _skip_string(text: str, i: int) -> int:
+    """Индекс после строки JSON, начинающейся с кавычки в позиции i."""
+    i += 1
+    while i < len(text):
+        if text[i] == "\\":
+            i += 2
+            continue
+        if text[i] == '"':
+            return i + 1
+        i += 1
+    raise CorpusError("config.json: незакрытая строка")
+
+
+def _find_key(text: str, start: int, end: int, key: str) -> int:
+    """Позиция значения ключа key на верхнем уровне объекта text[start:end] (start — после '{')."""
+    depth = 0
+    i = start
+    while i < end:
+        c = text[i]
+        if c == '"':
+            j = _skip_string(text, i)
+            if depth == 0 and text[i + 1 : j - 1] == key:
+                k = j
+                while text[k] in " \t\r\n":
+                    k += 1
+                if text[k] == ":":
+                    k += 1
+                    while text[k] in " \t\r\n":
+                        k += 1
+                    return k
+            i = j
+            continue
+        if c in "{[":
+            depth += 1
+        elif c in "}]":
+            depth -= 1
+        i += 1
+    raise CorpusError(f"config.json: нет ключа {key!r}")
+
+
+def _value_end(text: str, i: int) -> int:
+    """Индекс после значения JSON (объект или массив), начинающегося в позиции i."""
+    depth = 0
+    while i < len(text):
+        c = text[i]
+        if c == '"':
+            i = _skip_string(text, i)
+            continue
+        if c in "{[":
+            depth += 1
+        elif c in "}]":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    raise CorpusError("config.json: незакрытый объект или массив")
+
+
+def update_config_tasks(text: str, tasks: list[dict[str, Any]]) -> str:
+    """Заменить modes.normal.tasks в тексте config.json, не трогая остальной текст и форматирование."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise CorpusError(f"config.json: неверный JSON ({exc})") from exc
+    if not isinstance(data.get("modes"), dict) or not isinstance(data["modes"].get("normal"), dict):
+        raise CorpusError("config.json: нет раздела modes.normal")
+    root_start = text.index("{") + 1
+    modes = _find_key(text, root_start, len(text), "modes")
+    normal = _find_key(text, modes + 1, _value_end(text, modes), "normal")
+    tasks_at = _find_key(text, normal + 1, _value_end(text, normal), "tasks")
+    tasks_end = _value_end(text, tasks_at)
+    line_start = text.rfind("\n", 0, tasks_at) + 1
+    indent = len(text[line_start:tasks_at]) - len(text[line_start:tasks_at].lstrip())
+    items = [json.dumps(t, ensure_ascii=False) for t in tasks]
+    pad = " " * (indent + 2)
+    rendered = "[\n" + ",\n".join(pad + item for item in items) + "\n" + " " * indent + "]" if items else "[]"
+    new_text = text[:tasks_at] + rendered + text[tasks_end:]
+    expected = json.loads(text)
+    expected["modes"]["normal"]["tasks"] = tasks
+    if json.loads(new_text) != expected:  # pragma: no cover - защита от ошибки замены
+        raise CorpusError("config.json: замена modes.normal.tasks изменила другие значения")
+    return new_text
+
+
+def build(root: Path = REPO_ROOT) -> CorpusBuild:
+    """Всё, что получается из корпуса и сценариев: {путь: текст} без записи на диск."""
+    corpus = root / CORPUS_REL
+    if not corpus.is_dir():
+        raise CorpusError(f"нет корпуса {corpus}")
+    inputs = P.collect_inputs([str(corpus)])
+    result, _files = P.run(inputs, corpus_options(corpus), base=root)
+    _check_hand_written(root, result)
+    files = _object_files(result.objects, "src")
+    files[REPORT_REL] = R.render_markdown(
+        result,
+        [CORPUS_REL],
+        command=COMMAND,
+        tasks_target=f"`{CONFIG_REL}` (режим normal, `modes.normal.tasks`)",
+    )
+    config_path = root / CONFIG_REL
+    warnings = list(result.errors)
+    if config_path.is_file():
+        files[CONFIG_REL] = update_config_tasks(config_path.read_text(encoding="utf-8"), config_tasks(result))
+    else:
+        warnings.append(f"{CONFIG_REL} нет — задачи только в отчёте ({REPORT_REL})")
+    tests = TG.generate(root / SCENARIOS_REL, result, root, "tests", root)
+    files.update(_object_files(tests.objects, "tests"))
+    html = R.render_html(result, [CORPUS_REL])
+    return CorpusBuild(files=files, result=result, tests=tests, html=html, warnings=warnings)
+
+
+def _existing(root: Path, managed: Sequence[str]) -> set[str]:
+    found: set[str] = set()
+    for rel_dir in managed:
+        base = root / rel_dir
+        if base.is_dir():
+            found.update(p.relative_to(root).as_posix() for p in base.rglob("*") if p.is_file())
+    return found
+
+
+@dataclass
+class Diff:
+    changed: list[str] = field(default_factory=list)
+    missing: list[str] = field(default_factory=list)  # есть в результате, нет в репозитории
+    stale: list[str] = field(default_factory=list)  # есть в управляемых каталогах, нет в результате
+
+    @property
+    def clean(self) -> bool:
+        return not (self.changed or self.missing or self.stale)
+
+
+def diff_files(files: dict[str, str], root: Path, managed: Sequence[str]) -> Diff:
+    """Сравнение {путь: текст} с диском; лишние — файлы управляемых каталогов, которых нет в files."""
+    diff = Diff()
+    for rel, text in sorted(files.items()):
+        path = root / rel
+        if not path.is_file():
+            diff.missing.append(rel)
+        elif path.read_bytes() != text.encode("utf-8"):
+            diff.changed.append(rel)
+    diff.stale = sorted(_existing(root, managed) - set(files))
+    return diff
+
+
+def apply_diff(diff: Diff, files: dict[str, str], root: Path, managed: Sequence[str]) -> None:
+    """Записать изменённые и новые файлы, удалить лишние и опустевшие каталоги управляемых каталогов."""
+    for rel in diff.stale:
+        (root / rel).unlink()
+    for rel_dir in managed:
+        base = root / rel_dir
+        if base.is_dir():
+            for d in sorted((p for p in base.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
+                if not any(d.iterdir()):
+                    d.rmdir()
+            if not any(base.iterdir()):
+                base.rmdir()
+    for rel in [*diff.missing, *diff.changed]:
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(files[rel].encode("utf-8"))
+
+
+def compare(build_result: CorpusBuild, root: Path = REPO_ROOT) -> Diff:
+    return diff_files(build_result.files, root, MANAGED_DIRS)
+
+
+def write(build_result: CorpusBuild, root: Path = REPO_ROOT, html: bool = True) -> Diff:
+    """Записать результат; удалить лишние файлы управляемых каталогов. Возвращает, что изменилось."""
+    diff = compare(build_result, root)
+    apply_diff(diff, build_result.files, root, MANAGED_DIRS)
+    if html:
+        target = root / REPORT_HTML_REL
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(build_result.html.encode("utf-8"))
+    return diff
+
+
+__all__ = [
+    "COMMAND",
+    "CONFIG_REL",
+    "CORPUS_REL",
+    "FOLDER",
+    "MANAGED_DIRS",
+    "REPORT_REL",
+    "CorpusBuild",
+    "CorpusError",
+    "Diff",
+    "apply_diff",
+    "build",
+    "compare",
+    "config_tasks",
+    "corpus_options",
+    "diff_files",
+    "update_config_tasks",
+    "write",
+]

@@ -1,0 +1,74 @@
+// Фикстура s7conv: организационные блоки и одиночный экземпляр IEC-таймера.
+ORGANIZATION_BLOCK "Main"
+TITLE = "Main Program Sweep (Cycle)"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP
+      cmdTmp : "UDT_MotorCmd";
+   END_VAR
+
+BEGIN
+	#cmdTmp.start := "Start_PB";
+	#cmdTmp.stop := NOT "Stop_PB";
+	#cmdTmp.mode := 1;
+	"Motor1_DB"(cmd := #cmdTmp,
+	            feedback := %I0.2,
+	            ack := "DB_Hmi".ackRequest);
+	"Motor_Run" := "Motor1_DB".run;
+	"Delay_DB".TON(IN := "Motor1_DB".fault,
+	               PT := T#10s);
+	"Horn" := "Delay_DB".Q;
+	%MW10 := INT_TO_WORD("DB_Hmi".counter);
+	%M12.1 := %MW10.%X3;
+END_ORGANIZATION_BLOCK
+
+ORGANIZATION_BLOCK "Cyclic interrupt 100ms"
+TITLE = Fast level control
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+	"Level_DB"();
+END_ORGANIZATION_BLOCK
+
+ORGANIZATION_BLOCK "Startup"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+	"DB_Hmi".counter := 0;
+	"DB_Hmi".ackRequest := FALSE;
+END_ORGANIZATION_BLOCK
+
+DATA_BLOCK "DB_Hmi"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR
+      ackRequest : Bool;
+      counter : Int;
+   END_VAR
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "Delay_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+IEC_TIMER
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "Level_DB"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"FB_Level"
+
+BEGIN
+
+END_DATA_BLOCK

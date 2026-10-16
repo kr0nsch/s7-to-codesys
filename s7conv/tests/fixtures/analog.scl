@@ -1,0 +1,70 @@
+// Фикстура s7conv: масштабирование аналогового входа и глобальный DB уставок.
+FUNCTION "FC_ScaleAnalog" : Real
+TITLE = Scale raw analog value 0..27648
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT
+      raw : Int;   // сырое значение канала
+      low : Real;
+      high : Real;
+   END_VAR
+
+   VAR_OUTPUT
+      valid : Bool;
+   END_VAR
+
+   VAR_TEMP
+      norm : Real;
+   END_VAR
+
+   VAR CONSTANT
+      RAW_MAX : Int := 27648;
+   END_VAR
+
+
+BEGIN
+	#norm := NORM_X(MIN := 0, VALUE := #raw, MAX := #RAW_MAX);
+	#valid := #raw >= -864 AND #raw <= 28512;
+	#FC_ScaleAnalog := SCALE_X(MIN := #low, VALUE := #norm, MAX := #high);
+END_FUNCTION
+
+DATA_BLOCK "DB_Settings"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR
+      levelLow : Real := 0.0;
+      levelHigh : Real := 100.0;
+      pumpDelay : Time := T#5s;
+      oldDelay : S5Time := S5T#2s;
+      label : String;
+   END_VAR
+   VAR RETAIN
+      totalVolume : LReal;
+      counterRaw : Int;
+   END_VAR
+
+BEGIN
+   levelHigh := 95.5;
+END_DATA_BLOCK
+
+FUNCTION_BLOCK "FB_Level"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_OUTPUT
+      level : Real;
+      levelPercent : Int;
+   END_VAR
+   VAR
+      sensorOk : Bool;
+   END_VAR
+
+BEGIN
+	#level := "FC_ScaleAnalog"(raw := %IW64,
+	                           low := "DB_Settings".levelLow,
+	                           high := "DB_Settings".levelHigh,
+	                           valid => #sensorOk);
+	#levelPercent := SCALE_X(MIN := 0, VALUE := #level / 100.0, MAX := 100);
+	"DB_Settings".totalVolume := "DB_Settings".totalVolume + #level * 0.001;
+	%Q4.0 := #sensorOk AND #level > "DB_Settings".levelHigh;
+	"Alarm_Lamp" := NOT #sensorOk;
+END_FUNCTION_BLOCK

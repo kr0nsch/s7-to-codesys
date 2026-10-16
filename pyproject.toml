@@ -5,15 +5,28 @@
 [project]
 name = "plc-repo-template-tools"
 version = "0.1.0"
-description = "Инструменты шаблона ПЛК-репозитория: раскладка ST, сборка, линтер, проверки"
+description = "Инструменты шаблона ПЛК-репозитория: раскладка ST, сборка, линтер, проверки; конвертер SCL → ST s7conv"
 requires-python = ">=3.11"
+
+# Конвертер s7conv (пакет s7conv/): python -m pip install -e . даёт консольную команду s7conv;
+# без установки — python -m s7conv из корня репозитория.
+[project.scripts]
+s7conv = "s7conv.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["s7conv", "s7conv.*"]
+exclude = ["s7conv.tests*"]
 
 [tool.ruff]
 line-length = 120
 target-version = "py311"
 extend-exclude = ["build"]
 # Каталоги модулей проекта (для сортировки импортов: first-party)
-src = ["tools", "tools/codesys", "tools/check", "tools/tests"]
+src = [".", "tools", "tools/codesys", "tools/check", "tools/tests", "scenarios/reference", "samples", "tools_project"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "C4", "RUF"]
@@ -32,11 +45,13 @@ exclude = ["tools/codesys/*.py"]
 # Общее подмножество Python 2.7 и 3.x: __future__, "%"-форматирование, class X(object),
 # без f-строк, распаковки [*a], raise ... from, contextlib.suppress
 "tools/codesys/*.py" = ["UP", "SIM", "C4", "B904", "RUF005", "RUF012"]
+# Тесты s7conv: исходники SCL в строках — тестовые данные, переносить их по ширине нельзя
+"s7conv/tests/*.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"
-files = ["tools"]
-mypy_path = ["tools", "tools/codesys", "tools/check"]
+files = ["tools", "scenarios/reference", "samples", "s7conv", "tools_project"]
+mypy_path = ["tools", "tools/codesys", "tools/check", "scenarios/reference", "samples", "tools_project"]
 strict = true
 warn_unreachable = true
 # Скрипты CODESYS (IronPython 2.7) используют глобальные объекты среды CODESYS (projects,
@@ -47,9 +62,22 @@ exclude = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tools/tests"]
-pythonpath = ["tools", "tools/codesys", "tools/check"]
-addopts = "-ra --strict-markers"
+# scenarios/reference — эталонные модели сценариев; samples — проверка матрицы покрытия корпуса SCL;
+# tools_project — проверки репозитория проекта (настройки линтера, config.json, обёртка iec_checker)
+testpaths = ["tools/tests", "scenarios/reference", "samples", "s7conv/tests", "tools_project"]
+pythonpath = [".", "tools", "tools/codesys", "tools/check", "scenarios/reference", "samples", "tools_project"]
+# Три теста шаблона проверяют, что настройки репозитория совпадают с настройками самого шаблона, —
+# в проекте они по замыслу шаблона отличаются (обоснование — docs/STATIC_ANALYSIS.md, раздел «Тесты
+# шаблона»). Их заменяют тесты tools_project/test_repo_config.py:
+# - test_toml_matches_defaults: st_lint.toml снимает правила оформления с src/*/Converted/;
+# - test_integration_repository_sources: в сгенерированном коде есть конструкции CODESYS, которых нет в
+#   грамматике iec_checker 0.4 (ParserError шаблон не обосновывает) — проверка идёт через
+#   tools_project/iec_checker_gate.py;
+# - test_config_is_valid_json_without_user_paths: задачи режима normal — из OB корпуса (s7conv build-corpus).
+addopts = """-ra --strict-markers
+    --deselect=tools/tests/test_st_lint.py::test_toml_matches_defaults
+    --deselect=tools/tests/test_run_iec_checker.py::test_integration_repository_sources
+    --deselect=tools/tests/test_cds.py::test_config_is_valid_json_without_user_paths"""
 markers = [
     "integration: проверки с настоящими plc (RuSTy) и iec_checker; пропускаются, если инструмента нет",
 ]
