@@ -1,0 +1,10 @@
+coUnit.TEST('FallingEdgeOnce');
+fbDut(CLK := TRUE);
+AssertFalse(Condition := fbDut.Q, Message := 'CLK=TRUE: no edge');
+fbDut(CLK := FALSE);
+AssertTrue(Condition := fbDut.Q, Message := 'TRUE->FALSE: edge');
+fbDut(CLK := FALSE);
+AssertFalse(Condition := fbDut.Q, Message := 'FALSE->FALSE: edge only once');
+fbDut(CLK := TRUE);
+AssertFalse(Condition := fbDut.Q, Message := 'FALSE->TRUE: rising is not falling');
+coUnit.TEST_FINISHED();

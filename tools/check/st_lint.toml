@@ -2,6 +2,19 @@
 # Значения здесь повторяют значения по умолчанию из st_lint.py, чтобы их было видно и
 # можно было менять в проектах, созданных из шаблона.
 # Шаблоны путей (exclude) — fnmatch по пути от корня репозитория; '*' захватывает и '/'.
+#
+# Проект s7-to-codesys: код в папках Converted (src/*/Converted/) генерирует конвертер s7conv из
+# корпуса samples/scl (python -m s7conv build-corpus). Он сохраняет имена, числа и пометки исходного
+# кода S7, поэтому с него сняты только правила оформления по CONTRIBUTING.md, а не форматные:
+#   STL004 — пометки MIGRATION-TODO: это механизм отчёта конвертера (docs/CONVERSION_REPORT.md), не задачи
+#            с номером issue;
+#   STL006, STL007 — префиксы имён объектов и переменных: имена S7 (UDT_*, DB_*, FC_*, condition, tonOn)
+#            сохраняются, чтобы сконвертированный код сверялся с исходником и тегами HMI/SCADA построчно;
+#   STL008 — числа в логике — константы исходного SCL; вынос их в GVL_Const — ручной этап миграции;
+#   STL011 — эвристика «время счётом циклов» (например, cycleCount — счётчик циклов промывки, а не время).
+# Заголовок POU (STL001), табуляция, длина строки, ASCII в идентификаторах и строках, нормализация
+# файла (STL002, STL003, STL005, STL009, STL010) и раскладка (LAY*) проверяются и в Converted.
+# Рукописный код (src/*/S7Compat, tests/) проверяется полностью. Обоснование — docs/STATIC_ANALYSIS.md.
 
 [lint]
 paths = ["src", "tests"]        # каталоги раскладки (docs/LAYOUT.md)
@@ -29,6 +42,9 @@ keywords = ["назначение", "автор", "версия", "докуме�
 require_docs_link = true        # в заголовке есть путь вида docs/<файл>.md
 exclude = []
 
+[rules.STL004]
+exclude = ["src/*/Converted/*"]   # проект: MIGRATION-TODO в сгенерированном коде (см. шапку файла)
+
 [rules.STL006]
 # Допустимые префиксы имён объектов; пустой список — проверка выключена.
 program = ["PRG_"]
@@ -44,13 +60,13 @@ pvl = ["PVL_", "GVL_"]
 # Методы и свойства — PascalCase без префиксов.
 member_pattern = "^[A-Z][A-Za-z0-9]*$"
 member_exceptions = ["FB_init", "FB_exit", "FB_reinit"]
-exclude = []
+exclude = ["src/*/Converted/*"]   # проект: имена объектов S7 в сгенерированном коде
 
 [rules.STL007]
 allow_names = []                # имена-исключения, например ["i", "j"]
 constant_pattern = "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"   # VAR CONSTANT / VAR_GLOBAL CONSTANT
 fb_types = ["TON", "TOF", "TP", "R_TRIG", "F_TRIG", "CTU", "CTD", "CTUD", "RS", "SR"]
-exclude = []
+exclude = ["src/*/Converted/*"]   # проект: имена переменных S7 в сгенерированном коде
 
 [rules.STL007.type_prefixes]
 BOOL = "x"
@@ -89,9 +105,10 @@ DATE_AND_TIME = "dt"
 [rules.STL008]
 allowed_values = [0, 1, 2]      # сравниваются по значению: 0.0, 1.0, 2.0 тоже допустимы
 exempt_objects = ["GVL_Const"]
-exclude = ["tests/*"]           # в тестах ожидаемые значения — это данные, а не логика
+# в тестах ожидаемые значения — это данные, а не логика; проект: числа исходного SCL в Converted
+exclude = ["tests/*", "src/*/Converted/*"]
 
 [rules.STL011]
 name_pattern = "(?i)(cycle|cyc|scan|tick)"                  # счётчик с таким именем
 time_name_pattern = "(?i)(time|delay|timeout|_ms$|_s$|sec)" # сравнение счётчика с «временем»
-exclude = []
+exclude = ["src/*/Converted/*"]   # проект: эвристика на сгенерированном коде
