@@ -1,122 +1,111 @@
 # Ручные шаги
 
-Шаги, которые выполняет человек в IDE CODESYS или в консоли Windows. Всё, что можно выполнить без
-CODESYS (сборка текстов, линтер, статанализ), описано в [README](../README.md#быстрый-старт-без-железа)
-и выполняется в CI.
+Что делает человек: установка CODESYS и coUnit, импорт в проект, сборка и тесты в CODESYS Control Win,
+ручные объекты проекта. Всё, что выполняется без CODESYS (конвертер, линтер, статанализ, RuSTy), — в
+[README](../README.md#быстрый-старт-без-железа) и в CI.
 
-> Команды скриптов CODESYS в этом документе — **будет уточнено после прогона скриптов**.
-> До первого реального прогона они не считаются проверенными.
+Команды CODESYS выполняет `tools/codesys/cds.py` (подробно — [tools/README.md](../tools/README.md),
+раздел «codesys/cds.py»). Скрипты проверены на CODESYS 3.5.17.30 при создании шаблона; **проект
+s7-to-codesys в CODESYS ещё не собирался** — после первого прогона итог записывается в
+[TEST_REPORT.md](TEST_REPORT.md), ошибки сборки — в [BUILD_ERRORS.md](BUILD_ERRORS.md).
 
-## 1. Установка CODESYS 3.5.17.30 и CfUnit
+## 1. Установка
 
-1. Скачать CODESYS V3.5 SP17 Patch 3 (3.5.17.30) с сайта ОВЕН (раздел ПО для ПЛК2xx) и установить
-   с компонентом CODESYS Control Win V3.
-2. Установить пакет таргет-файлов ОВЕН ПЛК210: «Инструменты → Установщик пакетов» (Tools → Package
-   Manager). Версию таргет-файла сверить с прошивкой ПЛК.
-3. Установить CfUnit 1.2.0.0 — в этой версии библиотека называется co♻e / coUnit, пространство
-   имён в коде `coUnit` (см. [ASSUMPTIONS.md](ASSUMPTIONS.md), C6). Источник — SVN проекта counit
-   на CODESYS Forge (`tags/v1.2.0.0/`): пакет `v1.2.0.0.package` ставится через CODESYS
-   Installer, либо сама библиотека `co♻e.library` — через «Инструменты → Репозиторий библиотек
-   → Установить» (Tools → Library Repository → Install). Проверка ссылки запросом `HEAD` даёт
-   401 — скачивать обычным `GET` (браузером).
-4. Добавить библиотеку в Library Manager тестового приложения и уменьшить её параметры
-   (`GVL_Param_coUnit`): `MaxNumberOfTestSuites` 10–20, `MaxNumberOfTestsForEachTestSuite`
-   ≤ 50, `MaxNumberOfAssertsForEachTestSuite` ≤ 200. С параметрами по умолчанию сборка падает
-   с C0106 (нехватка глобальной памяти, около 78 МБ). Где это редактируется в SP17 Patch 3 —
-   будет уточнено при установке (пункт C7 в ASSUMPTIONS.md).
-5. Записать установленную версию в [TEST_REPORT.md](TEST_REPORT.md).
-6. Проверить запуск из консоли: `"%CODESYS_EXE%" --help` — сохранить вывод в
-   `build/codesys_help.txt` (в git не попадает): по нему уточняются ключи `--profile`, `--noUI`,
-   `--runscript`.
+1. CODESYS V3.5 SP17 Patch 3 (3.5.17.30) с сайта ОВЕН с компонентом CODESYS Control Win V3.
+2. Для ПЛК210 — пакет таргет-файлов ОВЕН («Инструменты → Установщик пакетов»); версию таргет-файла
+   сверить с прошивкой ПЛК.
+3. Библиотека coUnit 1.2.0.0 (CfUnit, MIT; в коде пространство имён `coUnit`) — в репозиторий
+   библиотек `System`. Если её нет, `cds.py` установит её из файла, заданного переменной
+   `COUNIT_LIBRARY`. Параметры библиотеки — по умолчанию (на Control Win собирается без C0106 —
+   [ASSUMPTIONS.md](ASSUMPTIONS.md), C7).
+4. Переменные окружения пользователя (через `setx` их видит `cds.py` и без перезапуска консоли):
 
-## 2. Переменные окружения CODESYS_EXE и CODESYS_PROFILE
+   | Переменная | Значение |
+   |---|---|
+   | `CODESYS_EXE` | путь к `CODESYS.exe` |
+   | `CODESYS_PROFILE` | `CODESYS V3.5 SP17 Patch 3` |
+   | `COUNIT_LIBRARY` | путь к `counit.library`, если библиотеки нет в репозитории |
 
-Скрипты и инструменты берут путь к CODESYS только из переменных окружения — абсолютных путей
-в репозитории нет.
+5. Пользовательский процесс рантайма (без прав администратора): `python tools/codesys/cds.py runtime init`
+   один раз, дальше `cds.py test` запускает рантайм сам.
 
-| Переменная | Значение | Пример (сверить со своей установкой) |
-|---|---|---|
-| `CODESYS_EXE` | полный путь к `CODESYS.exe` | `C:\Program Files\CODESYS 3.5.17.30\CODESYS\Common\CODESYS.exe` |
-| `CODESYS_PROFILE` | имя профиля установки | `CODESYS V3.5 SP17 Patch 3` |
+## 2. Пересборка корпуса (если менялись конвертер, корпус или сценарии)
 
-Задать для пользователя (PowerShell, затем перезапустить консоль):
-
-```powershell
-[Environment]::SetEnvironmentVariable("CODESYS_EXE", "<путь к CODESYS.exe>", "User")
-[Environment]::SetEnvironmentVariable("CODESYS_PROFILE", "<имя профиля>", "User")
+```bash
+python -m s7conv build-corpus          # src/*/Converted, отчёт, задачи в config.json, тесты сценариев
+python -m s7conv build-corpus --check  # то же без записи: код 1, если репозиторий устарел (так в CI)
 ```
 
-Имя профиля видно в заголовке окна CODESYS и в каталоге `Profiles` установки.
+Сгенерированное (`src/*/Converted`, `tests/POUs/Scenarios`, `tests/POUs/PRG_Tests`) руками не правится —
+правка в IDE будет потеряна при следующей пересборке. Решение о `F_TRIG` (раздел 5) меняет настройки
+сборки в `s7conv/corpus.py` (`corpus_options`).
 
-## 3. Импорт исходников в проект
-
-Скрипт `tools/codesys/import_sources.py` создаёт или пересоздаёт объекты проекта из `src/`
-(с флагом тестов — и из `tests/`, в папку `Tests`), сохраняет проект, лог пишет в `build/import.log`.
+## 3. Импорт, сборка, тесты
 
 ```bat
-rem будет уточнено после прогона скриптов
-"%CODESYS_EXE%" --profile="%CODESYS_PROFILE%" --noUI --runscript="tools\codesys\import_sources.py"
+python tools\codesys\cds.py build            :: src/ → build\s7-to-codesys.project, сборка
+python tools\codesys\cds.py test             :: src/ + tests/ → тестовый проект, Control Win, coUnit
+python tools\codesys\cds.py report           :: итог прогона → docs/TEST_REPORT.md
 ```
 
-Что создаётся только руками (не входит в раскладку, см. [LAYOUT.md](LAYOUT.md#чего-в-раскладке-нет-ручные-шаги)):
+- Рабочий проект получает задачи из `tools/codesys/config.json` (режим `normal`): `MainTask` 10 мс
+  (`PRG_Startup`, `PRG_Main`), `Task_OB30` 100 мс (`PRG_Cyclic_interrupt`). Тестовый — `TestTask` 10 мс
+  → `PRG_Tests` и библиотеку coUnit.
+- Артефакты: `build/build.log`, `build/build.json` (сообщения компилятора с файлом и строкой раскладки),
+  `build/test-results.json`, `build/junit.xml`.
+- Без лицензии Control Win работает 2 часа; `cds.py test` перезапускает рантайм, если он работает
+  дольше 100 минут.
 
-- [ ] дерево устройств: ПЛК210 для рабочей сборки, CODESYS Control Win V3 для тестов;
-- [ ] конфигурация задач, если скрипт не смог создать её по `tools/codesys/config.json`;
-- [ ] визуализации, конфигураторы обмена, графические языки.
+## 4. Что создаётся только руками
 
-## 4. Сборка
+- [ ] Дерево устройств ПЛК210 и привязка каналов ввода-вывода. `GVL_IO` и `GVL_Markers` (папка
+      `Converted`) содержат пересчитанные адреса S7 как заготовку — на ПЛК210 каналы модулей
+      привязываются в дереве устройств ([methodology.md](methodology.md), «Масштабирование аналоговых
+      сигналов»).
+- [ ] Задача по событию для `PRG_Diagnostic_error_interrupt` (OB82): автоматически не создаётся.
+- [ ] Свободный цикл для `MainTask`, если он нужен вместо 10 мс (`tools/codesys` создаёт только
+      циклические задачи).
+- [ ] Объект Persistent Variables, если реманентные данные переводятся в `PERSISTENT`
+      (`s7conv --retain persistent`): в SP17 скриптом не создаётся.
+- [ ] Символьная конфигурация / OPC UA / Modbus для HMI и SCADA.
+- [ ] Функции неявной проверки (Add Object → POUs for implicit checks: `CheckDivDInt`, `CheckDivLInt`,
+      `CheckBounds` и др.) — подключить на время наладки или записать, почему не нужны (пометки
+      `expr.div_int`, MAPPING.md «Расхождения, которые конвертер не помечает»).
+- [ ] Поведение после Stop → Start в CODESYS: флаг первого цикла не сбрасывается, код OB100 (`PRG_Startup`)
+      и эмуляция `Initial_Call` не выполняются повторно — проверить, приемлемо ли это для объекта
+      (в S7 каждый STOP → RUN — тёплый пуск с OB100).
 
-```bat
-rem будет уточнено после прогона скриптов
-"%CODESYS_EXE%" --profile="%CODESYS_PROFILE%" --noUI --runscript="tools\codesys\build.py"
-```
+## 5. После первого прогона тестов
 
-Сообщения компилятора — в `build/build.log`. Если сборка в IDE даёт ошибки, которых нет в логе,
-скопируйте их в [BUILD_ERRORS.md](BUILD_ERRORS.md).
-
-## 5. Запуск тестов
-
-1. Запустить рантайм: значок CODESYS Control Win V3 в трее → Start PLC.
-2. Запустить скрипт тестов:
-
-   ```bat
-   rem будет уточнено после прогона скриптов
-   "%CODESYS_EXE%" --profile="%CODESYS_PROFILE%" --noUI --runscript="tools\codesys\run_tests.py"
-   ```
-
-3. Вручную (если скрипт недоступен): импорт с тестами → «Онлайн → Логин» → «Старт» →
-   дождаться `PRG_Tests.xAllFinished = TRUE` → результаты в журнале устройства (Device → Log,
-   логгер `coUnit` или `co♻e`). Итоговый блок `TESTS FINISHED RUNNING` coUnit пишет с классом
-   ERROR даже при зелёном прогоне — смотреть на счётчик `Failed tests`.
-4. XML с результатами (xUnit) рантайм может записать не по пути из параметров библиотеки, а в
-   каталог `PlcLogic` рабочей папки Control Win — будет уточнено после прогона скриптов.
-5. Перенести итог в [TEST_REPORT.md](TEST_REPORT.md): версия CODESYS и coUnit, число тестов,
-   упавшие тесты с сообщениями.
-
-Без лицензии Control Win работает 2 часа, потом его нужно перезапустить.
+1. `python tools/codesys/cds.py report` и разбор упавших тестов в [TEST_REPORT.md](TEST_REPORT.md)
+   (раздел «Что ожидать при первом прогоне»).
+2. **F_TRIG.** Если падает строка 1 сценария `FB_PumpAlternation/RotateOnStop` (`leadPump` = 2 вместо 1),
+   F_TRIG CODESYS Standard даёт ложный спад на первом вызове. Тогда: в `s7conv/corpus.py` в
+   `corpus_options` поставить `f_trig=M.S7COMPAT`, выполнить `python -m s7conv build-corpus`, повторить
+   `cds.py test`, записать вывод в ASSUMPTIONS.md (S4, K18) и MAPPING.md (`fb.f_trig`). Если строка
+   проходит — отметить S4 как подтверждённое.
+3. Тесты `MatchesStandardInRealTime` сверяют таймеры S7Compat со Standard: расхождение — разобрать по
+   семантике в объявлении блока (ASSUMPTIONS.md, K19), при необходимости поправить блок S7Compat.
+4. Обновить таблицы «Последний прогон» в [STATIC_ANALYSIS.md](STATIC_ANALYSIS.md) результатами CI.
 
 ## 6. Экспорт перед коммитом
 
-Если что-то правилось в IDE, перед коммитом выгрузите объекты обратно в `src/` и проверьте дифф:
+Правки в IDE допустимы только в рукописном коде (`S7Compat`, `tests/POUs/S7Compat`). Перед коммитом:
 
 ```bat
-rem будет уточнено после прогона скриптов
-"%CODESYS_EXE%" --profile="%CODESYS_PROFILE%" --noUI --runscript="tools\codesys\export_sources.py"
+python tools\codesys\cds.py export --tests
 git diff --stat
+python -m s7conv build-corpus --check
 ```
 
-Цикл «импорт → экспорт» без правок в IDE не должен давать диффа. Если дифф есть — это ошибка
-скриптов, её нужно записать в issue.
+Последняя команда должна пройти: если экспорт изменил сгенерированное, правку нужно перенести в
+конвертер или корпус. Цикл «импорт → экспорт» без правок не должен давать диффа
+(`python tools\codesys\cds.py roundtrip`).
 
 ## 7. Зеркало на GitVerse или GitFlic
 
-1. Создать пустой репозиторий на GitVerse или GitFlic (без README и лицензии).
-2. Добавить его как второй remote и отправить все ветки и теги:
-
-   ```bash
-   git remote add mirror <url-зеркала>
-   git push mirror --all
-   git push mirror --tags
-   ```
-
-3. После каждого релиза повторять `git push mirror --all` и `git push mirror --tags`.
+```bash
+git remote add mirror <url-зеркала>
+git push mirror --all
+git push mirror --tags
+```

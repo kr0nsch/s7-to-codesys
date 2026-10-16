@@ -1,75 +1,160 @@
 # Статический анализ
 
-Находки `iec_checker` по `build/assembled/` (и `st_lint` по `src/`, `tests/`), которые не
-исправлены в коде, — с обоснованием. Исправленные находки сюда не пишутся. Здесь же — итог
-проверки компиляции RuSTy.
+Линтер `st_lint`, статанализ `iec_checker` и проверка компиляции RuSTy для `src/` и `tests/`: как они
+запускаются в этом проекте, что в них настроено иначе, чем в шаблоне, и почему; обоснования находок,
+которые не исправлены в коде. Исправленные находки сюда не пишутся.
+
+В `src/` две части с разными правилами:
+
+- **`src/*/Converted/`** — код, который генерирует `s7conv build-corpus` из корпуса `samples/scl`. Он
+  сохраняет имена, числа, структуру ветвлений и пометки исходного SCL (принцип переноса один к одному —
+  [methodology.md](methodology.md)). Руками не правится: правка — в конвертере или корпусе.
+- **`src/*/S7Compat/`** и **`tests/`** — рукописный код (слой совместимости и его тесты) и
+  сгенерированные тесты сценариев; проверяются полностью, как в шаблоне.
 
 ## Как запускается
 
 | Инструмент | Где | Вход | Отчёт |
 |---|---|---|---|
-| `tools/check/st_lint.py --strict` | локально и в CI | `src/`, `tests/` | вывод в консоль, код выхода ≠ 0 при нарушениях |
-| `tools/check/run_iec_checker.py --tests` | локально и в CI (обязательно): бинарник iec_checker v0.4 из релизов github.com/jubnzv/iec-checker | `build/assembled/iec-checker/` (вариант сборки `iec-checker`) | `build/iec_checker.json`, `build/iec_checker.md` |
-| то же с `--docker` | CI, необязательное задание: образ `jubnzv1/iec-checker:nightly`, закреплённый по дайджесту в `ci.yml` | то же | то же, артефакт `iec-checker-nightly-reports` |
-| `tools/check/run_rusty.py` | локально и в CI (необязательное задание): RuSTy `plc --check` | `build/assembled/rusty/` (вариант сборки `rusty`, `src/` и `tests/`) | `build/rusty.log`, `build/rusty.json` |
+| `python tools/check/st_lint.py --strict` | локально и в CI | `src/`, `tests/` | консоль; код выхода ≠ 0 при нарушениях |
+| `python tools_project/iec_checker_gate.py` | локально и в CI (обязательно): iec_checker v0.4 | `build/assembled/iec-checker/` (вариант сборки `iec-checker`, `src/` и `tests/`) | `build/iec_checker.json`, `build/iec_checker.md`, `build/iec_checker_gate.json` |
+| то же с `--docker <образ nightly>` | CI, необязательное задание | то же | артефакт `iec-checker-nightly-reports` |
+| `python tools/check/run_rusty.py` | локально и в CI (необязательное задание): RuSTy 1.0.6 `plc --check` | `build/assembled/rusty/` без файлов из `tools/check/rusty_exclude.txt` | `build/rusty.log`, `build/rusty.json` |
+| `pytest s7conv/tests/test_rusty_check.py` | локально и в CI (pytest) | весь `src/` и `tests/` с дополнительными прокладками | результат теста |
 
-Обоснования в `tools/check/iec_checker_allow.toml` подобраны под находки v0.4 — той же версии, что в
-обязательном шаге CI. Образ `nightly` разбирает больше конструкций и может находить иначе: если
-находка есть только в одной версии — укажите это в столбце «решение». Интеграционный тест
-`tools/tests/test_run_iec_checker.py::test_integration_repository_sources` проверяет, что каждое
-обоснование используется: после правок примера уберите устаревшие записи.
+`iec_checker_gate.py` — обёртка проекта над `tools/check/run_iec_checker.py` шаблона: тот же вариант
+сборки и тот же файл обоснований, но `ParserError` допускается только в местах из
+`tools_project/iec_checker_parser_gaps.toml` (раздел «Пробелы разборщика»). Без обёртки
+`run_iec_checker.py --tests` завершается кодом 1 из-за этих мест — так задумано шаблоном: `ParserError`
+обосновать нельзя.
 
 ## Последний прогон
 
 | Дата | Инструмент | Вход | Итог |
 |---|---|---|---|
-| 2026-10-16 | `st_lint --strict` | `src/`, `tests/` (60 файлов) | 0 ошибок, 0 предупреждений |
-| 2026-10-16 | `run_iec_checker.py` (iec_checker 0.4, Windows, локально) | 8 объектов `src/` | ошибок разбора нет; необоснованных 0; обоснованных 32: CP3 — 24, L17 — 4, CP9 — 2, UnusedVariable — 2; артефактов сборки 10 (CP3) |
-| 2026-10-16 | `run_iec_checker.py --tests` (iec_checker 0.4, Windows, локально) | 11 объектов `src/` и `tests/` | ошибок разбора нет; необоснованных 0; обоснованных 100: CP3 — 49, UnusedVariable — 30, CP9 — 17, L17 — 4; артефактов сборки 10 (CP3) |
-| 2026-10-16 | `run_rusty.py` (RuSTy 1.0.6, `plc --check`, Windows, локально) | 11 файлов `build/assembled/rusty/` (`src/` и `tests/` с прокладками coUnit и Standard) | 0 ошибок, 0 предупреждений; исключений в `rusty_exclude.txt` нет |
-| — | iec_checker 0.4 (CI, Linux) | 11 объектов `src/` и `tests/` | _перенести из отчёта CI_ |
+| 2026-10-16 | `st_lint --strict` | `src/`, `tests/` (240 файлов) | 0 ошибок, 0 предупреждений |
+| 2026-10-16 | `iec_checker_gate.py` (iec_checker 0.4, Windows, локально) | 54 объекта `src/` и `tests/` | необоснованных 0; известных пробелов разборщика 6; обоснованных 858; артефактов сборки 163; неиспользованных обоснований и устаревших записей о пробелах нет |
+| 2026-10-16 | `run_rusty.py` (RuSTy 1.0.6, Windows, локально) | 44 файла (10 исключены) | 0 ошибок, 1 предупреждение (E067 — см. «RuSTy») |
+| 2026-10-16 | `test_repository_sources_pass_rusty_with_shims` | 53 файла из 54 (без `DB_Telegram`) | пройден |
+| — | iec_checker 0.4 (CI, Linux) | то же | _перенести из отчёта CI_ |
 | — | iec_checker `nightly` (CI, необязательно) | то же | _перенести из отчёта CI_ |
 
-## Находки
+## st_lint
 
-| Правило | Файл | Находка | Решение / обоснование |
-|---|---|---|---|
-| PLCOPEN-CP3 | все POU `src/` (34) | «Variable … shall be initialized before being used» для входов, выходов и локальных переменных без явного начального значения | Обосновано. В CODESYS, как и по МЭК 61131-3, переменная без явного начального значения получает значение по умолчанию своего типа (0, `FALSE`; у `E_DeviceMode` это `Auto = 0`). Явные значения стоят там, где умолчание не подходит: режим `OutOfService`, уставка и гистерезис из `GVL_Const`. Вариант сборки `iec-checker` убирает неконстантные начальные значения, поэтому находка есть и для них. Часть находок — на копиях переменных в методах, которые сборка понижает до функций (`Acknowledge`, `Reset`, `Count`) |
-| PLCOPEN-CP9 | `FB_Example` (тело) | «Code is too complex (28 McCabe complexity)», «(26 statements)» | Обосновано. Пороги iec_checker 0.4 — сложность > 15 и > 25 операторов, а сложность он считает завышенно: проверено на синтетическом примере, одна конструкция `IF … ELSE … END_IF` прибавляет 5. Классическая цикломатическая сложность тела — 8 (7 точек ветвления: 3 в `CASE`, 3 в `IF … ELSIF`, 1 в счётчике). Делить 40 строк линейной логики на методы ради метрики — хуже для чтения |
-| PLCOPEN-L17 | `FB_Example`: `IF xFault …` в режиме `Auto`, `IF` счётчика включений | «Each IF instruction should have an ELSE clause» | Обосновано: действия «иначе» нет. В зоне гистерезиса выход сохраняет состояние, без фронта счётчик не меняется. Пустая ветка `ELSE` или присваивание переменной самой себе только добавили бы шум |
-| PLCOPEN-L17 | `PRG_Main`: обработка `stCmd.xAck`, `stCmd.xReset` | то же | Обосновано: однократная команда не пришла — делать нечего |
-| UnusedVariable | `PRG_Main`: `stCmd`, `stSts` | «Found unused local variable» | Ложное срабатывание: переменные используются через поля (`stCmd.xAck`, `stSts.xOut := …`), iec_checker 0.4 обращения к полям структуры не учитывает. Перепроверить на образе `nightly` |
+**Настройки.** `tools/check/st_lint.toml` = умолчания `st_lint.py` плюс исключение `src/*/Converted/*` для
+пяти правил оформления по CONTRIBUTING.md (обоснование — и в шапке файла):
 
-Исправлено по итогам прогона (для истории): защёлка отказа в `FB_Example` и квитирование в
-`Acknowledge` записаны логическими выражениями вместо `IF` без `ELSE`.
+| Правило | Почему снято с `Converted` |
+|---|---|
+| STL004 — `TODO` без номера issue | пометки `MIGRATION-TODO` — механизм отчёта конвертера ([CONVERSION_REPORT.md](CONVERSION_REPORT.md)), а не задачи трекера |
+| STL006 — префиксы объектов | имена S7 сохраняются: `UDT_AnalogCfg`, `DB_Plant`, `FC_Statistics` — так их ищут по исходнику и тегам HMI/SCADA |
+| STL007 — префиксы переменных | то же для переменных: `condition`, `tonOn`, `feedbackTime` |
+| STL008 — «магические числа» | числа — константы исходного SCL; вынос в `GVL_Const` — ручной этап после проверки поведения |
+| STL011 — «время счётом циклов» (эвристика) | ложное срабатывание: `cycleCount` в `FB_Sequencer` — число циклов промывки, а не время |
 
-### Если анализируются и тесты (`assemble --tests`)
+Остальное — заголовок POU (STL001), табуляция, длина строки, ASCII в идентификаторах и строках,
+нормализация файла, подавления (STL002, STL003, STL005, STL009, STL010, STL012) и раскладка (LAY*) —
+проверяется и в `Converted`: конвертер обязан выдавать аккуратный текст. Тест
+`tools_project/test_repo_config.py` следит, чтобы настройки отличались от шаблона только этим.
 
-| Правило | Файл | Находка | Решение / обоснование |
-|---|---|---|---|
-| UnusedVariable | `FB_F_Clamp_Test`: `R_LOW`, `R_HIGH`, `R_INSIDE`, `R_BELOW`, `R_ABOVE`, `R_DELTA`; `FB_Example_Test`: `R_SP_PCT`, `R_HYST_PCT`, … `UDI_TWO_SWITCH_ONS` (10) | «Found unused local variable» | Артефакт понижения: константы набора (`VAR CONSTANT`) используются в методах-тестах, которые сборка выносит в отдельные функции |
-| UnusedVariable | `FB_Example_Test`: `fbDut` в 10 методах | то же | Ложное срабатывание, как для `stCmd`/`stSts` в `PRG_Main`: экземпляр используется вызовом `fbDut(...)`, чтением выходов и вызовом методов, iec_checker 0.4 это использованием не считает (в методе, где `fbDut` присваивается интерфейсу, находки нет) |
-| UnusedVariable | `PRG_Tests`: `fbF_ClampTest`, `fbExampleTest` | то же | Ложное срабатывание: экземпляры используются вызовом `AreAllTestsFinished()` и регистрируются в coUnit самим объявлением |
-| PLCOPEN-CP9 | `FB_F_Clamp_Test` (1), `FB_Example_Test` (14) | «Code is too complex (16…40 McCabe complexity)», «(33…48 statements)» | Обосновано: в наборах и методах-тестах нет ветвлений (классическая сложность — 1), это последовательности вызовов и проверок; завышенный подсчёт iec_checker. Для тестов метрика не показательна |
-| PLCOPEN-CP3 | `FB_F_Clamp_Test`, `FB_Example_Test`, `PRG_Tests` (25) | как выше | Обосновано, как для `src/`: результаты и экземпляры получают значения до чтения |
+**Подавления в рукописном коде.** 14 строк `// lint:allow STL007` — входы и выходы таймеров и детектора
+спада S7Compat (`IN`, `PT`, `Q`, `ET`, `CLK`): имена интерфейса TON/TOF/TP/F_TRIG нужны, чтобы
+сгенерированный код вызывал `FB_S7Ton` так же, как `TON`, без правок вызовов.
 
-## RuSTy (`plc --check`)
+## iec_checker
 
-Компилятор RuSTy 1.0.6 проверяет синтаксис и типы варианта сборки `rusty` (`src/` и `tests/`); компоновки
-нет. Пространства имён `coUnit.`/`CfUnit.` убираются, объявления coUnit и блоков CODESYS Standard берутся
-из прокладок `tools/check/rusty_shims/` (сигнатуры — по исследованию API, с CODESYS не сверялись).
-Последний прогон — в таблице выше: 0 ошибок, 0 предупреждений, исключений нет. Найденные RuSTy ошибки
-исправляются в коде; файл, который RuSTy не может разобрать из-за расширения CODESYS, заносится в
-`tools/check/rusty_exclude.txt` с причиной.
+### Пробелы разборщика (ParserError)
 
-## Ограничения разборщика
+После `ParserError` iec_checker файл дальше не анализирует; эти файлы проверяют компиляторы (RuSTy в
+pytest, CODESYS) и st_lint. Каждое место записано в `tools_project/iec_checker_parser_gaps.toml`
+(файл и регулярное выражение по тексту строки); запись без находки — ошибка обёртки.
 
-Конструкции CODESYS, которые iec_checker 0.4 не разбирает, — и что с ними делает вариант сборки
-`iec-checker` (подробно — [LAYOUT.md](LAYOUT.md#собранный-текст-buildassembled) и `tools/README.md`):
-
-| Конструкция | Где в примере | Как обходится |
+| Файл | Конструкция | Почему не заменить |
 |---|---|---|
-| метки `CASE` вида `E_DeviceMode.Auto` | `FB_Example` | сборка заменяет метки целыми значениями перечисления |
-| неконстантные начальные значения (`:= E_DeviceMode.OutOfService`, `:= GVL_Const.ИМЯ`) | `FB_Example`, `ST_ExampleCmd` | сборка убирает начальное значение (отсюда часть находок CP3) |
-| `VAR_GLOBAL` вне `CONFIGURATION`, прагмы `{attribute …}` | `GVL_Const`, `E_DeviceMode` | сборка понижает |
-| методы и свойства внутри `FUNCTION_BLOCK`, `IMPLEMENTS`, `EXTENDS` | `FB_Example`, `FB_F_Clamp_Test`, `FB_Example_Test` | сборка выносит методы в функции `<ФБ>__<метод>` — анализ методов приблизительный |
+| `src/POUs/S7Compat/F_S7Now/F_S7Now.impl.st` | оператор `TIME()` | единственный источник времени ПЛК без сторонних библиотек; вызывается только здесь — тесты берут время через `F_S7Now()` |
+| `src/DUTs/Converted/UDT_DosingRecipe.dut.st` | `doseStep : ARRAY[1..4] OF REAL := [...]` в структуре | ошибка понижения `iec-checker` в шаблоне (`tools/st_flavors.py`, `pass_lower_types`): тип массива в структуре заменяется типом элемента, инициализатор остаётся. Исправлять — в шаблоне |
+| `src/POUs/Converted/FB_EventLogger/FB_EventLogger.impl.st` | `buffer[i].code` — поле элемента массива | в грамматике iec_checker 0.4 нет обращения к полю после индекса (проверено на минимальном примере) |
+| `src/POUs/Converted/PRG_Main/PRG_Main.impl.st` | `DB_Hmi.pump[1].startReq` | то же |
+| `src/POUs/Converted/FB_Ramp/FB_Ramp.impl.st` | пустой оператор `;` (ветка `ELSIF hold`) | `;` допустим в МЭК 61131-3 и CODESYS; iec_checker 0.4 требует в ветке хотя бы один оператор (и ветку только с комментарием тоже не разбирает) |
+| `src/POUs/Converted/FB_Valve/FB_Valve.impl.st` | `;` в ветке `CASE` (ожидание сброса) | то же |
+
+### Обоснованные находки
+
+Записи — `tools/check/iec_checker_allow.toml`; каждая используется (иначе обёртка завершается ошибкой).
+
+| Правило | Где | Число | Обоснование |
+|---|---|---:|---|
+| PLCOPEN-CP3 | `src/*`, `tests/*` | 431 | Переменная без явного начального значения получает значение по умолчанию своего типа (МЭК 61131-3, как в CODESYS); вариант сборки `iec-checker` убирает неконстантные начальные значения |
+| PLCOPEN-CP9 | `src/*/Converted/*` | 19 | Сложность — как у исходного блока SCL; конвертер структуру не меняет. Пороги iec_checker 0.4 (сложность > 15, > 25 операторов) и завышенный подсчёт (одна конструкция `IF … ELSE` прибавляет 5 — проверено в шаблоне) |
+| PLCOPEN-CP9 | `tests/*` | 107 | Наборы и методы-тесты — последовательности вызовов и проверок; классическая сложность 1–3 |
+| PLCOPEN-L17 | `src/*/Converted/*` | 43 | `IF` без `ELSE` перенесены из SCL: «иначе» в исходной логике — сохранить состояние |
+| PLCOPEN-L17 | `src/POUs/S7Compat/FB_S7T*` | 6 | В таймерах без ветки «иначе» выходы и момент отсчёта сохраняют значение — это и есть семантика TON/TOF/TP |
+| PLCOPEN-L17 | `tests/*` | 58 | Однократный запуск сценария (`IF NOT xDone`) и тесты на несколько циклов (`IF NOT xRtDone`, `IF xRtDone`): в остальных циклах делать нечего |
+| PLCOPEN-L10 | `FC_Statistics` | 1 | `CONTINUE` перенесён из SCL (блок проверяет `CONTINUE` и `RETURN` при конвертации) |
+| PLCOPEN-CP4 | `GVL_IO` | 3 | Ложное срабатывание: номер слова `%IW32`/`%IW33`/`%IW34` iec_checker считает номером байта; в CODESYS это байты 64–65, 66–67, 68–69 (S7 `%IW64`/`%IW66`/`%IW68`) — перекрытия нет |
+| UnusedVariable | `src/*/Converted/*` | 31 | См. ниже |
+| UnusedVariable | наборы тестов, `PRG_Tests` | 156 | Артефакт понижения (переменные набора используются в методах, которые сборка выносит в функции) и ложные срабатывания: экземпляр `fbDut` используется вызовом и чтением выходов; экземпляры наборов в `PRG_Tests` регистрируются объявлением и используются `AreAllTestsFinished()` |
+
+**UnusedVariable в сгенерированном коде** (31 находка):
+
+- ложные срабатывания iec_checker 0.4 — вызов экземпляра ФБ и чтение его выходов (`tonOn`, `edgeAck`,
+  `ctuBatch`, `tonStep`… — 18 находок в `FB_AlarmDelay`, `FB_BatchCounter`, `FB_Debounce`, `FB_Motor`,
+  `FB_PumpAlternation`, `FB_Sequencer`), аргумент во вложенном вызове (`TIME_TO_DINT(cycleTime)`,
+  `INT_TO_WORD(batchPreset)`), запись полей структуры (`status.running := …`), константа в границах `FOR`
+  (`SAMPLE_COUNT`);
+- переменные интерфейса S7, которые используют только непереведённые операторы (`MIGRATION-TODO`):
+  `archiveDb`, `retryDelay`, `remaining`, `timerValue` в `FB_LegacyTelegram`, `ret_` в `PRG_Startup`;
+- стартовая информация OB, которую код OB не читает: `Event_Count` (`PRG_Cyclic_interrupt`),
+  `MultiError` (`PRG_Diagnostic_error_interrupt`).
+
+Удаление неиспользуемого — ручной этап после перевода TODO, а не задача конвертера.
+
+**Артефакты сборки** (163: CP3 — 117, UnusedVariable — 46) — находки на строках, которые создало
+понижение (копии переменных набора в функциях-методах); на код не указывают.
+
+## RuSTy
+
+Компилятор RuSTy 1.0.6 проверяет синтаксис и типы варианта сборки `rusty`; компоновки нет. Объявления
+coUnit и блоков CODESYS Standard — из прокладок `tools/check/rusty_shims/` шаблона.
+
+**Что RuSTy отвергает и почему** (расхождения диалектов, а не ошибки кода; файлы — в
+`tools/check/rusty_exclude.txt` с причинами):
+
+| Причина | Файлы | Комментарий |
+|---|---|---|
+| нет `TIME_TO_DINT` в stdlib RuSTy (там `TIME` 64-битный, есть `TIME_TO_LINT`) | `FB_PIController`, `FB_Ramp`, `FB_Totalizer` | вызовы из SCL переносятся как есть: в CODESYS функция есть |
+| RuSTy убирает имя GVL (`qualified_only`), одинаковое имя в двух GVL неоднозначно (E004) | `DB_Telegram` | `heartbeat` есть и в `DB_Plant` |
+| `%MW5` и `%MD5` для RuSTy — одна аппаратная переменная (E037, прерывает компиляцию) | `GVL_Markers` | в CODESYS это байты 10–11 и 20–23 (S7 `%MW10` и `%MD20`) |
+| зависят от исключённых объявлений | `GVL_InstanceDBs`, `PRG_Main`, `PRG_Cyclic_interrupt`, `FB_Totalizer_ScenarioTest`, `PRG_Tests` | без типов и переменных выше RuSTy не разрешит ссылки |
+
+Чтобы исключения не уменьшали покрытие, `s7conv/tests/test_rusty_check.py::test_repository_sources_pass_rusty_with_shims`
+проверяет **весь** `src/` и `tests/`: к прокладкам добавлено объявление `TIME_TO_DINT`, у `GVL_Markers`
+сняты `AT`, исключён только `DB_Telegram` — 53 файла из 54 проходят без ошибок. Ещё два теста там же
+проверяют результат конвертера по фикстурам и по корпусу с настройками по умолчанию.
+
+**Предупреждение E067** «Implicit downcast from 'DINT' to 'INT'» в `FB_PumpAlternation`
+(`required := LIMIT(0, demand, PUMP_COUNT)`): в RuSTy литерал `0` — `DINT`, и `LIMIT` возвращает `DINT`;
+в CODESYS литерал получает тип из контекста (`INT`). Оставлено как есть.
+
+Ошибка конвертера, найденная RuSTy и исправленная: `CTU_INT.PV`/`CV` в S7 — `INT`, в CODESYS Standard —
+`WORD`; конвертер теперь пишет явные `INT_TO_WORD(...)` и `WORD_TO_INT(...)` (раньше — неявное
+преобразование со сменой знака, на которое CODESYS выдаёт предупреждение).
+
+## Тесты шаблона, заменённые проектными
+
+Три теста шаблона сравнивают настройки репозитория с настройками самого шаблона; в проекте они по
+замыслу шаблона отличаются, поэтому тесты исключены в `pyproject.toml` (`--deselect`) и заменены
+тестами `tools_project/test_repo_config.py`:
+
+| Тест шаблона | Почему не подходит | Замена |
+|---|---|---|
+| `test_st_lint.py::test_toml_matches_defaults` | `st_lint.toml` снимает правила оформления с `src/*/Converted/*` | настройки = умолчания + ровно эти исключения; форматные правила в `Converted` включены |
+| `test_run_iec_checker.py::test_integration_repository_sources` | в `src/` есть конструкции CODESYS, которых нет в грамматике iec_checker 0.4, а шаблон `ParserError` не обосновывает | `test_repository_sources_pass_iec_checker_gate`: обёртка проходит, каждое обоснование и каждая запись о пробеле используются |
+| `test_cds.py::test_config_is_valid_json_without_user_paths` | задачи режима `normal` в `tools/codesys/config.json` — из OB корпуса (`MainTask` 10 мс с `PRG_Startup` и `PRG_Main`, `Task_OB30` 100 мс), а не задача шаблона | те же проверки config.json, задачи `normal` = задачам из `s7conv build-corpus` |
+
+## Предложения в шаблон
+
+- `tools/st_flavors.py`, понижение `iec-checker`: при замене массива в поле структуры типом элемента
+  убирать и начальное значение `[...]` (сейчас — `ParserError` на допустимом коде).
+- Понижение для `a[i].b` и пустого оператора `;` — тогда пробелы разборщика в этом проекте исчезнут, а
+  обёртку можно будет убрать.

@@ -103,13 +103,28 @@ jobs:
         if: ${{ !cancelled() }}
         run: python tools/check/st_lint.py --strict
 
-      # run_iec_checker.py сам собирает вариант iec-checker в build/assembled/iec-checker/ и берёт
-      # бинарник из переменной IEC_CHECKER; обоснованные находки — tools/check/iec_checker_allow.toml
-      # и docs/STATIC_ANALYSIS.md
+      # Обёртка проекта над tools/check/run_iec_checker.py: тот же вариант сборки iec-checker и файл
+      # обоснований tools/check/iec_checker_allow.toml; ParserError допускается только в местах из
+      # tools_project/iec_checker_parser_gaps.toml (конструкции CODESYS вне грамматики iec_checker 0.4).
+      # Бинарник — из переменной IEC_CHECKER; разбор находок — docs/STATIC_ANALYSIS.md
       - name: Статанализ (iec_checker)
         id: iec_checker
         if: ${{ !cancelled() }}
-        run: python tools/check/run_iec_checker.py --tests
+        run: python tools_project/iec_checker_gate.py
+
+      # Конвертер s7conv: корпус разбирается без ошибок; закоммиченный результат build-corpus
+      # (src/*/Converted, docs/CONVERSION_REPORT.md, задачи в tools/codesys/config.json, тесты сценариев
+      # tests/POUs/Scenarios и PRG_Tests) воспроизводится из корпуса и сценариев побайтно.
+      - name: s7conv — корпус SCL
+        id: s7conv
+        if: ${{ !cancelled() }}
+        run: |
+          python -m s7conv check samples/scl
+          python -m s7conv build-corpus --check
+          python -m s7conv gen-tests scenarios --out tests --check
+          python -m s7conv convert samples/scl --out build/converted --timers s7compat --emit-support \
+            --report-html build/report.html -q
+          python tools/assemble.py --root build/converted --check-only
 
       - name: Сводка
         if: ${{ !cancelled() }}
@@ -121,6 +136,7 @@ jobs:
           R_ASSEMBLE: ${{ steps.assemble.outcome }}
           R_ST_LINT: ${{ steps.st_lint.outcome }}
           R_IEC_CHECKER: ${{ steps.iec_checker.outcome }}
+          R_S7CONV: ${{ steps.s7conv.outcome }}
         run: |
           status() {
             case "$1" in
@@ -142,6 +158,7 @@ jobs:
             echo "| assemble | $(status "$R_ASSEMBLE") |"
             echo "| st_lint --strict | $(status "$R_ST_LINT") |"
             echo "| iec_checker $IEC_CHECKER_VERSION | $(status "$R_IEC_CHECKER") |"
+            echo "| s7conv: корпус SCL (build-corpus --check) | $(status "$R_S7CONV") |"
             echo ""
             echo "Отчёты — в артефакте \`build-reports\`. Находки iec_checker разбираются в \`docs/STATIC_ANALYSIS.md\`."
             if [ -f build/iec_checker.md ]; then
@@ -178,7 +195,7 @@ jobs:
 
       - name: Статанализ (iec_checker nightly)
         id: nightly
-        run: python tools/check/run_iec_checker.py --docker "$IEC_CHECKER_IMAGE" --tests
+        run: python tools_project/iec_checker_gate.py --docker "$IEC_CHECKER_IMAGE"
 
       - name: Сводка
         if: ${{ !cancelled() }}
@@ -234,20 +251,34 @@ jobs:
           echo "RUSTY_STDLIB_INCLUDE=$dir/stdlib/include" >> "$GITHUB_ENV"
 
       # run_rusty.py сам собирает вариант rusty (src/ и tests/ с прокладками tools/check/rusty_shims/);
-      # компилятор и stdlib — из переменных RUSTY_PLC и RUSTY_STDLIB_INCLUDE
+      # компилятор и stdlib — из переменных RUSTY_PLC и RUSTY_STDLIB_INCLUDE; расхождения диалектов —
+      # tools/check/rusty_exclude.txt (весь src/ и tests/ с доп. прокладками проверяет pytest)
       - name: RuSTy plc --check
         id: rusty
         run: python tools/check/run_rusty.py
+
+      # ST, сгенерированный s7conv из фикстур без неподдерживаемых конструкций (с F_NormX/F_ScaleX)
+      - name: RuSTy plc --check — результат s7conv
+        id: rusty_s7conv
+        if: ${{ !cancelled() }}
+        run: |
+          python -m s7conv convert s7conv/tests/fixtures/motor.scl s7conv/tests/fixtures/analog.scl \
+            s7conv/tests/fixtures/main.scl s7conv/tests/fixtures/tags.csv --out build/s7conv_fixtures --emit-support -q
+          # исключения репозитория (rusty_exclude.txt) к результату по фикстурам не относятся
+          : > build/no_exclude.txt
+          python tools/check/run_rusty.py --root build/s7conv_fixtures --no-tests --exclude-file build/no_exclude.txt \
+            --log build/rusty_s7conv.log --json build/rusty_s7conv.json
 
       - name: Сводка
         if: ${{ !cancelled() }}
         env:
           R_RUSTY: ${{ steps.rusty.outcome }}
+          R_RUSTY_S7CONV: ${{ steps.rusty_s7conv.outcome }}
         run: |
           {
             echo "## RuSTy $RUSTY_VERSION (необязательная проверка)"
             echo ""
-            echo "Итог \`plc --check\`: ${R_RUSTY:-нет данных}"
+            echo "Итог \`plc --check\`: ${R_RUSTY:-нет данных}; ST от s7conv: ${R_RUSTY_S7CONV:-нет данных}"
             echo ""
             if [ -f build/rusty.log ]; then
               echo '```text'
