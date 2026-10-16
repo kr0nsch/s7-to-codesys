@@ -45,6 +45,7 @@ SCL — [GRAMMAR.md](GRAMMAR.md); итог по корпусу — [CONVERSION_R
 | `VAR_TEMP` в FC | `VAR` | авто (у функции CODESYS временные — обычные `VAR`) |
 | `VAR CONSTANT`, классический `CONST ... END_CONST` | `VAR CONSTANT` | авто |
 | `VAR_INPUT` OB (стартовая информация: `Initial_Call`, `Remanence`, `LostRetentive`, ...) | `VAR` | проверка (`ob.start_info`): CODESYS их не заполняет |
+| `VAR_INPUT` событийного OB (OB82, OB40 и др.: `IO_State`, `Channel`, ...) | `VAR_INPUT` | проверка (`ob.start_info`): CODESYS их не заполняет, задачу по событию создаёт инженер (`ob.event`), и его обработчик передаёт стартовую информацию параметрами вызова: `PRG_Diagnostic_error_interrupt(IO_State := ..., Channel := ...)`. В `VAR` программы извне записать нельзя — **проверено в CODESYS 3.5.17.30**: `PRG_X.Channel := 3;` даёт ошибку C0037 «не является входом». Системные типы (`HW_ANY` у `LADDR`) не переносятся (`type.unsupported`) |
 | `Initial_Call` OB | эмуляция: `Initial_Call := NOT xS7convFirstCycleDone; xS7convFirstCycleDone := TRUE;` в начале тела | проверка (`ob.initial_call`) |
 | атрибуты `InstructionName`, `LibVersion`, `S7_SetPoint` | опускаются | авто |
 | `ExternalAccessible/Visible/Writable := 'False'` | опускаются | проверка (`decl.hmi_access`): видимость для HMI/OPC UA в CODESYS — символьная конфигурация |
@@ -87,7 +88,7 @@ SCL — [GRAMMAR.md](GRAMMAR.md); итог по корпусу — [CONVERSION_R
 | `TONR_TIME` | — | TODO | таймера с накоплением в Standard нет |
 | `IEC_TIMER` (переменная или DB) | `TON`/`TOF`/`TP` по вызову `#t.TON(...)` / `"DB".TON(...)` | авто/проверка (`fb.generic`) | вызов `.TON(...)` → вызов экземпляра |
 | `R_TRIG` | `R_TRIG` | авто | |
-| `F_TRIG` | `F_TRIG`; с `--f-trig s7compat` — `FB_S7FTrig` (S7Compat) | проверка (`fb.f_trig`); с `s7compat` — авто (`fb.f_trig_s7compat`) | в S7 память фронта после запуска — FALSE, поэтому на первом вызове с `CLK = FALSE` спада нет. Даёт ли `F_TRIG` CODESYS Standard ложный спад на первом вызове (зависит от начального значения его памяти), не проверено — сверить с источником; первая строка сценария `FB_PumpAlternation/RotateOnStop` проверяет это в CODESYS. Корпус собирается со Standard `F_TRIG`, чтобы тест это показал; `FB_S7FTrig` готов на случай расхождения |
+| `F_TRIG` | `F_TRIG`; с `--f-trig s7compat` — `FB_S7FTrig` (S7Compat) | проверка (`fb.f_trig`); с `s7compat` — авто (`fb.f_trig_s7compat`) | в S7 память фронта после запуска — FALSE, поэтому на первом вызове с `CLK = FALSE` спада нет. **Проверено в CODESYS 3.5.17.30 (Standard 3.5.17.0): `F_TRIG` Standard ведёт себя так же** — тест `FB_S7FTrig_Test.StandardFTrigMatchesS7` (Standard.F_TRIG и `FB_S7FTrig` на одних входах с первого вызова) и строка 1 сценария `FB_PumpAlternation/RotateOnStop` проходят (TEST_REPORT.md). Корпус собирается со Standard `F_TRIG`; пометка остаётся, потому что поведение зависит от версии библиотеки: на другой версии Standard повторить тест, при падении — `--f-trig s7compat` (`FB_S7FTrig`) |
 | `CTU`, `CTD`, `CTUD`, `CTU_INT`, `CTU_DINT`, ... | `CTU`, `CTD`, `CTUD` | проверка (`fb.counter`) | вход `R` → `RESET`, `LD` → `LOAD`; в CODESYS Standard `PV` и `CV` — WORD (0…65535), в S7 — тип счётчика (сверить с источником). Аргумент `PV` и присваивание `CV` переменной другого целого типа получают явное преобразование: `PV := INT_TO_WORD(x)`, `n := WORD_TO_INT(ctu.CV)` (`conv.instruction_type`) — без него CODESYS предупреждает о неявной смене знака |
 | `SR`, `RS` | `SR`, `RS` | проверка (`fb.flipflop`) | `SR`: `S`/`R1`/`Q` → `SET1`/`RESET`/`Q1`; `RS`: `R`/`S1`/`Q` → `RESET1`/`SET`/`Q1` |
 | `IEC_COUNTER` и варианты | `CTU`/`CTD`/`CTUD` по вызову | проверка | |
@@ -239,7 +240,7 @@ CODESYS Control Win — сверить с источником (ожидаетс
 | S7 | CODESYS | Статус |
 |---|---|---|
 | `VAR RETAIN` в глобальном DB | `VAR_GLOBAL RETAIN` | авто (`db.retain`) |
-| то же с `--retain persistent` | `VAR_GLOBAL PERSISTENT RETAIN` | проверка (`db.persistent`): постоянные переменные CODESYS объявляются в объекте Persistent Variables — сверить с источником |
+| то же с `--retain persistent` | `VAR_GLOBAL PERSISTENT RETAIN` | проверка (`db.persistent`): постоянные переменные CODESYS хранятся по списку объекта Persistent Variables. **Проверено в CODESYS 3.5.17.30:** `VAR_GLOBAL PERSISTENT RETAIN` в обычном GVL собирается, но с предупреждением C0244 «Приложение не содержит VAR_PERSISTENT-списка для ввода экземпляра пути для переменной …» — объект Persistent Variables создаётся вручную ([MANUAL_STEPS.md](MANUAL_STEPS.md), 4.2), сохранность при загрузке на ПЛК210 — сверить на стенде |
 | DB с `NON_RETAIN`, `VAR NON_RETAIN`, оптимизированный DB без `RETAIN` | `VAR_GLOBAL` | авто |
 | стандартный DB (`S7_Optimized_Access := 'FALSE'`) без `NON_RETAIN` | `VAR_GLOBAL RETAIN` | проверка (`db.retain_standard`) |
 | экземплярный DB | переменная в `GVL_InstanceDBs` (без RETAIN); `VAR RETAIN` самого ФБ остаётся в ФБ | авто |
@@ -264,7 +265,7 @@ CODESYS Control Win — сверить с источником (ожидаетс
 | OB1 «Main» (Program cycle; также OB ≥ 123 с «cycle» в имени) | PROGRAM в `MainTask`: циклическая 10 мс (`--main-task cyclic`, `--main-interval`), приоритет 15 | авто; номер не найден — проверка (`ob.main`) |
 | OB30…OB38, OB с «cyclic» в имени | PROGRAM в задаче `Task_OB<n>` (или `Task_<период>ms`) с периодом OB | авто, если период из `--ob-config` или из имени/заголовка («100ms», «0,5 s»); период по умолчанию — проверка (`ob.cyclic`) |
 | OB100 «Startup» | PROGRAM, первым в `MainTask`; тело выполняется один раз по флагу `xS7convStartupDone` | проверка (`ob.startup`) |
-| OB10…OB17, OB20…OB23, OB40…OB47, OB8x, OB121/122 и прочие | PROGRAM без задачи | TODO (`ob.event`): задачу по событию создать вручную |
+| OB10…OB17, OB20…OB23, OB40…OB47, OB8x, OB121/122 и прочие | PROGRAM без задачи; стартовая информация — `VAR_INPUT` (её передаёт обработчик события) | TODO (`ob.event`): задачу по событию или вызов из обработчика создать вручную ([MANUAL_STEPS.md](MANUAL_STEPS.md), 4.1) |
 
 Номер OB во внешнем источнике TIA не выгружается. Порядок поиска: `--ob-config` (или `ob_config.json`
 во входном каталоге), `OB<n>` в имени или заголовке, стандартные имена TIA («Main» → 1, «Startup» → 100,
@@ -378,7 +379,8 @@ TIA Portal Information System (F1 на инструкции) для своей �
 Конвертер помечает то, что видно по тексту одной конструкции. Расхождения ниже зависят от данных во
 время работы или от настроек проекта, и пометка на каждой арифметической операции утопила бы остальные.
 Их закрывают решением на уровне проекта (чек-лист [methodology.md](methodology.md), раздел 4) и тестами.
-Всё в этой таблице — по сведениям автора, **сверить с источником** для своей версии TIA Portal и CODESYS.
+Всё в этой таблице, кроме отмеченного «проверено», — по сведениям автора, **сверить с источником** для своей
+версии TIA Portal и CODESYS.
 
 | Что | S7 | CODESYS | Что делать |
 |---|---|---|---|
@@ -386,7 +388,7 @@ TIA Portal Information System (F1 на инструкции) для своей �
 | Индекс массива вне границ | ошибка программирования: OB121 или STOP CPU (S7-1500) | без проверки — запись в чужую память; проверка — функция неявной проверки `CheckBounds` | подключить `CheckBounds` на время наладки или ограничить индексы явно |
 | Деление REAL на 0 | результат ±INF/NaN, ENO = FALSE | ±INF/NaN или исключение FPU — зависит от платформы; функции неявной проверки `CheckDivReal`/`CheckDivLReal` | делители проверять явно (как `FB_PIController` корпуса) |
 | Значение счётчика FOR после цикла, вычисление конечного значения и шага | переносится дословно | то же | не использовать счётчик после цикла и не менять границы внутри; конечное значение, равное максимуму типа счётчика, в CODESYS даёт бесконечный цикл (справка CODESYS, FOR) |
-| Неявные преобразования типов | без проверки IEC SCL допускает, например, Int ↔ Word, DInt → Int | часть — с предупреждением (смена знака, потеря данных), BOOL ↔ число и TIME ↔ число — ошибка компиляции (сверить) | разобрать предупреждения сборки CODESYS, ошибки — явными `*_TO_*` |
+| Неявные преобразования типов | без проверки IEC SCL допускает, например, Int ↔ Word, DInt → Int | проверено в 3.5.17.30: смена знака (INT → WORD) — предупреждение C0195, сужение (DINT → INT, REAL → INT) — ошибка C0032 (STATIC_ANALYSIS.md, «Компилятор CODESYS»); BOOL ↔ число и TIME ↔ число — ошибка компиляции (сверить) | разобрать предупреждения сборки CODESYS (в корпусе их 0), ошибки — явными `*_TO_*` |
 | Обновление выходов IEC-таймера | S7-1500 обновляет Q/ET и при обращении к ним вне вызова (сверить) | только при вызове | читать Q/ET сразу после вызова (так написан корпус) |
 
 ## Пометки MIGRATION-CHECK — сводка правил

@@ -120,8 +120,9 @@ scenario,cycle,t_ms,<столбцы данных>,boundary,comment
     `t - t_спада >= PT`; если IN вернулся раньше, Q не падал.
   - **R_TRIG**: `Q = CLK AND NOT M; M := CLK`, M в начале FALSE (на первом вызове с CLK = TRUE — фронт).
   - **F_TRIG**: `Q = NOT CLK AND M; M := CLK`, M в начале FALSE — **на первом вызове спада нет**
-    (так ведёт себя S7). Начальное состояние F_TRIG в CODESYS сверить: если отличается, первая строка
-    сценариев `FB_PumpAlternation` это покажет.
+    (так ведёт себя S7). F_TRIG CODESYS Standard 3.5.17.0 ведёт себя так же: первая строка сценария
+    `FB_PumpAlternation/RotateOnStop` и тест `StandardFTrigMatchesS7` проходят в Control Win
+    ([docs/TEST_REPORT.md](../docs/TEST_REPORT.md)).
   - Выходы таймера меняются только при вызове таймера.
 - Блоки без таймеров (`FB_AnalogIn`, `FB_PumpAlternation`): `t_ms = 100 · (cycle − 1)`, столбец
   информационный.

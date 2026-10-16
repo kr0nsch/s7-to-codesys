@@ -149,7 +149,7 @@ Standard CODESYS, `s7compat` — рукописные ФБ с семантико
 
 | Строка | Статус | Блок | Правило | Причина |
 |---:|---|---|---|---|
-| 54 | ! требует проверки | FB_BatchCounter | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard ложный спад на первом вызове (начальное значение памяти) — сверить с источником или тестом |
+| 54 | ! требует проверки | FB_BatchCounter | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 — тоже (тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот тест |
 | 55 | ! требует проверки | FB_BatchCounter | `fb.counter` | счётчик S7 → CTU (CODESYS Standard): PV и CV — WORD (0…65535), в S7 — тип счётчика; проверить диапазон |
 | 90 | ! требует проверки | FB_BatchCounter | `expr.slice_read` | срез .%W0 → DWORD_TO_WORD(SHR(...)): нумерация срезов S7 от младшей части — сверить с источником |
 | 91 | ! требует проверки | FB_BatchCounter | `expr.slice_read` | срез .%B1 → WORD_TO_BYTE(SHR(...)): нумерация срезов S7 от младшей части — сверить с источником |
@@ -164,7 +164,7 @@ Standard CODESYS, `s7compat` — рукописные ФБ с семантико
 |---:|---|---|---|---|
 | 37 | ! требует проверки | FB_Debounce | `type.s5time` | S5Time → TIME: в S7 S5TIME — BCD с шагом 10 мс…10 с, диапазон до 2h46m30s |
 | 38 | ! требует проверки | FB_Debounce | `type.s5time` | S5Time → TIME: в S7 S5TIME — BCD с шагом 10 мс…10 с, диапазон до 2h46m30s |
-| 52 | ! требует проверки | FB_Debounce | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard ложный спад на первом вызове (начальное значение памяти) — сверить с источником или тестом |
+| 52 | ! требует проверки | FB_Debounce | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 — тоже (тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот тест |
 | 64 | ! требует проверки | FB_Debounce | `conv.s5time` | S5TI_TIM: S5Time уже сопоставлен с TIME — преобразование убрано |
 | 65 | ! требует проверки | FB_Debounce | `conv.s5time` | S5TI_TIM: S5Time уже сопоставлен с TIME — преобразование убрано |
 
@@ -246,7 +246,7 @@ Standard CODESYS, `s7compat` — рукописные ФБ с семантико
 
 | Строка | Статус | Блок | Правило | Причина |
 |---:|---|---|---|---|
-| 65 | ! требует проверки | FB_PumpAlternation | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard ложный спад на первом вызове (начальное значение памяти) — сверить с источником или тестом |
+| 65 | ! требует проверки | FB_PumpAlternation | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 — тоже (тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот тест |
 
 ### `samples/scl/FB_Ramp.scl`
 
@@ -282,8 +282,8 @@ Standard CODESYS, `s7compat` — рукописные ФБ с семантико
 
 | Строка | Статус | Блок | Правило | Причина |
 |---:|---|---|---|---|
-| 74 | ! требует проверки | FB_Valve | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard ложный спад на первом вызове (начальное значение памяти) — сверить с источником или тестом |
-| 75 | ! требует проверки | FB_Valve | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard ложный спад на первом вызове (начальное значение памяти) — сверить с источником или тестом |
+| 74 | ! требует проверки | FB_Valve | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 — тоже (тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот тест |
+| 75 | ! требует проверки | FB_Valve | `fb.f_trig` | F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 — тоже (тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот тест |
 
 ### `samples/scl/FC_Statistics.scl`
 
@@ -333,7 +333,7 @@ Standard CODESYS, `s7compat` — рукописные ФБ с семантико
 | 43 | ! требует проверки | Startup | `name.renamed` | имя «ret» переименовано в «ret_» (ключевое слово CODESYS или повтор) |
 | 62 | ✕ не поддерживается | Startup | `func.unsupported` | WR_SYS_T: нет прямого аналога в CODESYS Standard |
 | 67 | ✕ не поддерживается | Diagnostic error interrupt | `ob.event` | OB82: событийный OB — задача по событию не создаётся, настроить вручную |
-| 71 | ! требует проверки | Diagnostic error interrupt | `ob.start_info` | входы OB (стартовая информация S7) объявлены как VAR — CODESYS их не заполняет |
+| 71 | ! требует проверки | Diagnostic error interrupt | `ob.start_info` | входы событийного OB (стартовая информация S7) оставлены VAR_INPUT: CODESYS их не заполняет — их передаёт вызов из обработчика события |
 | 73 | ✕ не поддерживается | Diagnostic error interrupt | `type.unsupported` | системный тип S7 HW_ANY не поддерживается |
 | 81 | ✕ не поддерживается | Diagnostic error interrupt | `decl.dropped_use` | использует «LADDR», объявление которой не перенесено (системный тип S7 HW_ANY не поддерживается) |
 
