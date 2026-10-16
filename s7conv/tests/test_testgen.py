@@ -211,6 +211,31 @@ def test_generated_suite_text(conv: ConvertFn) -> None:
     assert suite.asserts == 4 and suite.tests == 1 and suite.rows == 2
 
 
+def test_suite_over_counit_limits_is_rejected(conv: ConvertFn, monkeypatch: pytest.MonkeyPatch) -> None:
+    """coUnit 1.2.0.0 не проверяет свои лимиты (запись за границы массивов) — генератор не выпускает набор,
+    который к ним подходит: проверок больше бюджета или тестов больше MaxNumberOfTestsForEachTestSuite."""
+    result = conv(fb("#out := #go;", DECLS)).result
+    rows = "".join(f"Run,{i},{100 * (i - 1)},TRUE,TRUE,FALSE,\n" for i in range(1, 4))
+    sf = TG.read_scenarios(
+        "scenario,cycle,t_ms,in.go:BOOL,out.out:BOOL,boundary,comment\n" + rows, "scenarios/FB_T.csv"
+    )
+    assert TG.generate_suite(sf, result).asserts == 3
+    monkeypatch.setattr(TG, "COUNIT_ASSERTS_BUDGET", 2)
+    with pytest.raises(TG.ScenarioError, match=r"проверок 3 .*разделите"):
+        TG.generate_suite(sf, result)
+    monkeypatch.setattr(TG, "COUNIT_ASSERTS_BUDGET", 900)
+    monkeypatch.setattr(TG, "COUNIT_MAX_TESTS_PER_SUITE", 0)
+    with pytest.raises(TG.ScenarioError, match=r"сценариев 1 .*разделите"):
+        TG.generate_suite(sf, result)
+
+
+def test_corpus_suites_fit_counit_limits(corpus_tests: TG.TestsBuild) -> None:
+    assert TG.COUNIT_ASSERTS_BUDGET <= 900 < TG.COUNIT_MAX_ASSERTS_PER_SUITE == 1000
+    assert TG.COUNIT_MAX_TESTS_PER_SUITE == 100
+    for suite in corpus_tests.suites:
+        assert suite.asserts <= TG.COUNIT_ASSERTS_BUDGET and suite.tests <= TG.COUNIT_MAX_TESTS_PER_SUITE
+
+
 def test_long_assert_lines_are_wrapped(conv: ConvertFn) -> None:
     result = conv(fb("#out := #go;", DECLS)).result
     sf = TG.read_scenarios(

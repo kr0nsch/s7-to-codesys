@@ -62,9 +62,9 @@ VAR
     avail : ARRAY[1..3] OF BOOL;  // Готовность насосов
     runReq : ARRAY[1..3] OF BOOL;  // Назначение насосов
     edgeAlternate : R_TRIG;
-    // MIGRATION-CHECK: F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard
-    //                  ложный спад на первом вызове (начальное значение памяти) — сверить с источником или тестом
-    //                  (стр. 65)
+    // MIGRATION-CHECK: F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 —
+    //                  тоже (тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот
+    //                  тест (стр. 65)
     edgeStop : F_TRIG;
 END_VAR
 VAR_TEMP

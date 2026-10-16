@@ -51,9 +51,9 @@ VAR_OUTPUT
 END_VAR
 VAR
     pulseCounter : INT;  // Импульсы текущей дозы
-    // MIGRATION-CHECK: F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard
-    //                  ложный спад на первом вызове (начальное значение памяти) — сверить с источником или тестом
-    //                  (стр. 54)
+    // MIGRATION-CHECK: F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 —
+    //                  тоже (тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот
+    //                  тест (стр. 54)
     edgePulse : F_TRIG;
     // MIGRATION-CHECK: счётчик S7 → CTU (CODESYS Standard): PV и CV — WORD (0…65535), в S7 — тип счётчика;
     //                  проверить диапазон (стр. 55)

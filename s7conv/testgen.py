@@ -443,10 +443,31 @@ def generate_suite(sf: ScenarioFile, result: ConversionResult) -> SuiteBuild:
         body += ["", f"{IND}{CLOCK}.xSimulation := FALSE;", "END_IF", "coUnit.TEST_FINISHED();"]
         obj.methods.append(L.StMethod(scenario, "\n".join(mdecl) + "\n", "\n".join(body) + "\n"))
     _check_widths(obj)
+    _check_counit_limits(sf.path, obj.name, asserts, len(scenarios))
     return SuiteBuild(obj, asserts, len(sf.rows), len(scenarios))
 
 
 MAX_LINE = 120  # tools/check/st_lint.toml, max_line_length
+
+# Лимиты coUnit 1.2.0.0 (GVL_Param_coUnit, значения по умолчанию): библиотека их не проверяет — лишние проверки
+# и тесты пишутся за границы массивов набора. Генератор держит запас: набор с проверками больше бюджета или
+# с тестами больше лимита не выпускается — CSV нужно разделить (один набор на файл CSV).
+COUNIT_MAX_ASSERTS_PER_SUITE = 1000  # MaxNumberOfAssertsForEachTestSuite
+COUNIT_ASSERTS_BUDGET = 900  # запас под проверки, которые добавит ручная правка набора
+COUNIT_MAX_TESTS_PER_SUITE = 100  # MaxNumberOfTestsForEachTestSuite
+
+
+def _check_counit_limits(path: str, suite: str, asserts: int, tests: int) -> None:
+    if asserts > COUNIT_ASSERTS_BUDGET:
+        raise ScenarioError(
+            f"{path}: в наборе {suite} проверок {asserts} — больше {COUNIT_ASSERTS_BUDGET} (лимит coUnit 1.2.0.0 "
+            f"{COUNIT_MAX_ASSERTS_PER_SUITE} на набор не проверяется библиотекой); разделите сценарии на несколько CSV"
+        )
+    if tests > COUNIT_MAX_TESTS_PER_SUITE:
+        raise ScenarioError(
+            f"{path}: в наборе {suite} сценариев {tests} — больше лимита coUnit {COUNIT_MAX_TESTS_PER_SUITE} тестов "
+            "на набор; разделите сценарии на несколько CSV"
+        )
 
 
 def _check_widths(obj: L.StObject) -> None:

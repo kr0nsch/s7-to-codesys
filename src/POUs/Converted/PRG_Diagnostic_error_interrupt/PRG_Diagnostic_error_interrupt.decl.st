@@ -5,9 +5,10 @@
 // Источник:   samples/scl/OB_Startup.scl, строки 67–85, ORGANIZATION_BLOCK "Diagnostic error interrupt"
 // Сгенерировано s7conv: пометки MIGRATION-CHECK и MIGRATION-TODO требуют ручного разбора.
 // MIGRATION-TODO: OB82: событийный OB — задача по событию не создаётся, настроить вручную (стр. 67)
-// MIGRATION-CHECK: входы OB (стартовая информация S7) объявлены как VAR — CODESYS их не заполняет (стр. 71)
+// MIGRATION-CHECK: входы событийного OB (стартовая информация S7) оставлены VAR_INPUT: CODESYS их не заполняет — их
+//                  передаёт вызов из обработчика события (стр. 71)
 PROGRAM PRG_Diagnostic_error_interrupt
-VAR
+VAR_INPUT
     IO_State : WORD;  // Состояние ввода-вывода объекта
     // MIGRATION-TODO: системный тип S7 HW_ANY не поддерживается (стр. 73)
     // LADDR : HW_ANY;

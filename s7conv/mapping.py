@@ -138,8 +138,8 @@ FB_TYPES: dict[str, FbRule] = {
     "F_TRIG": FbRule(
         "F_TRIG",
         "fb.f_trig",
-        "F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard ложный спад "
-        "на первом вызове (начальное значение памяти) — сверить с источником или тестом",
+        "F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 — тоже "
+        "(тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот тест",
     ),
     "SR": FbRule(
         "SR",

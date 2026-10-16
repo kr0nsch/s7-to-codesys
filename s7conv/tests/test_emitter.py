@@ -466,6 +466,8 @@ def test_retain_as_persistent_option(conv: ConvertFn) -> None:
     r = conv(UDT_TEXT, DB_TEXT, options=Options(retain_mode="persistent"))
     assert "VAR_GLOBAL PERSISTENT RETAIN" in r.decl("DB_Plant")
     assert "db.persistent" in r.rules("check")
+    # проверено в CODESYS 3.5.17.30: PERSISTENT в обычном GVL без объекта Persistent Variables — C0244
+    assert "C0244" in r.decl("DB_Plant")
 
 
 def test_standard_db_without_non_retain_is_retain(conv: ConvertFn) -> None:
@@ -655,6 +657,43 @@ def test_obs_become_programs_and_tasks(conv: ConvertFn) -> None:
         },
     ]
     assert {"ob.start_info", "ob.initial_call", "ob.startup"} <= r.rules("check")
+    assert "ob.event" in r.rules("todo")
+
+
+EVENT_OB = """ORGANIZATION_BLOCK "Diagnostic error interrupt"
+   VAR_INPUT
+      IO_State : Word;
+      Channel : UInt;
+   END_VAR
+BEGIN
+   "DB_H".x := UINT_TO_INT(#Channel);
+END_ORGANIZATION_BLOCK
+ORGANIZATION_BLOCK "Cyclic interrupt"
+   VAR_INPUT
+      Event_Count : Int;
+   END_VAR
+BEGIN
+   "DB_H".x := #Event_Count;
+END_ORGANIZATION_BLOCK
+DATA_BLOCK "DB_H"
+   VAR
+      x : Int;
+   END_VAR
+BEGIN
+END_DATA_BLOCK
+"""
+
+
+def test_event_ob_start_info_stays_input(conv: ConvertFn) -> None:
+    """Событийный OB вызывает рукописный обработчик события и передаёт стартовую информацию параметрами:
+    в VAR программы извне записать нельзя (CODESYS 3.5.17.30: C0037). У циклического OB входы — VAR."""
+    r = conv(EVENT_OB)
+    event = r.decl("PRG_Diagnostic_error_interrupt")
+    assert "VAR_INPUT\n    IO_State : WORD;" in event and "Channel : UINT;" in event
+    assert "оставлены VAR_INPUT" in event
+    cyclic = r.decl("PRG_Cyclic_interrupt")
+    assert "VAR_INPUT" not in cyclic and "VAR\n    Event_Count : INT;" in cyclic
+    assert [n.rule for n in r.notes if n.rule == "ob.start_info"] == ["ob.start_info", "ob.start_info"]
     assert "ob.event" in r.rules("todo")
 
 

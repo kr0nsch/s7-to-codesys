@@ -6,8 +6,9 @@
 задана явно), а окончательный результат — прогон в CODESYS Control Win (docs/TEST_REPORT.md).
 
 Что показывает: (1) сгенерированные тесты и сконвертированный код согласованы со сценариями при
-семантике F_TRIG S7; (2) если F_TRIG CODESYS Standard даёт ложный спад на первом вызове, упадёт ровно
-один тест — RotateOnStop; (3) тесты не пустые: искажённое ожидание или искажённая логика блока ловятся.
+семантике F_TRIG S7; (2) если F_TRIG CODESYS Standard даёт ложный спад на первом вызове, из сценариев упадёт
+ровно один тест — RotateOnStop, из рукописных — StandardFTrigMatchesS7 (в CODESYS 3.5.17.30 оба проходят:
+ложного спада нет); (3) тесты не пустые: искажённое ожидание или искажённая логика блока ловятся.
 """
 
 from __future__ import annotations
@@ -67,6 +68,15 @@ def test_f_trig_with_false_edge_on_first_call_breaks_only_rotate_on_stop(objects
     assert failed == {"FB_PumpAlternation_ScenarioTest": ["RotateOnStop"]}
     first = results["FB_PumpAlternation_ScenarioTest"].failures["RotateOnStop"][0]
     assert first.startswith("RotateOnStop#1 leadPump: Expected 1, Actual 2")
+
+
+def test_f_trig_characterization_test_tells_the_hypotheses_apart(objects: list[L.StObject]) -> None:
+    """Рукописный StandardFTrigMatchesS7 проверяет Standard.F_TRIG напрямую: проходит при семантике S7
+    (так и вышло в CODESYS 3.5.17.30, docs/TEST_REPORT.md) и падает при ложном спаде на первом вызове."""
+    assert Sim(objects, f_trig=F_TRIG_S7).run_suite("FB_S7FTrig_Test").failures == {}
+    out = Sim(objects, f_trig=F_TRIG_IEC_M_FALSE).run_suite("FB_S7FTrig_Test")
+    assert sorted(out.failures) == ["StandardFTrigMatchesS7"]
+    assert out.failures["StandardFTrigMatchesS7"][0].startswith("Standard F_TRIG, first call CLK=FALSE: no edge")
 
 
 @pytest.mark.parametrize("suite", COMPAT_SUITES)

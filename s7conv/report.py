@@ -410,9 +410,11 @@ code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-siz
 .card .hint { color: var(--muted); font-size: 12.5px; margin: 0 0 16px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
-  padding: 14px 16px; }
-.tile .label { color: var(--ink-2); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
-.tile .value { font-size: 28px; font-weight: 600; line-height: 1.15; margin-top: 4px; }
+  padding: 14px 16px; display: flex; flex-direction: column; }
+.tile .label { color: var(--ink-2); font-size: 12.5px; display: flex; align-items: flex-start; gap: 6px; }
+.tile .label .dot { margin-top: 4px; }
+/* значение и подпись прижаты к низу плитки: в ряду они на одной линии, даже если подпись плитки в две строки */
+.tile .value { font-size: 28px; font-weight: 600; line-height: 1.15; margin-top: auto; padding-top: 4px; }
 .tile .note { color: var(--muted); font-size: 12px; }
 .tile.hero .value { font-size: 40px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
@@ -465,7 +467,7 @@ summary .chev { color: var(--muted); transition: transform .15s; display: inline
 details[open] summary .chev { transform: rotate(90deg); }
 summary .counts { display: flex; gap: 14px; color: var(--ink-2); font-size: 12.5px;
   font-variant-numeric: tabular-nums; }
-summary .counts span { display: inline-flex; align-items: center; gap: 5px; }
+summary .counts > span { display: inline-flex; align-items: center; gap: 5px; min-width: 3.4em; }
 .blocks { color: var(--ink-2); font-size: 12.5px; margin: 0 0 10px; }
 .blocks code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
 .msg { overflow-wrap: anywhere; }

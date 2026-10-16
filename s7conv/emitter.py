@@ -958,8 +958,8 @@ class Emitter:
         if self.o.retain_mode == "persistent":
             self.check(
                 "db.persistent",
-                "PERSISTENT в обычном GVL: в CODESYS постоянные переменные объявляются в объекте "
-                "Persistent Variables — сверить с источником",
+                "PERSISTENT в обычном GVL: CODESYS 3.5.17 предупреждает C0244 (в приложении нет списка "
+                "VAR_PERSISTENT) — создать объект Persistent Variables и внести в него пути переменных",
             )
         return True
 
@@ -1158,8 +1158,8 @@ class Emitter:
         if retained and self.o.retain_mode == "persistent":
             self.check(
                 "db.persistent",
-                "PERSISTENT в обычном GVL: в CODESYS постоянные переменные объявляются в объекте "
-                "Persistent Variables — сверить с источником",
+                "PERSISTENT в обычном GVL: CODESYS 3.5.17 предупреждает C0244 (в приложении нет списка "
+                "VAR_PERSISTENT) — создать объект Persistent Variables и внести в него пути переменных",
             )
         head = self.header(sym, "Глобальный DB", self.frames[-1].notes)
         out = [*head, "{attribute 'qualified_only'}", "VAR_GLOBAL", *normal, "END_VAR"]
@@ -1176,6 +1176,7 @@ class Emitter:
         assert self.cur is not None
         blk = sym.block
         startup = False
+        event_ob = False
         if blk.kind == BLOCK_FB:
             keyword, pou_kind, what = f"FUNCTION_BLOCK {sym.st_name}", L.POU_FUNCTION_BLOCK, "Функциональный блок"
             self.hit("pou.fb")
@@ -1194,11 +1195,13 @@ class Emitter:
             self.hit("pou.fc")
         else:
             keyword, pou_kind, what = f"PROGRAM {sym.st_name}", L.POU_PROGRAM, "Программа (OB)"
-            startup = self.register_ob(sym)
+            ob_kind = self.register_ob(sym)
+            startup = ob_kind == T.STARTUP
+            event_ob = ob_kind == T.EVENT
             self.hit("pou.ob")
         decl_lines: list[str] = []
         for sec in blk.sections:
-            decl_lines.extend(self.section(sym, sec))
+            decl_lines.extend(self.section(sym, sec, event_ob=event_ob))
         initial_call = None
         if blk.kind == BLOCK_OB:
             var = self.cur.scope.get("initial_call")
@@ -1235,7 +1238,8 @@ class Emitter:
         decl = "\n".join([*self.header(sym, what, self.frames[-1].notes), keyword, *decl_lines])
         self.obj(L.KIND_POU, sym.st_name, decl, "\n".join(body), pou_kind)
 
-    def register_ob(self, sym: S.BlockSym) -> bool:
+    def register_ob(self, sym: S.BlockSym) -> str:
+        """Классифицирует OB (задача, номер, период) и возвращает его вид: tasks.MAIN, CYCLIC, STARTUP или EVENT."""
         assert self.cur is not None
         blk = sym.block
         info = T.ObInfo(name=blk.name, program=sym.st_name, file=self.cur.display, line=blk.span.line)
@@ -1257,7 +1261,6 @@ class Emitter:
                 "(в S7 OB100 выполняется при каждом STOP → RUN); задачи с более высоким приоритетом могут "
                 "выполниться раньше",
             )
-            return True
         elif info.kind == T.CYCLIC:
             msg = f"{number} → циклическая задача {info.interval_ms} мс ({info.interval_origin})"
             if info.notes:
@@ -1268,9 +1271,9 @@ class Emitter:
             if info.number is None:
                 self.check("ob.main", "номер OB не указан — принят OB1 по имени блока")
             self.hit("ob.main")
-        return False
+        return info.kind
 
-    def section(self, sym: S.BlockSym, sec: VarSection) -> list[str]:
+    def section(self, sym: S.BlockSym, sec: VarSection, event_ob: bool = False) -> list[str]:
         blk = sym.block
         kind = sec.kind
         mods = list(sec.modifiers)
@@ -1283,10 +1286,19 @@ class Emitter:
             kind = "VAR"
             self.hit("section.fc_temp")
         if blk.kind == BLOCK_OB and kind == "VAR_INPUT":
-            self.check(
-                "ob.start_info", "входы OB (стартовая информация S7) объявлены как VAR — CODESYS их не заполняет"
-            )
-            kind = "VAR"
+            if event_ob:
+                # Событийный OB вызывает рукописный обработчик события: стартовую информацию он передаёт
+                # параметрами вызова. В VAR программы извне записать нельзя (CODESYS 3.5.17: ошибка C0037).
+                self.check(
+                    "ob.start_info",
+                    "входы событийного OB (стартовая информация S7) оставлены VAR_INPUT: CODESYS их не заполняет — "
+                    "их передаёт вызов из обработчика события",
+                )
+            else:
+                self.check(
+                    "ob.start_info", "входы OB (стартовая информация S7) объявлены как VAR — CODESYS их не заполняет"
+                )
+                kind = "VAR"
         if blk.kind == BLOCK_FC and kind == "VAR" and "CONSTANT" not in mods:
             self.hit("section.fc_var")
         out_mods: list[str] = []

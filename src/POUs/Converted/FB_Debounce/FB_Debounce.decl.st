@@ -51,9 +51,9 @@ VAR
     tonOn : FB_S7Ton;
     tofOff : FB_S7Tof;
     edgeUp : R_TRIG;
-    // MIGRATION-CHECK: F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; даёт ли F_TRIG CODESYS Standard
-    //                  ложный спад на первом вызове (начальное значение памяти) — сверить с источником или тестом
-    //                  (стр. 52)
+    // MIGRATION-CHECK: F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 —
+    //                  тоже (тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот
+    //                  тест (стр. 52)
     edgeDown : F_TRIG;
 END_VAR
 VAR_TEMP

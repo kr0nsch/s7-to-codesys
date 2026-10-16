@@ -1,0 +1,17 @@
+coUnit.TEST('StandardFTrigMatchesS7');
+fbStandard(CLK := FALSE);
+fbCompat(CLK := FALSE);
+AssertFalse(Condition := fbStandard.Q, Message := 'Standard F_TRIG, first call CLK=FALSE: no edge');
+AssertEquals_BOOL(Expected := fbCompat.Q, Actual := fbStandard.Q, Message := 'call 1 CLK=FALSE: Standard = S7');
+fbStandard(CLK := TRUE);
+fbCompat(CLK := TRUE);
+AssertEquals_BOOL(Expected := fbCompat.Q, Actual := fbStandard.Q, Message := 'call 2 CLK=TRUE: Standard = S7');
+fbStandard(CLK := FALSE);
+fbCompat(CLK := FALSE);
+AssertTrue(Condition := fbStandard.Q, Message := 'Standard F_TRIG, TRUE->FALSE: edge');
+AssertEquals_BOOL(Expected := fbCompat.Q, Actual := fbStandard.Q, Message := 'call 3 CLK=FALSE: Standard = S7');
+fbStandard(CLK := FALSE);
+fbCompat(CLK := FALSE);
+AssertFalse(Condition := fbStandard.Q, Message := 'Standard F_TRIG, FALSE->FALSE: edge only once');
+AssertEquals_BOOL(Expected := fbCompat.Q, Actual := fbStandard.Q, Message := 'call 4 CLK=FALSE: Standard = S7');
+coUnit.TEST_FINISHED();
