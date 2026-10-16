@@ -92,8 +92,8 @@ reason = "Артефакт понижения: переменные набора
 [[allow]]
 id = "UnusedVariable"
 file = "tests/POUs/S7Compat/*/*.method.decl.st"
-match = "FBDUT"
-reason = "Ложное срабатывание iec_checker 0.4: экземпляр используется вызовом fbDut(...) и чтением выходов — это он не считает использованием"
+match = "FBDUT|FBSTANDARD|FBCOMPAT"
+reason = "Ложное срабатывание iec_checker 0.4: экземпляр используется вызовом (fbDut(...), fbStandard(...), fbCompat(...)) и чтением выходов — это он не считает использованием"
 
 [[allow]]
 id = "UnusedVariable"

@@ -4,17 +4,24 @@
 отличается от шаблона ровно так, как задумано и описано в docs/STATIC_ANALYSIS.md:
 
 - st_lint.toml = умолчания st_lint.py плюс исключения src/*/Converted/* для правил оформления;
-- tools/codesys/config.json: как у шаблона, кроме задач режима normal — они из OB корпуса;
+- tools/codesys/config.json: как у шаблона, кроме задач режима normal (они из OB корпуса) и ссылки на
+  библиотеку Standard (плейсхолдер в library.libraries — сконвертированный код использует TON, R_TRIG, CTU);
+- тесты шаблона, которые берут config.json репозитория за основу фикстур и рассчитаны на пустой
+  library.libraries, выполняются против config.json без ссылки на Standard (template_shaped_config);
 - статанализ iec_checker проходит через обёртку tools_project/iec_checker_gate.py.
 """
 
 from __future__ import annotations
 
 import copy
+import importlib
+import inspect
 import json
 import os
 import re
+import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -64,6 +71,95 @@ def test_codesys_config_is_template_config_with_corpus_tasks() -> None:
     assert data["modes"]["normal"]["tasks"] == C.config_tasks(built.result)
     main = data["modes"]["normal"]["tasks"][0]
     assert main["name"] == "MainTask" and main["pous"][-1] == "PRG_Main"
+    # единственное отличие ссылок на библиотеки от шаблона — Standard через плейсхолдер профиля
+    assert data["libraries"]["standard"] == {
+        "label": "Standard (плейсхолдер, разрешает профиль CODESYS)",
+        "title": "Standard",
+        "company": "System",
+        "version": "*",
+        "placeholder": "Standard",
+    }
+    assert data["library"]["libraries"] == ["standard"]
+    assert data["modes"]["normal"]["libraries"] == []
+
+
+def test_codesys_projects_reference_standard_and_counit(tmp_path: Path) -> None:
+    """Замена test_cds.py::test_mode_config_resolves_libraries: Standard нужен проекту приложения, тестам и
+    проверке всего пула объектов (cds.py library), coUnit — только тестовому проекту."""
+    from cdshost import cli
+
+    data = json.loads(CONFIG.read_text(encoding="utf-8"))
+    environ = {"USERPROFILE": str(tmp_path), "HOME": str(tmp_path), "LOCALAPPDATA": str(tmp_path)}
+    s = cli.Settings(data, tmp_path, cli.make_getenv(environ, registry=False))
+    assert [x["key"] for x in s.mode_config("normal")["libraries"]] == ["standard"]
+    assert [x["key"] for x in s.mode_config("test")["libraries"]] == ["counit", "standard"]
+    assert [x["key"] for x in s.other_libraries("normal")] == ["counit"]
+    assert s.other_libraries("test") == []
+    assert s.referenced_library_keys() == ["counit", "standard"]
+    assert [x["key"] for x in s.library_config()["libraries"]] == ["standard"]
+    standard = s.library_spec("standard")
+    assert standard["placeholder"] == "Standard" and standard["install_from"] is None
+
+
+# --- тесты шаблона, рассчитанные на config.json шаблона ------------------------------------------------
+
+TEMPLATE_TESTS_DIR = REPO_ROOT / "tools" / "tests"
+# Тесты шаблона берут config.json репозитория за основу фикстур и рассчитаны на пустой library.libraries:
+# сравнивают описания библиотек со списком ключей, ждут ровно одну ссылку (coUnit), а поддельный
+# репозиторий библиотек в тестах deps не знает Standard. Здесь они выполняются против config.json без
+# ссылки на Standard; в pyproject.toml они исключены (--deselect), обоснование — docs/STATIC_ANALYSIS.md.
+TEMPLATE_SHAPED_TESTS = [
+    ("test_cds", "test_mode_config_resolves_libraries"),
+    ("test_cds_library", "test_repo_library_config"),
+    ("test_cds_library", "test_doc_keys_are_not_libraries"),
+    ("test_cds_library", "test_import_step_carries_repository"),
+    ("test_cds_library", "test_cmd_deps_builds_missing"),
+    ("test_cds_library", "test_cmd_deps_rebuild_present"),
+    ("test_cds_library", "test_cmd_deps_library_without_its_dependencies"),
+]
+
+
+def _template_test_module(name: str) -> ModuleType:
+    if str(TEMPLATE_TESTS_DIR) not in sys.path:
+        sys.path.insert(0, str(TEMPLATE_TESTS_DIR))
+    return importlib.import_module(name)
+
+
+def template_shaped_config() -> dict[str, Any]:
+    """config.json репозитория без ссылки на Standard — в том виде, на который рассчитаны тесты шаблона."""
+    data: dict[str, Any] = json.loads(CONFIG.read_text(encoding="utf-8"))
+    del data["libraries"]["standard"]
+    data["library"]["libraries"] = []
+    return data
+
+
+@pytest.mark.parametrize(("module_name", "test_name"), TEMPLATE_SHAPED_TESTS)
+def test_template_tests_pass_with_template_shaped_config(
+    module_name: str,
+    test_name: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = _template_test_module(module_name)
+    config = tmp_path / "template-config.json"
+    config.write_text(json.dumps(template_shaped_config(), ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(module, "CONFIG", config)
+    if hasattr(module, "repo_library_raw"):  # test_cds_library читает раздел library с диска сам
+        monkeypatch.setattr(module, "repo_library_raw", lambda: template_shaped_config()["library"])
+    func = getattr(module, test_name)
+    work = tmp_path / "t"
+    work.mkdir()
+    fixtures: dict[str, Any] = {"tmp_path": work, "monkeypatch": monkeypatch, "capsys": capsys}
+    params = inspect.signature(func).parameters
+    assert set(params) <= set(fixtures), f"{test_name}: неизвестные фикстуры {set(params) - set(fixtures)}"
+    func(**{name: fixtures[name] for name in params})
+
+
+def test_template_shaped_tests_are_deselected_in_pyproject() -> None:
+    text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    for module_name, test_name in TEMPLATE_SHAPED_TESTS:
+        assert f"--deselect=tools/tests/{module_name}.py::{test_name}" in text, test_name
 
 
 # --- обёртка iec_checker ------------------------------------------------------------------------------

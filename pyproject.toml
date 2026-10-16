@@ -66,18 +66,28 @@ exclude = [
 # tools_project — проверки репозитория проекта (настройки линтера, config.json, обёртка iec_checker)
 testpaths = ["tools/tests", "scenarios/reference", "samples", "s7conv/tests", "tools_project"]
 pythonpath = [".", "tools", "tools/codesys", "tools/check", "scenarios/reference", "samples", "tools_project"]
-# Три теста шаблона проверяют, что настройки репозитория совпадают с настройками самого шаблона, —
-# в проекте они по замыслу шаблона отличаются (обоснование — docs/STATIC_ANALYSIS.md, раздел «Тесты
-# шаблона»). Их заменяют тесты tools_project/test_repo_config.py:
+# Десять тестов шаблона рассчитаны на настройки самого шаблона — в проекте они по замыслу шаблона
+# отличаются (обоснование — docs/STATIC_ANALYSIS.md, раздел «Тесты шаблона»). Их заменяют тесты
+# tools_project/test_repo_config.py:
 # - test_toml_matches_defaults: st_lint.toml снимает правила оформления с src/*/Converted/;
 # - test_integration_repository_sources: в сгенерированном коде есть конструкции CODESYS, которых нет в
 #   грамматике iec_checker 0.4 (ParserError шаблон не обосновывает) — проверка идёт через
 #   tools_project/iec_checker_gate.py;
-# - test_config_is_valid_json_without_user_paths: задачи режима normal — из OB корпуса (s7conv build-corpus).
+# - test_config_is_valid_json_without_user_paths: задачи режима normal — из OB корпуса (s7conv build-corpus);
+# - семь тестов test_cds.py и test_cds_library.py берут config.json за основу фикстур и рассчитаны на пустой
+#   library.libraries (в проекте там плейсхолдер Standard) — выполняются против config.json без этой
+#   ссылки (test_template_tests_pass_with_template_shaped_config).
 addopts = """-ra --strict-markers
     --deselect=tools/tests/test_st_lint.py::test_toml_matches_defaults
     --deselect=tools/tests/test_run_iec_checker.py::test_integration_repository_sources
-    --deselect=tools/tests/test_cds.py::test_config_is_valid_json_without_user_paths"""
+    --deselect=tools/tests/test_cds.py::test_config_is_valid_json_without_user_paths
+    --deselect=tools/tests/test_cds.py::test_mode_config_resolves_libraries
+    --deselect=tools/tests/test_cds_library.py::test_repo_library_config
+    --deselect=tools/tests/test_cds_library.py::test_doc_keys_are_not_libraries
+    --deselect=tools/tests/test_cds_library.py::test_import_step_carries_repository
+    --deselect=tools/tests/test_cds_library.py::test_cmd_deps_builds_missing
+    --deselect=tools/tests/test_cds_library.py::test_cmd_deps_rebuild_present
+    --deselect=tools/tests/test_cds_library.py::test_cmd_deps_library_without_its_dependencies"""
 markers = [
     "integration: проверки с настоящими plc (RuSTy) и iec_checker; пропускаются, если инструмента нет",
 ]

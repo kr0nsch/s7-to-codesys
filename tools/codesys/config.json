@@ -96,6 +96,13 @@
         "default": null
       }
     },
+    "standard": {
+      "label": "Standard (плейсхолдер, разрешает профиль CODESYS)",
+      "title": "Standard",
+      "company": "System",
+      "version": "*",
+      "placeholder": "Standard"
+    },
     "_doc": [
       "Библиотеки-зависимости; режимы (modes.*.libraries) и library.libraries ссылаются на них по ключу.",
       "Какая библиотека: title (точно), title_contains (подстрока), company (точно); без них — по namespace.",
@@ -209,7 +216,9 @@
     "exclude": [
       "PRG_Main"
     ],
-    "libraries": [],
+    "libraries": [
+      "standard"
+    ],
     "path": {
       "env": "CDS_LIBRARY",
       "default": "build/{name}.library"
