@@ -182,28 +182,25 @@ coUnit и блоков CODESYS Standard — из прокладок `tools/check
 
 ## Тесты шаблона, заменённые проектными
 
-Десять тестов шаблона рассчитаны на настройки самого шаблона; в проекте они по замыслу шаблона
-отличаются, поэтому тесты исключены в `pyproject.toml` (`--deselect`) и заменены тестами
+Два теста шаблона рассчитаны на настройки самого шаблона; в проекте они по замыслу шаблона
+отличаются, поэтому исключены в `pyproject.toml` (`--deselect`) и заменены тестами
 `tools_project/test_repo_config.py`:
 
 | Тест шаблона | Почему не подходит | Замена |
 |---|---|---|
 | `test_st_lint.py::test_toml_matches_defaults` | `st_lint.toml` снимает правила оформления с `src/*/Converted/*` | настройки = умолчания + ровно эти исключения; форматные правила в `Converted` включены |
 | `test_run_iec_checker.py::test_integration_repository_sources` | в `src/` есть конструкции CODESYS, которых нет в грамматике iec_checker 0.4, а шаблон `ParserError` не обосновывает | `test_repository_sources_pass_iec_checker_gate`: обёртка проходит, каждое обоснование и каждая запись о пробеле используются |
-| `test_cds.py::test_config_is_valid_json_without_user_paths` | задачи режима `normal` в `tools/codesys/config.json` — из OB корпуса (`MainTask` 10 мс с `PRG_Startup` и `PRG_Main`, `Task_OB30` 100 мс), а не задача шаблона | те же проверки config.json, задачи `normal` = задачам из `s7conv build-corpus`, ссылка на Standard |
-| `test_cds.py::test_mode_config_resolves_libraries` | ждёт, что у режима `normal` нет библиотек; в проекте плейсхолдер `Standard` в `library.libraries` (без него сконвертированный код не собирается: `Неизвестный тип: 'R_TRIG'`) | `test_codesys_projects_reference_standard_and_counit` и этот же тест шаблона против config.json без ссылки на Standard |
-| `test_cds_library.py`: `test_repo_library_config`, `test_doc_keys_are_not_libraries`, `test_import_step_carries_repository`, `test_cmd_deps_builds_missing`, `test_cmd_deps_rebuild_present`, `test_cmd_deps_library_without_its_dependencies` | берут config.json репозитория за основу фикстур и рассчитаны на пустой `library.libraries`: сравнивают описания библиотек со списком ключей, ждут одну ссылку (coUnit), а поддельный репозиторий библиотек тестов `deps` не знает Standard | `test_template_tests_pass_with_template_shaped_config`: те же функции шаблона выполняются против config.json без ссылки на Standard (логика `cds.py` проверяется полностью); `test_template_shaped_tests_are_deselected_in_pyproject` следит за списком исключений |
+
+Задачи режима `normal` из OB корпуса и ссылку на Standard проверяют
+`test_codesys_config_is_template_config_with_corpus_tasks` и
+`test_codesys_projects_reference_standard_and_counit`; тесты `tools/tests/` шаблона больше не зависят от
+`config.json` репозитория и выполняются полностью.
 
 ## Предложения в шаблон
 
-- `tools/tests/test_cds.py`, `tools/tests/test_cds_library.py`: тесты берут `tools/codesys/config.json`
-  репозитория за основу фикстур и ломаются, как только репозиторий добавляет плейсхолдер `Standard` в
-  `library.libraries`, — то, что советует `tools/README.md`. `test_repo_library_config` сравнивает список
-  описаний библиотек (`library_config()["libraries"]`) со списком ключей и проходит только при пустом
-  списке. Фикстуры стоит строить из собственного эталонного config.json тестов, а не из файла репозитория.
-- `tools/codesys/config.json` шаблона: ссылки на Standard нет, хотя без неё не собирается любой код с
-  TON/R_TRIG/CTU (первая сборка этого проекта — 89 ошибок). Плейсхолдер `standard` в `libraries` и
-  `library.libraries` по умолчанию сэкономил бы шаг каждому репозиторию.
+Учтены в шаблоне: ссылка на Standard по умолчанию, тесты `cds.py` на собственной копии конфигурации,
+полная проверка компиляции `cds.py check` (видит объекты без задачи, в том числе OB82). Остаются:
+
 - `tools/st_flavors.py`, понижение `iec-checker`: при замене массива в поле структуры типом элемента
   убирать и начальное значение `[...]` (сейчас — `ParserError` на допустимом коде).
 - Понижение для `a[i].b` и пустого оператора `;` — тогда пробелы разборщика в этом проекте исчезнут, а

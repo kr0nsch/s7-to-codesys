@@ -44,15 +44,15 @@ python -m s7conv build-corpus --check  # то же без записи: код 1
 
 ```bat
 python tools\codesys\cds.py build            :: src/ → build\s7-to-codesys.project, сборка
-python tools\codesys\cds.py library          :: проверка всех объектов src/ (и без задачи)
+python tools\codesys\cds.py check --tests     :: компиляция всех объектов src/ и tests/ (и без задачи)
 python tools\codesys\cds.py test             :: src/ + tests/ → тестовый проект, Control Win, coUnit
 python tools\codesys\cds.py roundtrip        :: импорт → экспорт → побайтное сравнение с src/, tests/
 python tools\codesys\cds.py report           :: итог прогона → docs/TEST_REPORT.md
 ```
 
 - `build` компилирует только объекты, достижимые из задач; `PRG_Diagnostic_error_interrupt` (OB82) задачи
-  не имеет, поэтому весь корпус проверяет `library` («Проверить все объекты пула»; файл
-  `build/s7-to-codesys.library` — побочный результат, не устанавливается).
+  не имеет, поэтому весь корпус и тесты проверяет `check --tests` («Проверить все объекты пула» во
+  временном проекте без устройства; на диск ничего не записывается).
 - Библиотека Standard подключается плейсхолдером `Standard` из `tools/codesys/config.json`
   (`library.libraries`); без неё сконвертированный код не собирается.
 
