@@ -51,7 +51,7 @@ exclude = ["tools/codesys/*.py"]
 [tool.mypy]
 python_version = "3.11"
 files = ["tools", "scenarios/reference", "samples", "s7conv", "tools_project"]
-mypy_path = ["tools", "tools/codesys", "tools/check", "scenarios/reference", "samples", "tools_project"]
+mypy_path = ["tools", "tools/codesys", "tools/check", "scenarios/reference", "samples"]
 strict = true
 warn_unreachable = true
 # Скрипты CODESYS (IronPython 2.7) используют глобальные объекты среды CODESYS (projects,
@@ -63,19 +63,10 @@ exclude = [
 
 [tool.pytest.ini_options]
 # scenarios/reference — эталонные модели сценариев; samples — проверка матрицы покрытия корпуса SCL;
-# tools_project — проверки репозитория проекта (настройки линтера, config.json, обёртка iec_checker)
+# tools_project — проверки настроек репозитория проекта (st_lint.toml, config.json)
 testpaths = ["tools/tests", "scenarios/reference", "samples", "s7conv/tests", "tools_project"]
-pythonpath = [".", "tools", "tools/codesys", "tools/check", "scenarios/reference", "samples", "tools_project"]
-# Два теста шаблона рассчитаны на настройки самого шаблона — в проекте они по замыслу отличаются
-# (обоснование — docs/STATIC_ANALYSIS.md, раздел «Тесты шаблона»). Их заменяют тесты
-# tools_project/test_repo_config.py:
-# - test_toml_matches_defaults: st_lint.toml снимает правила оформления с src/*/Converted/;
-# - test_integration_repository_sources: в сгенерированном коде есть конструкции CODESYS, которых нет в
-#   грамматике iec_checker 0.4 (ParserError шаблон не обосновывает) — проверка идёт через
-#   tools_project/iec_checker_gate.py.
-addopts = """-ra --strict-markers
-    --deselect=tools/tests/test_st_lint.py::test_toml_matches_defaults
-    --deselect=tools/tests/test_run_iec_checker.py::test_integration_repository_sources"""
+pythonpath = [".", "tools", "tools/codesys", "tools/check", "scenarios/reference", "samples"]
+addopts = "-ra --strict-markers"
 markers = [
     "integration: проверки с настоящими plc (RuSTy) и iec_checker; пропускаются, если инструмента нет",
 ]

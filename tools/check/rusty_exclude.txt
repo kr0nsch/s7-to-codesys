@@ -3,23 +3,16 @@
 # Пример:
 #   FB_ModbusMaster.st  # использует SysCom (CAA), объявлений для RuSTy нет
 #
-# Проект s7-to-codesys: исключены только расхождения диалектов RuSTy 1.0.6 и CODESYS (разбор —
-# docs/STATIC_ANALYSIS.md, раздел «RuSTy»). Все исключённые файлы всё равно проверяются RuSTy в pytest
-# (s7conv/tests/test_rusty_check.py::test_repository_sources_pass_rusty_with_shims): там к прокладкам
-# добавлено объявление TIME_TO_DINT, а у GVL_Markers сняты AT, так что компилятор видит весь src/ и tests/.
+# Проект s7-to-codesys: исключены только расхождения диалектов RuSTy 1.0.6 и CODESYS и то, что от них
+# зависит (разбор — docs/STATIC_ANALYSIS.md, раздел «RuSTy»); остальные 51 файл src/ и tests/ RuSTy
+# проверяет. GVL_Markers и PRG_Main RuSTy проверяет и в pytest
+# (s7conv/tests/test_rusty_check.py::test_repository_sources_pass_rusty_with_shims): там у GVL_Markers сняты
+# AT, и компилятор видит весь src/ и tests/, кроме DB_Telegram.
 #
-# 1. Нет TIME_TO_DINT в stdlib RuSTy (там TIME 64-битный, есть только TIME_TO_LINT); в CODESYS функция есть.
-FB_PIController.st  # TIME_TO_DINT(cycleTime), TIME_TO_DINT(ti) — из SCL; нет в stdlib RuSTy
-FB_Ramp.st  # TIME_TO_DINT(cycleTime) — из SCL; нет в stdlib RuSTy
-FB_Totalizer.st  # TIME_TO_DINT(cycleTime) — из SCL; нет в stdlib RuSTy
-# 2. RuSTy убирает имена GVL (qualified_only): одинаковое имя в двух GVL для него неоднозначно (E004).
+# 1. RuSTy убирает имена GVL (замена R3): одинаковое имя в двух GVL для него неоднозначно (E004).
 DB_Telegram.st  # heartbeat есть и в DB_Plant; в CODESYS это DB_Telegram.heartbeat и DB_Plant.heartbeat
-# 3. RuSTy считает %MW5 и %MD5 одной аппаратной переменной (E037, прерывает компиляцию); в CODESYS это
+# 2. RuSTy считает %MW5 и %MD5 одной аппаратной переменной (E037, прерывает компиляцию); в CODESYS это
 #    байты 10–11 и 20–23 (адресная модель — docs/MAPPING.md, «Адреса»).
 GVL_Markers.st  # HMI_StatusPT101 AT %MW5 и HMI_DosingPacked AT %MD5 (S7 %MW10 и %MD20)
-# 4. Зависят от исключённых выше объявлений (типы и переменные): без них RuSTy не разрешит ссылки.
-GVL_InstanceDBs.st  # экземпляры FB_PIController, FB_Ramp, FB_Totalizer
-PRG_Main.st  # GVL_InstanceDBs.*, GVL_Markers.*
-PRG_Cyclic_interrupt.st  # GVL_InstanceDBs.DB_FQ101 (FB_Totalizer), DB_RampSP (FB_Ramp), DB_PIC101 (FB_PIController)
-FB_Totalizer_ScenarioTest.st  # экземпляры FB_Totalizer
-PRG_Tests.st  # экземпляр FB_Totalizer_ScenarioTest
+# 3. Зависит от исключённого объявления: без GVL_Markers RuSTy не разрешит ссылки (E048).
+PRG_Main.st  # GVL_Markers.* (HMI_DosingPacked, HMI_StatusPT101, HMI_P101Running, Clock_1Hz)

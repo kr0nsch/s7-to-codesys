@@ -75,7 +75,7 @@ flowchart LR
 | Контур | Где | Что ловит |
 |---|---|---|
 | Python | CI и локально: ruff, mypy, pytest | разбор, эмиттер, генератор тестов, снапшот корпуса (`build-corpus` воспроизводит закоммиченное побайтно), RuSTy по всему `src/` и `tests/`; наборы coUnit, исполненные интерпретатором ST (`s7conv/tests/stsim.py`) против закоммиченного кода, и мутации логики |
-| ST без CODESYS | CI и локально: `st_lint`, `assemble.py`, iec_checker (через `tools_project/iec_checker_gate.py`), RuSTy | раскладка, оформление, синтаксис и типы, статанализ ([STATIC_ANALYSIS.md](STATIC_ANALYSIS.md)) |
+| ST без CODESYS | CI и локально: `st_lint`, `assemble.py`, iec_checker (`run_iec_checker.py --tests`), RuSTy | раскладка, оформление, синтаксис и типы, статанализ ([STATIC_ANALYSIS.md](STATIC_ANALYSIS.md)) |
 | CODESYS | Windows, CODESYS 3.5.17.30 и Control Win V3 | компиляция CODESYS, тесты coUnit ([TEST_REPORT.md](TEST_REPORT.md)) |
 
 ## Каталоги
@@ -87,6 +87,6 @@ flowchart LR
 | `scenarios/` | сценарии CSV, эталонные модели и их тесты (`scenarios/reference`) |
 | `src/`, `tests/` | раскладка ST: сгенерированное и рукописное (таблица выше) |
 | `tools/` | инструменты шаблона: `assemble.py`, `check/` (линтер, iec_checker, RuSTy), `codesys/` (CODESYS из консоли) |
-| `tools_project/` | проверки репозитория проекта: обёртка iec_checker, тесты настроек |
+| `tools_project/` | проверки настроек репозитория проекта (`st_lint.toml`, `config.json`) |
 | `docs/` | документация и отчёты |
 | `build/` | артефакты сборки и проверок, в git не хранится |

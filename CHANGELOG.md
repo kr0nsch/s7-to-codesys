@@ -45,8 +45,6 @@
 - Интерпретатор ST для тестов (`s7conv/tests/stsim.py`) и `test_scenarios_simulated.py`: сгенерированные и
   рукописные наборы coUnit исполняются против закоммиченного кода без CODESYS, с проверкой гипотезы о
   F_TRIG и мутациями логики.
-- `tools_project/iec_checker_gate.py`: статанализ через `run_iec_checker.py` шаблона, `ParserError`
-  допускается только в описанных местах (`tools_project/iec_checker_parser_gaps.toml`).
 - pytest: снапшот корпуса (`build-corpus` воспроизводит закоммиченное), генератор тестов (формат CSV,
   сверка с эталонным читателем, имена, текст ST, ожидаемые значения из CSV), RuSTy по всему `src/` и
   `tests/`, проверки настроек репозитория (`tools_project/test_repo_config.py`).
@@ -72,9 +70,19 @@
   STL011 (имена, числа и пометки исходного SCL сохраняются); форматные правила действуют.
 - `tools/check/iec_checker_allow.toml` и `tools/check/rusty_exclude.txt` — под сгенерированный код и
   слой совместимости, с причинами.
-- `pyproject.toml`: три теста шаблона, сравнивающие настройки с шаблоном, заменены проектными; ещё семь
-  тестов `cds.py`, рассчитанных на пустой `library.libraries`, выполняются против config.json без ссылки на
-  Standard (`tools_project/test_repo_config.py`).
+- Инструменты синхронизированы с шаблоном: понижение `iec-checker` для `TIME()`, `a[i].b`, пустого оператора
+  `;` и массива с начальным значением в структуре, прокладка RuSTy `rusty_shims/codesys_conversions.st`
+  (`TIME_TO_DINT` и другие преобразования TIME), проверка ключей `st_lint.toml`, составные префиксы массивов
+  в STL007.
+- Статанализ — `python tools/check/run_iec_checker.py --tests` шаблона, без обёртки проекта: `ParserError` 0
+  (раньше шесть мест допускала обёртка `tools_project/iec_checker_gate.py`, она удалена вместе со списком
+  мест). В блоках, которые раньше не разбирались (`FB_EventLogger`, `FB_Ramp`, `FB_Valve`, `PRG_Main`), —
+  98 новых находок, все обоснованы (всего 962, было 864); среди них `EXIT` в `FB_EventLogger`
+  (PLCOPEN-L10) — перенесён из SCL как есть.
+- `tools/check/rusty_exclude.txt`: исключены 3 файла вместо 10, `run_rusty.py` проверяет 51 файл из 54 (было
+  44); тесты `s7conv/tests/test_rusty_check.py` больше не добавляют своё объявление `TIME_TO_DINT`.
+- `pyproject.toml`: тесты шаблона выполняются полностью, без `--deselect`; отличия настроек проекта от
+  шаблона проверяет `tools_project/test_repo_config.py`.
 - Пометка `fb.f_trig` называет проверенную версию (Standard 3.5.17.0) и тест для повторной проверки вместо
   «сверить с источником или тестом».
 - Отчёт HTML: значения плиток итога выровнены по нижнему краю, счётчики в «Подробно по файлам» — по

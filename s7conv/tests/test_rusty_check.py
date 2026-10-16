@@ -64,13 +64,8 @@ def test_generated_st_passes_rusty_check(tmp_path: Path, capsys: pytest.CaptureF
     assert "error[" not in output
 
 
-# Объявления, которых нет в stdlib RuSTy (в RuSTy TIME 64-битный), но которые есть в CODESYS
-EXTRA_SHIM = """FUNCTION TIME_TO_DINT : DINT
-VAR_INPUT
-    IN : TIME;
-END_VAR
-END_FUNCTION
-"""
+# Преобразования TIME_TO_DINT и т. п., которых нет в stdlib RuSTy, объявлены в прокладке шаблона
+# tools/check/rusty_shims/codesys_conversions.st (своё объявление здесь дало бы дубль, E004).
 # RuSTy убирает префикс GVL (замена R3): одинаковые имена в разных GVL для него — дубль.
 # DB_Telegram (heartbeat — как и в DB_Plant) из кода не используется символьно (только %DB30/PEEK — TODO).
 EXCLUDE = "DB_Telegram.st  # имя heartbeat есть и в DB_Plant: в CODESYS GVL с qualified_only, в RuSTy — дубль\n"
@@ -90,9 +85,6 @@ def test_converted_corpus_passes_rusty_check(tmp_path: Path, capsys: pytest.Capt
     markers = root / "src" / "GVLs" / "GVL_Markers.gvl.st"
     if markers.is_file():
         markers.write_text(re.sub(r" AT %M[XBWD][\d.]+", "", markers.read_text(encoding="utf-8")), encoding="utf-8")
-    shims = tmp_path / "shims"
-    shutil.copytree(run_rusty.DEFAULT_SHIMS, shims)
-    (shims / "s7conv_extra.st").write_text(EXTRA_SHIM, encoding="utf-8")
     exclude = tmp_path / "exclude.txt"
     exclude.write_text(EXCLUDE, encoding="utf-8")
     build = tmp_path / "build"
@@ -101,8 +93,6 @@ def test_converted_corpus_passes_rusty_check(tmp_path: Path, capsys: pytest.Capt
             "--root",
             str(root),
             "--no-tests",
-            "--shims",
-            str(shims),
             "--exclude-file",
             str(exclude),
             "--out",
@@ -123,8 +113,8 @@ def test_repository_sources_pass_rusty_with_shims(tmp_path: Path, capsys: pytest
     """Весь src/ и tests/ репозитория (сгенерированный, рукописный код и тесты) проходит plc --check.
 
     tools/check/rusty_exclude.txt исключает из run_rusty.py файлы с расхождениями диалектов и зависящие от них;
-    здесь те же расхождения сняты иначе — объявлением TIME_TO_DINT и снятием AT у GVL_Markers, — и компилятор
-    видит все файлы, кроме DB_Telegram (неоднозначное имя без квалификатора GVL).
+    здесь расхождение адресов снято иначе — у GVL_Markers убраны AT, — и компилятор видит все файлы, кроме
+    DB_Telegram (неоднозначное имя без квалификатора GVL).
     """
     from s7conv.layout import REPO_ROOT
 
@@ -133,9 +123,6 @@ def test_repository_sources_pass_rusty_with_shims(tmp_path: Path, capsys: pytest
     shutil.copytree(REPO_ROOT / "tests", root / "tests")
     markers = root / "src" / "GVLs" / "Converted" / "GVL_Markers.gvl.st"
     markers.write_text(re.sub(r" AT %M[XBWD][\d.]+", "", markers.read_text(encoding="utf-8")), encoding="utf-8")
-    shims = tmp_path / "shims"
-    shutil.copytree(run_rusty.DEFAULT_SHIMS, shims)
-    (shims / "s7conv_extra.st").write_text(EXTRA_SHIM, encoding="utf-8")
     exclude = tmp_path / "exclude.txt"
     exclude.write_text(EXCLUDE, encoding="utf-8")
     build = tmp_path / "build"
@@ -143,8 +130,6 @@ def test_repository_sources_pass_rusty_with_shims(tmp_path: Path, capsys: pytest
         [
             "--root",
             str(root),
-            "--shims",
-            str(shims),
             "--exclude-file",
             str(exclude),
             "--out",

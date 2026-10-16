@@ -98,7 +98,7 @@ python -m s7conv --help                               # все команды и
 
 python -m pytest                                      # тесты конвертера, генератора, настроек
 python tools/check/st_lint.py --strict                # линтер ST
-python tools_project/iec_checker_gate.py              # статанализ (iec_checker v0.4: --binary или IEC_CHECKER)
+python tools/check/run_iec_checker.py --tests         # статанализ (iec_checker v0.4: --binary или IEC_CHECKER)
 python tools/check/run_rusty.py                       # необязательно: RuSTy plc --check
 ```
 
@@ -175,11 +175,11 @@ C0195, сужение — ошибка C0032) — [docs/STATIC_ANALYSIS.md](docs
 | Проверка | Итог |
 |---|---|
 | ruff, `ruff format --check`, mypy (strict, 63 файла) | без замечаний |
-| pytest | 902 теста: разбор, эмиттер, генератор тестов, снапшоты фикстур, снапшот корпуса, RuSTy и iec_checker по всему `src/` и `tests/` (если инструмент установлен), интерпретатор ST `stsim` — те же наборы coUnit против сконвертированного кода и мутации логики |
+| pytest | 1024 теста: разбор, эмиттер, генератор тестов, снапшоты фикстур, снапшот корпуса, RuSTy и iec_checker по всему `src/` и `tests/` (если инструмент установлен), интерпретатор ST `stsim` — те же наборы coUnit против сконвертированного кода и мутации логики |
 | `s7conv build-corpus --check`, `gen-tests --check` | сгенерированное совпадает с конвертером побайтно |
 | `st_lint --strict` | 242 файла, 0 замечаний |
-| iec_checker 0.4 (`tools_project/iec_checker_gate.py`) | необоснованных находок 0; обоснования — в STATIC_ANALYSIS.md |
-| RuSTy 1.0.6 `plc --check` (необязательно) | 44 файла, 0 ошибок (10 исключены с причинами) |
+| iec_checker 0.4 (`run_iec_checker.py --tests`) | `ParserError` 0, необоснованных находок 0; обоснования — в STATIC_ANALYSIS.md |
+| RuSTy 1.0.6 `plc --check` (необязательно) | 51 файл, 0 ошибок (3 исключены с причинами) |
 
 `stsim` и CODESYS дали одинаковый итог по всем 39 сценариям; окончательный результат — прогон в Control Win.
 

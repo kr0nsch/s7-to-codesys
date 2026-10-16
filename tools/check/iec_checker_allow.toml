@@ -10,9 +10,8 @@
 #   reason — обязательно: почему находка допустима.
 # ParserError и LexingError обосновать нельзя: их исправляют в коде или в понижении iec-checker.
 #
-# Проект s7-to-codesys: статанализ запускается обёрткой tools_project/iec_checker_gate.py — она вызывает
-# run_iec_checker.py и дополнительно принимает ParserError только в местах из
-# tools_project/iec_checker_parser_gaps.toml (конструкции CODESYS, которых нет в грамматике iec_checker 0.4).
+# Проект s7-to-codesys: python tools/check/run_iec_checker.py --tests — ParserError 0, необоснованных 0;
+# каждая запись используется (проверяет pytest: test_run_iec_checker.py::test_integration_repository_sources).
 
 # --- Все исходники -------------------------------------------------------------------------------------
 
@@ -30,7 +29,7 @@ reason = "Как для src/: значения по умолчанию типо�
 # Конвертер переносит логику и интерфейс блоков S7 один к одному: структура ветвлений, сложность и состав
 # переменных — как в исходном SCL. Переработка (упрощение, удаление неиспользуемого) — ручной этап
 # миграции после конвертации (docs/methodology.md), а не задача конвертера. Перечень находок по файлам —
-# docs/STATIC_ANALYSIS.md, раздел «iec_checker: сгенерированный код».
+# docs/STATIC_ANALYSIS.md, раздел «iec_checker», «Обоснованные находки».
 
 [[allow]]
 id = "PLCOPEN-CP9"
@@ -48,6 +47,11 @@ file = "src/POUs/Converted/FC_Statistics/*"
 reason = "CONTINUE перенесён из SCL (FC_Statistics проверяет CONTINUE и RETURN при конвертации)"
 
 [[allow]]
+id = "PLCOPEN-L10"
+file = "src/POUs/Converted/FB_EventLogger/FB_EventLogger.impl.st"
+reason = "EXIT перенесён из SCL как есть (WHILE с выходом на первой пустой записи буфера, samples/scl/FB_EventLogger.scl): точный перенос, поведение то же, что в S7"
+
+[[allow]]
 id = "PLCOPEN-CP4"
 file = "src/GVLs/Converted/GVL_IO.gvl.st"
 match = "%WI3[234]"
@@ -56,7 +60,7 @@ reason = "Ложное срабатывание iec_checker 0.4: номер сл
 [[allow]]
 id = "UnusedVariable"
 file = "src/*/Converted/*"
-reason = "Ложные срабатывания iec_checker 0.4 (вызовы экземпляров ФБ и чтение их выходов, аргументы во вложенных вызовах, запись полей структуры, константы в границах FOR) и переменные интерфейса S7, которые используют только непереведённые операторы (MIGRATION-TODO) или стартовая информация OB; список — docs/STATIC_ANALYSIS.md"
+reason = "Ложные срабатывания iec_checker 0.4 (вызовы экземпляров ФБ и чтение их выходов, аргументы во вложенных вызовах, запись полей структуры, константы в границах FOR; массив, к которому обращаются только как a[i].x, — после понижения шаблона) и переменные интерфейса S7, которые используют только непереведённые операторы (MIGRATION-TODO) или стартовая информация OB; список — docs/STATIC_ANALYSIS.md"
 
 # --- Рукописный слой совместимости (src/*/S7Compat) ----------------------------------------------------
 

@@ -103,14 +103,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: python tools/check/st_lint.py --strict
 
-      # Обёртка проекта над tools/check/run_iec_checker.py: тот же вариант сборки iec-checker и файл
-      # обоснований tools/check/iec_checker_allow.toml; ParserError допускается только в местах из
-      # tools_project/iec_checker_parser_gaps.toml (конструкции CODESYS вне грамматики iec_checker 0.4).
-      # Бинарник — из переменной IEC_CHECKER; разбор находок — docs/STATIC_ANALYSIS.md
+      # run_iec_checker.py сам собирает вариант iec-checker в build/assembled/iec-checker/ (src/ и tests/) и
+      # берёт бинарник из переменной IEC_CHECKER; обоснованные находки — tools/check/iec_checker_allow.toml
+      # и docs/STATIC_ANALYSIS.md. Неиспользованные обоснования ловит pytest
+      # (test_run_iec_checker.py::test_integration_repository_sources)
       - name: Статанализ (iec_checker)
         id: iec_checker
         if: ${{ !cancelled() }}
-        run: python tools_project/iec_checker_gate.py
+        run: python tools/check/run_iec_checker.py --tests
 
       # Конвертер s7conv: корпус разбирается без ошибок; закоммиченный результат build-corpus
       # (src/*/Converted, docs/CONVERSION_REPORT.md, задачи в tools/codesys/config.json, тесты сценариев
@@ -195,7 +195,7 @@ jobs:
 
       - name: Статанализ (iec_checker nightly)
         id: nightly
-        run: python tools_project/iec_checker_gate.py --docker "$IEC_CHECKER_IMAGE"
+        run: python tools/check/run_iec_checker.py --docker "$IEC_CHECKER_IMAGE" --tests
 
       - name: Сводка
         if: ${{ !cancelled() }}
@@ -252,7 +252,7 @@ jobs:
 
       # run_rusty.py сам собирает вариант rusty (src/ и tests/ с прокладками tools/check/rusty_shims/);
       # компилятор и stdlib — из переменных RUSTY_PLC и RUSTY_STDLIB_INCLUDE; расхождения диалектов —
-      # tools/check/rusty_exclude.txt (весь src/ и tests/ с доп. прокладками проверяет pytest)
+      # tools/check/rusty_exclude.txt (весь src/ и tests/, у GVL_Markers без AT, проверяет pytest)
       - name: RuSTy plc --check
         id: rusty
         run: python tools/check/run_rusty.py

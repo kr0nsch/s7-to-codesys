@@ -276,10 +276,10 @@ coUnit.FB_TestSuite`). Итог — последний прогон в CODESYS (
 | Проверка | Итог | Примечание |
 |---|---|---|
 | `ruff check`, `ruff format --check`, `mypy` | пройдено, 2026-10-16, локально | mypy strict: 63 файла |
-| `pytest` | пройдено, 2026-10-16, локально | 902 теста; 10 тестов шаблона (11 элементов pytest: один тест параметризован) исключены и заменены проектными (STATIC_ANALYSIS.md, «Тесты шаблона»), включая интеграционные с настоящими `plc` и iec_checker |
+| `pytest` | пройдено, 2026-10-16, локально | 1024 теста, тесты шаблона — все, без `--deselect` (STATIC_ANALYSIS.md, «Тесты шаблона»), включая интеграционные с настоящими `plc` и iec_checker |
 | `python -m s7conv build-corpus --check` | пройдено, 2026-10-16, локально | `src/*/Converted`, отчёт, задачи в `config.json`, тесты сценариев воспроизводятся побайтно |
 | `python -m s7conv gen-tests scenarios --out tests --check` | пройдено, 2026-10-16, локально | 6 наборов, 39 тестов, 1895 проверок |
 | `tools/assemble.py --tests` | пройдено, 2026-10-16, локально | 54 объекта `src/` и `tests/` |
 | `tools/check/st_lint.py --strict` | пройдено, 2026-10-16, локально | 242 файла, 0 замечаний |
-| iec_checker 0.4 (`tools_project/iec_checker_gate.py`) | пройдено, 2026-10-16, локально | необоснованных 0, известных пробелов разборщика 6, обоснованных 864 — [STATIC_ANALYSIS.md](STATIC_ANALYSIS.md) |
-| RuSTy 1.0.6 (`run_rusty.py`) | пройдено, 2026-10-16, локально | 44 файла (10 исключены, причины — STATIC_ANALYSIS.md), 0 ошибок; весь `src/` и `tests/` с прокладками — в pytest |
+| iec_checker 0.4 (`run_iec_checker.py --tests`) | пройдено, 2026-10-16, локально | `ParserError` 0, необоснованных 0, обоснованных 962, артефактов сборки 163 — [STATIC_ANALYSIS.md](STATIC_ANALYSIS.md) |
+| RuSTy 1.0.6 (`run_rusty.py`) | пройдено, 2026-10-16, локально | 51 файл (3 исключены, причины — STATIC_ANALYSIS.md), 0 ошибок; весь `src/` и `tests/` (у `GVL_Markers` без `AT`) — в pytest |

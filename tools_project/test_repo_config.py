@@ -1,12 +1,11 @@
-"""Проверки настроек репозитория s7-to-codesys вместо двух тестов шаблона (pyproject.toml, addopts).
+"""Проверки настроек репозитория s7-to-codesys: проект отличается от шаблона ровно так, как задумано.
 
-Тесты шаблона сравнивают настройки с настройками самого шаблона; здесь проверяется, что проект
-отличается от шаблона ровно так, как задумано и описано в docs/STATIC_ANALYSIS.md:
+Тесты шаблона проверяют у файлов проекта только разбор и схему (test_repository_toml_is_valid,
+test_cds_config.py); здесь — что отличия именно те, что описаны в docs/STATIC_ANALYSIS.md:
 
 - st_lint.toml = умолчания st_lint.py плюс исключения src/*/Converted/* для правил оформления;
 - tools/codesys/config.json: как у шаблона, кроме задач режима normal (они из OB корпуса) и ссылки на
-  библиотеку Standard (плейсхолдер в library.libraries — сконвертированный код использует TON, R_TRIG, CTU);
-- статанализ iec_checker проходит через обёртку tools_project/iec_checker_gate.py.
+  библиотеку Standard (плейсхолдер в library.libraries — сконвертированный код использует TON, R_TRIG, CTU).
 """
 
 from __future__ import annotations
@@ -14,14 +13,9 @@ from __future__ import annotations
 import copy
 import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
-import pytest
-
-import iec_checker_gate as G
-import run_iec_checker
 import st_lint
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -95,75 +89,3 @@ def test_codesys_projects_reference_standard_and_counit(tmp_path: Path) -> None:
     assert [x["key"] for x in s.library_config()["libraries"]] == ["standard"]
     standard = s.library_spec("standard")
     assert standard["placeholder"] == "Standard" and standard["install_from"] is None
-
-
-# --- обёртка iec_checker ------------------------------------------------------------------------------
-
-
-def _report(*findings: dict[str, Any], unused: list[dict[str, Any]] | None = None) -> dict[str, Any]:
-    return {"findings": list(findings), "unused_allow": unused or [], "summary": {}}
-
-
-def _gap(file: str, match: str) -> G.Gap:
-    return G.Gap(file, re.compile(match), "причина")
-
-
-def test_gate_accepts_only_listed_parser_gaps(tmp_path: Path) -> None:
-    src = tmp_path / "src" / "POUs" / "FB_A"
-    src.mkdir(parents=True)
-    (src / "FB_A.impl.st").write_text("x := 1;\nbuf[i].code := 0;\n", encoding="utf-8")
-    known = {"id": "ParserError", "status": "error", "source": "src/POUs/FB_A/FB_A.impl.st", "source_line": 2}
-    other = {"id": "ParserError", "status": "error", "source": "src/POUs/FB_A/FB_A.impl.st", "source_line": 1}
-    allowed = {"id": "PLCOPEN-CP3", "status": "allowed", "source": "src/POUs/FB_A/FB_A.decl.st"}
-    result = G.evaluate(_report(known, allowed), [_gap("src/POUs/FB_A/FB_A.impl.st", r"\]\.\w")], tmp_path, True)
-    assert result.ok and len(result.known) == 1 and result.known[0]["line_text"] == "buf[i].code := 0;"
-    result = G.evaluate(_report(other), [_gap("src/POUs/FB_A/FB_A.impl.st", r"\]\.\w")], tmp_path, True)
-    assert not result.ok and result.errors == [other] and len(result.stale_gaps) == 1
-
-
-def test_gate_fails_on_unjustified_finding_and_unused_allow(tmp_path: Path) -> None:
-    finding = {"id": "PLCOPEN-L17", "status": "error", "source": "src/POUs/FB_A/FB_A.impl.st", "source_line": 3}
-    assert G.evaluate(_report(finding), [], tmp_path, True).errors == [finding]
-    unused = [{"id": "X", "file": "src/*"}]
-    assert not G.evaluate(_report(unused=unused), [], tmp_path, True).ok
-    assert G.evaluate(_report(unused=unused), [], tmp_path, False).ok
-
-
-def test_gate_gap_file_is_valid_and_points_to_existing_files() -> None:
-    gaps = G.load_gaps(G.DEFAULT_GAPS)
-    assert gaps
-    for gap in gaps:
-        assert (REPO_ROOT / gap.file).is_file(), gap.file
-        text = (REPO_ROOT / gap.file).read_text(encoding="utf-8")
-        assert any(gap.match.search(line) for line in text.splitlines()), gap.file
-
-
-def test_gate_rejects_bad_gap_file(tmp_path: Path) -> None:
-    bad = tmp_path / "gaps.toml"
-    bad.write_text('[[gap]]\nfile = "a"\nmatch = "("\nreason = "r"\n', encoding="utf-8")
-    with pytest.raises(G.GapError):
-        G.load_gaps(bad)
-    bad.write_text('[[gap]]\nfile = "a"\nmatch = "x"\n', encoding="utf-8")
-    with pytest.raises(G.GapError):
-        G.load_gaps(bad)
-    assert G.main(["--gaps", str(bad)]) == G.EXIT_CONFIG
-
-
-def _iec_checker_available() -> bool:
-    try:
-        run_iec_checker.find_binary()
-    except run_iec_checker.ToolMissing:
-        return False
-    return True
-
-
-@pytest.mark.integration
-@pytest.mark.skipif(not _iec_checker_available(), reason="iec_checker не найден")
-def test_repository_sources_pass_iec_checker_gate(tmp_path: Path) -> None:
-    """Замена test_integration_repository_sources шаблона: src/ и tests/ через обёртку, каждое обоснование
-    и каждая запись о пробеле разборщика используются."""
-    out = tmp_path / "gate.json"
-    assert G.main(["--root", str(REPO_ROOT), "--json", str(out)]) == G.EXIT_OK
-    summary = json.loads(out.read_text(encoding="utf-8"))
-    assert summary["ok"] and summary["errors"] == 0 and summary["unused_allow"] == []
-    assert {g["source"] for g in summary["known_parser_gaps"]} == {g.file for g in G.load_gaps(G.DEFAULT_GAPS)}

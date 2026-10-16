@@ -1,6 +1,8 @@
 # Настройки tools/check/st_lint.py. Описание правил — tools/README.md.
-# Значения здесь повторяют значения по умолчанию из st_lint.py, чтобы их было видно и
-# можно было менять в проектах, созданных из шаблона.
+# В шаблоне значения повторяют значения по умолчанию из st_lint.py, чтобы их было видно и
+# можно было менять в проектах, созданных из шаблона: файл принадлежит проекту. Тесты шаблона
+# сверяют с умолчаниями только эталон tools/tests/fixtures/st_lint_template.toml, а у этого
+# файла проверяют, что он разбирается и каждый ключ известен.
 # Шаблоны путей (exclude) — fnmatch по пути от корня репозитория; '*' захватывает и '/'.
 #
 # Проект s7-to-codesys: код в папках Converted (src/*/Converted/) генерирует конвертер s7conv из
@@ -64,7 +66,10 @@ exclude = ["src/*/Converted/*"]   # проект: имена объектов S7
 
 [rules.STL007]
 allow_names = []                # имена-исключения, например ["i", "j"]
-constant_pattern = "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"   # VAR CONSTANT / VAR_GLOBAL CONSTANT
+constant_pattern = "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"   # VAR CONSTANT / VAR_GLOBAL CONSTANT (не VAR_IN_OUT CONSTANT)
+# Массивы: "match" — 'a' или 'a' + префикс типа элемента (astAlarm — ARRAY OF ST_*, axFlag — ARRAY OF BOOL);
+# "any" — 'a' + любой префикс из таблиц ниже; "off" — только 'a' и заглавная буква (aValues)
+array_element_prefixes = "match"
 fb_types = ["TON", "TOF", "TP", "R_TRIG", "F_TRIG", "CTU", "CTD", "CTUD", "RS", "SR"]
 exclude = ["src/*/Converted/*"]   # проект: имена переменных S7 в сгенерированном коде
 
