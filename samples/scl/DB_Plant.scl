@@ -1,0 +1,273 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   DB_Plant.scl
+// Блоки:  глобальные DB "DB_Plant", "DB_Hmi", "DB_Telegram";
+//         DB по типу UDT "DB_RecipeActive";
+//         экземплярные DB функциональных блоков (18 шт.).
+// -----------------------------------------------------------------------------
+// Назначение
+//   Все блоки данных станции в одном исходнике («Generate source from blocks»
+//   для группы DB). Логики нет, кроме начальных значений в секции BEGIN.
+//   DB_Plant        — технологические данные; часть переменных сохраняемая
+//                     (секция VAR RETAIN): объём за всё время, наработка
+//                     фильтров, число промывок.
+//   DB_Hmi          — интерфейс с панелью оператора: команды, уставки, текст.
+//   DB_Telegram     — неоптимизированный DB (S7_Optimized_Access := 'FALSE')
+//                     с фиксированной раскладкой байтов: к нему обращаются
+//                     абсолютно (%DB30.DBW0, P#DB30.DBX4.0) и через PEEK/POKE.
+//                     Номер DB30 — свойство блока, в исходник TIA не попадает
+//                     (см. BlockProperties.csv).
+//   DB_RecipeActive — DB, созданный по типу "UDT_DosingRecipe". По тексту его
+//                     не отличить от экземплярного DB: нужна таблица символов.
+//   Экземплярные DB записаны в двух формах: как выгружает TIA Portal (имя ФБ
+//   отдельной строкой после NON_RETAIN) и компактно (DATA_BLOCK "DB" "FB").
+// Что проверяет при конвертации
+//   DB -> GVL; RETAIN -> RETAIN/PERSISTENT; экземплярный DB -> экземпляр ФБ в GVL;
+//   начальные значения из BEGIN; массив UDT; DTL (нет аналога в CODESYS Standard).
+// =============================================================================
+DATA_BLOCK "DB_Plant"
+TITLE = Plant process data
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Plant
+VERSION : 0.3
+//Технологические данные станции II подъёма
+   VAR
+      estopOk : Bool;   // Аварийный стоп не нажат (копия %I0.0)
+      tankLevel : Real;   // Уровень в РЧВ, м
+      flowSamples : Array[1..8] of Real;   // Выборка расхода FT101 раз в секунду, м3/ч
+      flowMin : Real;   // Минимум по выборке, м3/ч
+      flowMax : Real;   // Максимум по выборке, м3/ч
+      flowAvg : Real;   // Среднее по выборке, м3/ч
+      flowSampleCount : Int;   // Число достоверных отсчётов в выборке
+      clockMem : Bool;   // Память фронта меркера тактов "Clock_1Hz"
+      pressureCfg : "UDT_AnalogCfg";   // Параметры канала PT101 для HMI
+      pumpStatus : Array[1..3] of "UDT_DeviceStatus";   // Состояния насосов P101...P103
+      plantMode : Int;   // 0 — стоп, 1 — работа, 2 — промывка
+      alarmWord : Word;   // Слово аварий станции (биты см. OB "Main")
+      alarmDWord : DWord;   // Расширенное слово аварий
+      heartbeat : Byte;   // Счётчик жизни для верхнего уровня
+      pressureFastRaw : Int;   // Давление PT101, прямое чтение периферии
+      lastStart : Date_And_Time;   // Время последнего пуска станции
+      defaultClock { ExternalAccessible := 'False'; ExternalVisible := 'False'; ExternalWritable := 'False'} : DTL;   // Время для установки часов после потери RTC
+      clockLost : Bool;   // Часы CPU потеряны при запуске
+      diagCount : DInt;   // Число диагностических прерываний
+      diagLastLaddr : Word;   // Аппаратный идентификатор последнего модуля с диагностикой
+      diagLastChannel : UInt;   // Канал последней диагностики
+      diagIoState : Word;   // IO_State последней диагностики
+      operatorName : String[20];   // Оператор смены
+      shiftData : Struct   // Данные смены
+         startedAt : Date_And_Time;   // Начало смены
+         volume : LReal;   // Объём за смену, м3
+         pumpStarts : DInt;   // Пуски насосов за смену
+      END_STRUCT;
+   END_VAR
+   VAR RETAIN
+      totalVolume : LReal;   // Объём за всё время, м3 (копия из DB_FQ101)
+      filterRuntime : Array[1..4] of Time;   // Наработка фильтров с последней промывки
+      backwashCount : DInt;   // Число промывок
+   END_VAR
+
+
+BEGIN
+   tankLevel := 0.0;
+   plantMode := 1;
+   pressureCfg.rangeHigh := 16.0;
+   operatorName := 'NOBODY';
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_Hmi"
+TITLE = HMI interface
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Hmi
+VERSION : 0.2
+NON_RETAIN
+   VAR
+      cmdWord : Word;   // Запросы режима (биты, см. FB_ModeSelect); ФБ сбрасывает обработанные биты
+      modeRequest : Int := -1;   // Запрос режима числом: -1 — нет запроса
+      pump : Array[1..3] of Struct   // Команды насосам P101...P103
+         startReq : Bool;
+         stopReq : Bool;
+         resetReq : Bool;
+      END_STRUCT;
+      alarmAck : Bool;   // Квитирование аварий
+      backwashStart : Bool;   // Пуск промывки фильтра
+      backwashStop : Bool;   // Прерывание промывки
+      resetTotal : Bool;   // Сброс сменного счётчика объёма
+      setpointPressure : Real := 4.5;   // Уставка давления в коллекторе, бар
+      pidManual : Bool;   // Ручной режим регулятора давления
+      pidManualValue : Real;   // Ручное задание частоты, %
+      message : String[20];   // Текст для бегущей строки
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_Telegram"
+TITLE = Legacy telegram buffer
+{ S7_Optimized_Access := 'FALSE' }
+AUTHOR : WTP1
+FAMILY : Comm
+VERSION : 1.1
+NON_RETAIN
+//Буфер телеграммы удалённой станции (раскладка байтов фиксирована: DBW0 заголовок, DBW2 номер, DBB4...19 данные)
+   VAR
+      header : Word;   // DBW0: слово состояния станции
+      seqNo : Word;   // DBW2: номер телеграммы
+      payload : Array[0..15] of Byte;   // DBB4...DBB19: данные
+      crc : Word;   // DBW20
+      reserve : Array[0..12] of Byte;   // DBB22...DBB34
+      heartbeat : Byte;   // DBB35: счётчик жизни (пишет POKE в FB_EventLogger)
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_RecipeActive"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"UDT_DosingRecipe"
+
+BEGIN
+   name := 'SUMMER';
+   doseStep[1] := 0.8;
+   doseStep[2] := 1.2;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_P101"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"FB_Motor"
+
+BEGIN
+   feedbackTime := T#5S;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_P102"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"FB_Motor"
+
+BEGIN
+   feedbackTime := T#5S;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_P103"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"FB_Motor"
+
+BEGIN
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_PIC101"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"FB_PIController"
+
+BEGIN
+   kp := 2.0;
+   ti := T#20S;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_FQ101"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+"FB_Totalizer"
+
+BEGIN
+   lowFlowCutoff := 2.0;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_Backwash"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+"FB_Sequencer"
+
+BEGIN
+   drainTimeout := T#90S;
+
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_PT101" "FB_AnalogIn"
+BEGIN
+   rangeHigh := 16.0;
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_LT101" "FB_AnalogIn"
+BEGIN
+   rangeHigh := 5.0;
+   limitHH := 4.8;
+   limitH := 4.5;
+   limitL := 1.0;
+   limitLL := 0.5;
+   hysteresis := 0.05;
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_FT101" "FB_AnalogIn"
+BEGIN
+   rangeHigh := 1200.0;
+   limitHH := 1150.0;
+   limitH := 1100.0;
+   limitL := 0.0;
+   limitLL := -1.0;
+   hysteresis := 10.0;
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_AlarmPT101" "FB_AlarmDelay"
+BEGIN
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_Mode" "FB_ModeSelect"
+BEGIN
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_PumpAlt" "FB_PumpAlternation"
+BEGIN
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_LS201" "FB_Debounce"
+BEGIN
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_XV201" "FB_Valve"
+BEGIN
+   travelTime := T#45S;
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_Dosing" "FB_BatchCounter"
+BEGIN
+   pulsesPerDose := 50;
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_Logger" "FB_EventLogger"
+BEGIN
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_LegacyTlg" "FB_LegacyTelegram"
+BEGIN
+END_DATA_BLOCK
+
+DATA_BLOCK "DB_RampSP" "FB_Ramp"
+BEGIN
+END_DATA_BLOCK
+

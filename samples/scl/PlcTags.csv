@@ -1,0 +1,35 @@
+Name,Path,Data Type,Logical Address,Comment
+EStop_Ok,IO_Inputs,Bool,%I0.0,Аварийный стоп не нажат (НЗ цепь)
+P101_Fbk,IO_Inputs,Bool,%I0.1,P101 обратная связь контактора
+P101_ThermalOk,IO_Inputs,Bool,%I0.2,P101 тепловое реле в норме
+P102_Fbk,IO_Inputs,Bool,%I0.3,P102 обратная связь контактора
+P102_ThermalOk,IO_Inputs,Bool,%I0.4,P102 тепловое реле в норме
+LS201_Drained,IO_Inputs,Bool,%I0.5,Поплавок: фильтр опорожнён
+LS202_Full,IO_Inputs,Bool,%I0.6,Поплавок: фильтр заполнен
+P103_Fbk,IO_Inputs,Bool,%I0.7,P103 обратная связь контактора
+Sw_Local,IO_Inputs,Bool,%I1.0,Ключ «Местное» на шкафу
+Btn_Ack,IO_Inputs,Bool,%I1.1,Кнопка «Квитирование» на шкафу
+P103_ThermalOk,IO_Inputs,Bool,%I1.2,P103 тепловое реле в норме
+XV201_Opened,IO_Inputs,Bool,%I2.0,XV201 концевик «открыто»
+XV201_Closed,IO_Inputs,Bool,%I2.1,XV201 концевик «закрыто»
+FQ201_Pulse,IO_Inputs,Bool,%I3.0,Импульсы расходомера реагента (геркон НЗ)
+PT101_Raw,IO_Analog,Int,%IW64,PT101 давление в коллекторе 4-20 мА (0...16 бар)
+LT101_Raw,IO_Analog,Int,%IW66,LT101 уровень в РЧВ 4-20 мА (0...5 м)
+FT101_Raw,IO_Analog,Int,%IW68,FT101 расход в сеть 4-20 мА (0...1200 м3/ч)
+PT101_Fast,IO_Analog,Int,%IW272,Канал быстрого опроса давления (читается как %IW272:P)
+P101_Run,IO_Outputs,Bool,%Q0.0,P101 контактор
+P102_Run,IO_Outputs,Bool,%Q0.1,P102 контактор
+P103_Run,IO_Outputs,Bool,%Q0.2,P103 контактор
+XV_Drain,IO_Outputs,Bool,%Q0.4,Задвижка сброса промывной воды
+Q_AirBlower,IO_Outputs,Bool,%Q0.5,Воздуходувка промывки
+Q_WashPump,IO_Outputs,Bool,%Q0.6,Промывной насос
+XV201_Open,IO_Outputs,Bool,%Q1.0,XV201 пускатель «открыть»
+XV201_Close,IO_Outputs,Bool,%Q1.1,XV201 пускатель «закрыть»
+Lamp_Alarm,IO_Outputs,Bool,%Q2.0,Лампа «Авария» на шкафу
+VFD_SpeedRef,IO_Analog,Int,%QW80,Задание частоты ПЧ ведущего насоса (0...27648)
+Clock_1Hz,System,Bool,%M0.5,Меркер тактов 1 Гц (байт тактовых меркеров MB0)
+HMI_StatusPT101,Legacy_HMI,Word,%MW10,Слово состояния PT101 для старой панели
+HMI_P101Running,Legacy_HMI,Bool,%M12.0,P101 в работе для старой панели
+HMI_DosingPacked,Legacy_HMI,DWord,%MD20,Счётчики дозирования одним словом
+Tlg_Source,Legacy_HMI,Byte,%MB100,Начало области данных телеграммы (P#M100.0 BYTE 16)
+T_Retry,Timers,Timer,%T5,Таймер S5 повтора телеграммы (FB_LegacyTelegram)

@@ -1,0 +1,119 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   FB_PIController.scl
+// Блок:   FUNCTION_BLOCK "FB_PIController"
+// -----------------------------------------------------------------------------
+// Назначение
+//   Простой ПИ-регулятор давления в коллекторе (выход — задание частоты ПЧ
+//   ведущего насоса, %). Вызывается в OB "Cyclic interrupt" с периодом cycleTime.
+//   Экземпляр DB_PIC101. Это не замена PID_Compact: без самонастройки и
+//   без D-составляющей.
+//
+// Логика (нормативное описание; один вызов = один период cycleTime)
+//   1. e := sp - pv при reverseActing = TRUE (насос: давление ниже уставки —
+//      увеличить частоту); e := pv - sp при reverseActing = FALSE.
+//      Если |e| < deadband: e := 0.
+//   2. dt := cycleTime в секундах; tiS := ti в секундах.
+//   3. manual = TRUE: outPercent := LIMIT(outMin, manValue, outMax);
+//      integral := outPercent - kp * e (безударный переход в авто).
+//   4. manual = FALSE: если tiS > 0: integral := integral + kp * e * dt / tiS,
+//      иначе integral := 0; затем integral ограничивается так, чтобы
+//      kp * e + integral лежало в outMin...outMax (антинасыщение ограничением);
+//      outPercent := LIMIT(outMin, kp * e + integral, outMax).
+//   5. atHighLimit / atLowLimit — outPercent на границе; errorOut := e.
+//   integral хранится в LReal.
+// Что проверяет при конвертации
+//   LReal и смешанная арифметика с Real, ABS, LIMIT, MAX/MIN с именованными
+//   параметрами IN1/IN2, TIME_TO_DINT, ветвление IF/ELSE, VAR CONSTANT.
+// =============================================================================
+FUNCTION_BLOCK "FB_PIController"
+TITLE = Simple PI controller
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Control
+VERSION : 1.0
+//ПИ-регулятор давления, антинасыщение ограничением интегратора
+   VAR_INPUT
+      sp : Real;   // Уставка, бар
+      pv : Real;   // Измеренное значение, бар
+      kp : Real := 1.0;   // Коэффициент усиления, %/бар
+      ti : Time := T#10S;   // Время интегрирования
+      deadband : Real := 0.02;   // Зона нечувствительности, бар
+      reverseActing : Bool := TRUE;   // Обратное действие (e = sp - pv)
+      outMin : Real := 0.0;   // Нижний предел выхода, %
+      outMax : Real := 100.0;   // Верхний предел выхода, %
+      manual : Bool;   // Ручной режим
+      manValue : Real;   // Ручное значение выхода, %
+      cycleTime : Time := T#100MS;   // Период вызова
+   END_VAR
+
+   VAR_OUTPUT
+      outPercent : Real;   // Выход регулятора, %
+      errorOut : Real;   // Рассогласование после зоны нечувствительности
+      atHighLimit : Bool;   // Выход на верхнем пределе
+      atLowLimit : Bool;   // Выход на нижнем пределе
+   END_VAR
+
+   VAR
+      integral : LReal;   // Интегральная составляющая, %
+   END_VAR
+
+   VAR_TEMP
+      e : Real;
+      dtSeconds : LReal;
+      tiSeconds : LReal;
+      pPart : LReal;
+      upper : LReal;
+      lower : LReal;
+   END_VAR
+
+   VAR CONSTANT
+      MS_PER_SECOND : LReal := 1000.0;
+   END_VAR
+
+
+BEGIN
+    REGION Error
+        IF #reverseActing THEN
+            #e := #sp - #pv;
+        ELSE
+            #e := #pv - #sp;
+        END_IF;
+        IF ABS(#e) < #deadband THEN
+            #e := 0.0;
+        END_IF;
+        #errorOut := #e;
+    END_REGION
+
+    REGION Time base
+        #dtSeconds := DINT_TO_LREAL(TIME_TO_DINT(#cycleTime)) / #MS_PER_SECOND;
+        #tiSeconds := DINT_TO_LREAL(TIME_TO_DINT(#ti)) / #MS_PER_SECOND;
+        #pPart := REAL_TO_LREAL(#kp) * REAL_TO_LREAL(#e);
+    END_REGION
+
+    REGION Manual and automatic
+        IF #manual THEN
+            #outPercent := LIMIT(MN := #outMin, IN := #manValue, MX := #outMax);
+            #integral := REAL_TO_LREAL(#outPercent) - #pPart;
+        ELSE
+            IF #tiSeconds > 0.0 THEN
+                #integral := #integral + #pPart * #dtSeconds / #tiSeconds;
+            ELSE
+                #integral := 0.0;
+            END_IF;
+            // Антинасыщение: P + I в пределах outMin...outMax
+            #upper := REAL_TO_LREAL(#outMax) - #pPart;
+            #lower := REAL_TO_LREAL(#outMin) - #pPart;
+            #integral := MIN(IN1 := MAX(IN1 := #integral, IN2 := #lower), IN2 := #upper);
+            #outPercent := LIMIT(MN := #outMin, IN := LREAL_TO_REAL(#pPart + #integral), MX := #outMax);
+        END_IF;
+    END_REGION
+
+    REGION Limits
+        #atHighLimit := #outPercent >= #outMax;
+        #atLowLimit := #outPercent <= #outMin;
+    END_REGION
+
+END_FUNCTION_BLOCK
+

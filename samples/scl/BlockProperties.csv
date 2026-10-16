@@ -1,0 +1,46 @@
+Block,Kind,Number,Source,Optimized,Event,CycleTime_ms,Phase_ms,Priority,Comment
+Main,OB,1,OB_Main.scl,TRUE,ProgramCycle,,,1,Циклическая программа
+Cyclic interrupt,OB,30,OB_Cyclic.scl,TRUE,CyclicInterrupt,100,0,8,В проекте S7-300 был OB35 с тем же периодом
+Startup,OB,100,OB_Startup.scl,TRUE,Startup,,,1,Запуск (переход в RUN)
+Diagnostic error interrupt,OB,82,OB_Startup.scl,TRUE,DiagnosticErrorInterrupt,,,5,Диагностика модулей
+FB_AnalogIn,FB,10,FB_AnalogIn.scl,TRUE,,,,,
+FB_Motor,FB,11,FB_Motor.scl,TRUE,,,,,
+FB_AlarmDelay,FB,12,FB_AlarmDelay.scl,TRUE,,,,,
+FB_Totalizer,FB,13,FB_Totalizer.scl,TRUE,,,,,
+FB_PumpAlternation,FB,14,FB_PumpAlternation.scl,TRUE,,,,,
+FB_Sequencer,FB,15,FB_Sequencer.scl,TRUE,,,,,
+FB_Debounce,FB,16,FB_Debounce.scl,TRUE,,,,,
+FB_Valve,FB,17,FB_Valve.scl,TRUE,,,,,
+FB_PIController,FB,18,FB_PIController.scl,TRUE,,,,,
+FB_Ramp,FB,19,FB_Ramp.scl,TRUE,,,,,
+FB_BatchCounter,FB,20,FB_BatchCounter.scl,TRUE,,,,,
+FB_ModeSelect,FB,21,FB_ModeSelect.scl,TRUE,,,,,
+FB_EventLogger,FB,22,FB_EventLogger.scl,TRUE,,,,,
+FB_LegacyTelegram,FB,23,FB_LegacyTelegram.scl,FALSE,,,,,Перенесён из STEP 7 V5.x
+FC_Statistics,FC,10,FC_Statistics.scl,TRUE,,,,,
+UDT_AnalogCfg,UDT,,UDT_PlantTypes.scl,,,,,,
+UDT_DeviceStatus,UDT,,UDT_PlantTypes.scl,,,,,,
+UDT_DosingRecipe,UDT,,UDT_PlantTypes.scl,,,,,,
+DB_Plant,DB,1,DB_Plant.scl,TRUE,,,,,Глобальный DB; часть переменных сохраняемая
+DB_Hmi,DB,2,DB_Plant.scl,TRUE,,,,,Глобальный DB
+DB_RecipeActive,DB,3,DB_Plant.scl,TRUE,,,,,DB по типу UDT_DosingRecipe
+DB_Telegram,DB,30,DB_Plant.scl,FALSE,,,,,Номер 30 используется в коде (P#DB30 / %DB30 / PEEK)
+DB_Archive,DB,40,,FALSE,,,,,Архив телеграмм: исходника в корпусе нет (обращение только по номеру)
+DB_P101,DB,101,DB_Plant.scl,TRUE,,,,,Экземпляр FB_Motor
+DB_P102,DB,102,DB_Plant.scl,TRUE,,,,,Экземпляр FB_Motor
+DB_P103,DB,103,DB_Plant.scl,TRUE,,,,,Экземпляр FB_Motor
+DB_PIC101,DB,110,DB_Plant.scl,TRUE,,,,,Экземпляр FB_PIController
+DB_FQ101,DB,111,DB_Plant.scl,TRUE,,,,,Экземпляр FB_Totalizer (сохраняемые статические переменные)
+DB_Backwash,DB,112,DB_Plant.scl,TRUE,,,,,Экземпляр FB_Sequencer
+DB_PT101,DB,120,DB_Plant.scl,TRUE,,,,,Экземпляр FB_AnalogIn
+DB_LT101,DB,121,DB_Plant.scl,TRUE,,,,,Экземпляр FB_AnalogIn
+DB_FT101,DB,122,DB_Plant.scl,TRUE,,,,,Экземпляр FB_AnalogIn
+DB_AlarmPT101,DB,123,DB_Plant.scl,TRUE,,,,,Экземпляр FB_AlarmDelay
+DB_Mode,DB,124,DB_Plant.scl,TRUE,,,,,Экземпляр FB_ModeSelect
+DB_PumpAlt,DB,125,DB_Plant.scl,TRUE,,,,,Экземпляр FB_PumpAlternation
+DB_LS201,DB,126,DB_Plant.scl,TRUE,,,,,Экземпляр FB_Debounce
+DB_XV201,DB,127,DB_Plant.scl,TRUE,,,,,Экземпляр FB_Valve
+DB_Dosing,DB,128,DB_Plant.scl,TRUE,,,,,Экземпляр FB_BatchCounter
+DB_Logger,DB,129,DB_Plant.scl,TRUE,,,,,Экземпляр FB_EventLogger
+DB_LegacyTlg,DB,130,DB_Plant.scl,FALSE,,,,,Экземпляр FB_LegacyTelegram (неоптимизированный)
+DB_RampSP,DB,131,DB_Plant.scl,TRUE,,,,,Экземпляр FB_Ramp

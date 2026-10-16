@@ -1,0 +1,180 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:      FB_Sequencer.scl
+// Блок:      FUNCTION_BLOCK "FB_Sequencer"
+// Сценарии:  scenarios/FB_Sequencer.csv (модель scenarios/reference/model_fb_sequencer.py)
+// -----------------------------------------------------------------------------
+// Назначение
+//   Шаговая программа промывки скорого фильтра: опорожнение -> водовоздушная
+//   (воздушная) продувка -> промывка водой -> заполнение. Шаги — CASE по номеру
+//   шага, время шага — один таймер TON_TIME. Экземпляр DB_Backwash.
+//
+// Логика (нормативное описание; порядок шагов внутри вызова важен)
+//   Шаги: 0 IDLE, 10 DRAIN, 20 AIR SCOUR, 30 BACKWASH, 40 REFILL, 90 FAULT.
+//   «Рабочий» шаг — номер в диапазоне 10...40 (то есть 10, 20, 30 или 40; других
+//   номеров в этом диапазоне алгоритм не создаёт). stepTime — время с вызова, на котором
+//   шаг стал текущим (таймер перезапускается в том же вызове, где сменился шаг).
+//   1. Фронты: R_TRIG(start), R_TRIG(reset).
+//   2. Если stop = TRUE и шаг рабочий: шаг := 0 (прерывание, без аварии и без счёта).
+//      Иначе — переход по текущему шагу (не больше одного перехода за вызов):
+//        0:  фронт start AND permissive AND NOT stop        -> 10;
+//        10: levelLow                                       -> 20;
+//            иначе stepTime >= drainTimeout                 -> faultStep := 10, шаг 90;
+//        20: stepTime >= airTime                            -> 30;
+//        30: stepTime >= washTime                           -> 40;
+//        40: levelHigh                                      -> cycleCount + 1, шаг 0;
+//            иначе stepTime >= refillTimeout                -> faultStep := 40, шаг 90;
+//        90: фронт reset                                    -> faultStep := 0, шаг 0;
+//        другое значение                                    -> 0.
+//   3. Выходы по шагу после перехода (в том же вызове):
+//        drainValve := шаг 10 или 30; airBlower := шаг 20; washPump := шаг 30;
+//        inletValve := шаг 40; busy := шаг рабочий; fault := шаг 90;
+//        stepText: 'IDLE', 'DRAIN', 'AIR SCOUR', 'BACKWASH', 'REFILL', 'FAULT'.
+//   Начальное состояние экземпляра: шаг 0, все выходы FALSE / 0, stepText пустая
+//   строка до первого вызова.
+// Что проверяет при конвертации
+//   CASE с метками-литералами и ELSE, TON_TIME c ET, повторный вызов таймера в
+//   одном цикле (сброс и перезапуск), String[20] на выходе, DInt.
+// =============================================================================
+FUNCTION_BLOCK "FB_Sequencer"
+TITLE = Filter backwash sequence
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Filters
+VERSION : 2.0
+//Шаговая программа промывки фильтра
+   VAR_INPUT
+      start : Bool;   // Пуск промывки (по фронту)
+      stop : Bool;   // Прерывание (уровень)
+      permissive : Bool;   // Разрешение: другая промывка не идёт, в РЧВ есть вода
+      levelLow : Bool;   // Фильтр опорожнён
+      levelHigh : Bool;   // Фильтр заполнен
+      reset : Bool;   // Сброс аварии (по фронту)
+      drainTimeout : Time := T#60S;   // Предельное время опорожнения
+      airTime : Time := T#30S;   // Длительность продувки
+      washTime : Time := T#40S;   // Длительность промывки
+      refillTimeout : Time := T#90S;   // Предельное время заполнения
+   END_VAR
+
+   VAR_OUTPUT
+      stepNo : Int;   // Номер шага
+      drainValve : Bool;   // Задвижка сброса промывной воды
+      airBlower : Bool;   // Воздуходувка
+      washPump : Bool;   // Промывной насос
+      inletValve : Bool;   // Задвижка подачи исходной воды
+      busy : Bool;   // Промывка идёт
+      fault : Bool;   // Авария промывки
+      faultStep : Int;   // Шаг, на котором произошла авария
+      cycleCount : DInt;   // Число завершённых промывок
+      stepText : String[20];   // Название шага для HMI
+   END_VAR
+
+   VAR
+      tonStep {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : TON_TIME;   // Время шага (ET)
+      edgeStart {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+      edgeReset {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+   END_VAR
+
+   VAR_TEMP
+      stepAtEntry : Int;
+      stepRunning : Bool;
+   END_VAR
+
+   VAR CONSTANT
+      STEP_IDLE : Int := 0;
+      STEP_DRAIN : Int := 10;
+      STEP_AIR_SCOUR : Int := 20;
+      STEP_BACKWASH : Int := 30;
+      STEP_REFILL : Int := 40;
+      STEP_FAULT : Int := 90;
+      STEP_TIMER_MAX : Time := T#1D;   // PT таймера шага: только ET, Q не используется
+   END_VAR
+
+
+BEGIN
+    REGION Edges and step time
+        #edgeStart(CLK := #start);
+        #edgeReset(CLK := #reset);
+        #stepAtEntry := #stepNo;
+        #stepRunning := #stepNo >= #STEP_DRAIN AND #stepNo <= #STEP_REFILL;
+        #tonStep(IN := #stepRunning, PT := #STEP_TIMER_MAX);
+    END_REGION
+
+    REGION Step transitions
+        IF #stop AND #stepRunning THEN
+            #stepNo := #STEP_IDLE;
+        ELSE
+            CASE #stepNo OF
+                0:  // IDLE
+                    IF #edgeStart.Q AND #permissive AND NOT #stop THEN
+                        #stepNo := #STEP_DRAIN;
+                    END_IF;
+                10:  // DRAIN
+                    IF #levelLow THEN
+                        #stepNo := #STEP_AIR_SCOUR;
+                    ELSIF #tonStep.ET >= #drainTimeout THEN
+                        #faultStep := #STEP_DRAIN;
+                        #stepNo := #STEP_FAULT;
+                    END_IF;
+                20:  // AIR SCOUR
+                    IF #tonStep.ET >= #airTime THEN
+                        #stepNo := #STEP_BACKWASH;
+                    END_IF;
+                30:  // BACKWASH
+                    IF #tonStep.ET >= #washTime THEN
+                        #stepNo := #STEP_REFILL;
+                    END_IF;
+                40:  // REFILL
+                    IF #levelHigh THEN
+                        #cycleCount := #cycleCount + 1;
+                        #stepNo := #STEP_IDLE;
+                    ELSIF #tonStep.ET >= #refillTimeout THEN
+                        #faultStep := #STEP_REFILL;
+                        #stepNo := #STEP_FAULT;
+                    END_IF;
+                90:  // FAULT
+                    IF #edgeReset.Q THEN
+                        #faultStep := 0;
+                        #stepNo := #STEP_IDLE;
+                    END_IF;
+                ELSE
+                    #stepNo := #STEP_IDLE;
+            END_CASE;
+        END_IF;
+    END_REGION
+
+    REGION Restart step timer on transition
+        IF #stepNo <> #stepAtEntry THEN
+            #tonStep(IN := FALSE, PT := #STEP_TIMER_MAX);
+            #tonStep(IN := #stepNo >= #STEP_DRAIN AND #stepNo <= #STEP_REFILL,
+                     PT := #STEP_TIMER_MAX);
+        END_IF;
+    END_REGION
+
+    REGION Outputs
+        #drainValve := #stepNo = #STEP_DRAIN OR #stepNo = #STEP_BACKWASH;
+        #airBlower := #stepNo = #STEP_AIR_SCOUR;
+        #washPump := #stepNo = #STEP_BACKWASH;
+        #inletValve := #stepNo = #STEP_REFILL;
+        #busy := #stepNo >= #STEP_DRAIN AND #stepNo <= #STEP_REFILL;
+        #fault := #stepNo = #STEP_FAULT;
+
+        CASE #stepNo OF
+            0:
+                #stepText := 'IDLE';
+            10:
+                #stepText := 'DRAIN';
+            20:
+                #stepText := 'AIR SCOUR';
+            30:
+                #stepText := 'BACKWASH';
+            40:
+                #stepText := 'REFILL';
+            90:
+                #stepText := 'FAULT';
+        END_CASE;
+    END_REGION
+
+END_FUNCTION_BLOCK
+

@@ -1,0 +1,71 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   OB_Cyclic.scl
+// Блок:   ORGANIZATION_BLOCK "Cyclic interrupt" (OB30, период 100 мс)
+// -----------------------------------------------------------------------------
+// Назначение
+//   Циклическое прерывание 100 мс: измерение расхода и счётчик объёма,
+//   задатчик интенсивности уставки давления и ПИ-регулятор частоты ПЧ.
+//   В проекте S7-300 это был OB35 с тем же периодом; при переходе на S7-1500
+//   блок стал OB30. Номер, период (100 мс), сдвиг фазы и приоритет — свойства
+//   блока, в исходник не попадают (см. BlockProperties.csv). Константа
+//   CYCLE_TIME должна совпадать с периодом — это ручная договорённость.
+//
+// Логика (нормативное описание того, что делает OB)
+//   1. FT101 ("FT101_Raw") через FB_AnalogIn; счётчик объёма FB_Totalizer
+//      с cycleTime := CYCLE_TIME, интегрирование только при достоверном
+//      расходе; объёмы копируются в "DB_Plant".
+//   2. Уставка давления с HMI -> FB_Ramp -> FB_PIController; измеренное
+//      давление берётся из DB_PT101, который вызывается в OB1 (значение
+//      последнего цикла OB1 — риск согласованности данных между задачами).
+//      Ручной режим регулятора — по команде HMI или при недостоверном PT101.
+//   3. Выход регулятора 0...100 % -> 0...27648 на аналоговый выход %QW80
+//      через NORM_X и SCALE_X (SCALE_X с результатом Int).
+// Что проверяет при конвертации
+//   циклический OB -> задача CODESYS с интервалом из свойств блока;
+//   NORM_X Real->Real и SCALE_X Real->Int; данные, общие для двух задач.
+// =============================================================================
+ORGANIZATION_BLOCK "Cyclic interrupt"
+TITLE = Cyclic interrupt 100 ms
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT
+      Initial_Call : Bool;   // Первый вызов OB (состав входов — сверить с TIA Portal)
+      Event_Count : Int;   // Число потерянных запусков
+   END_VAR
+
+   VAR_TEMP
+      speedNorm : Real;   // Задание частоты, доли 0...1
+   END_VAR
+
+   VAR CONSTANT
+      CYCLE_TIME : Time := T#100MS;   // Должно совпадать со свойством OB «Время цикла»
+   END_VAR
+
+
+BEGIN
+    REGION Flow and totalizer
+        "DB_FT101"(raw := "FT101_Raw");
+        "DB_FQ101"(flow := "DB_FT101".value,
+                   cycleTime := #CYCLE_TIME,
+                   enable := "DB_FT101".valid,
+                   reset := "DB_Hmi".resetTotal);
+        "DB_Plant".totalVolume := "DB_FQ101".lifetimeTotal;
+        "DB_Plant".shiftData.volume := "DB_FQ101".total;
+    END_REGION
+
+    REGION Pressure control
+        "DB_RampSP"(target := "DB_Hmi".setpointPressure,
+                    cycleTime := #CYCLE_TIME);
+        "DB_PIC101"(sp := "DB_RampSP".rampValue,
+                    pv := "DB_PT101".value,
+                    manual := "DB_Hmi".pidManual OR NOT "DB_PT101".valid,
+                    manValue := "DB_Hmi".pidManualValue,
+                    cycleTime := #CYCLE_TIME);
+        #speedNorm := NORM_X(MIN := 0.0, VALUE := "DB_PIC101".outPercent, MAX := 100.0);
+        %QW80 := SCALE_X(MIN := 0, VALUE := #speedNorm, MAX := 27648);
+    END_REGION
+
+END_ORGANIZATION_BLOCK
+

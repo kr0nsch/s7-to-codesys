@@ -1,0 +1,105 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   FC_Statistics.scl
+// Блок:   FUNCTION "FC_Statistics" : Int
+// -----------------------------------------------------------------------------
+// Назначение
+//   Скользящая выборка расхода (8 отсчётов) и статистика по ней: минимум,
+//   максимум, среднее по достоверным отсчётам. Массив выборки передаётся как
+//   VAR_IN_OUT и хранится в "DB_Plant".flowSamples (у FC нет своей памяти).
+//
+// Логика (нормативное описание)
+//   1. Если validLow > validHigh: minValue, maxValue, average := 0.0,
+//      возвращается -1, ENO не меняется (RETURN сразу).
+//   2. Если shift = TRUE: samples[1..7] := samples[2..8], samples[8] := newSample.
+//   3. Достоверный отсчёт — validLow <= samples[i] <= validHigh; остальные
+//      пропускаются (CONTINUE).
+//   4. По достоверным: minValue, maxValue, average (сумма в LReal / число).
+//      Если достоверных нет: minValue = maxValue = average = 0.0.
+//   5. Возвращаемое значение — число достоверных отсчётов 0...8.
+// Что проверяет при конвертации
+//   FUNCTION с типом результата и присваиванием #FC_Statistics := ...,
+//   VAR_IN_OUT массива, FOR ... TO ... BY, CONTINUE, RETURN, MIN/MAX(IN1, IN2),
+//   INT_TO_LREAL, LREAL_TO_REAL.
+// =============================================================================
+FUNCTION "FC_Statistics" : Int
+TITLE = Min/max/average over 8 samples
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Math
+VERSION : 1.0
+   VAR_INPUT
+      newSample : Real;   // Новый отсчёт
+      shift : Bool;   // Сдвинуть выборку и добавить newSample
+      validLow : Real;   // Нижняя граница достоверности
+      validHigh : Real;   // Верхняя граница достоверности
+   END_VAR
+
+   VAR_OUTPUT
+      minValue : Real;   // Минимум
+      maxValue : Real;   // Максимум
+      average : Real;   // Среднее
+   END_VAR
+
+   VAR_IN_OUT
+      samples : Array[1..8] of Real;   // Выборка (хранится у вызывающего)
+   END_VAR
+
+   VAR_TEMP
+      i : Int;
+      count : Int;
+      sum : LReal;
+   END_VAR
+
+   VAR CONSTANT
+      SAMPLE_COUNT : Int := 8;
+   END_VAR
+
+
+BEGIN
+    #minValue := 0.0;
+    #maxValue := 0.0;
+    #average := 0.0;
+
+    IF #validLow > #validHigh THEN
+        #FC_Statistics := -1;
+        RETURN;
+    END_IF;
+
+    REGION Shift window
+        IF #shift THEN
+            FOR #i := 1 TO #SAMPLE_COUNT - 1 BY 1 DO
+                #samples[#i] := #samples[#i + 1];
+            END_FOR;
+            #samples[#SAMPLE_COUNT] := #newSample;
+        END_IF;
+    END_REGION
+
+    REGION Statistics
+        #count := 0;
+        #sum := 0.0;
+        FOR #i := 1 TO #SAMPLE_COUNT DO
+            IF #samples[#i] < #validLow OR #samples[#i] > #validHigh THEN
+                CONTINUE;
+            END_IF;
+            IF #count = 0 THEN
+                #minValue := #samples[#i];
+                #maxValue := #samples[#i];
+            ELSE
+                #minValue := MIN(IN1 := #minValue, IN2 := #samples[#i]);
+                #maxValue := MAX(IN1 := #maxValue, IN2 := #samples[#i]);
+            END_IF;
+            #count := #count + 1;
+            #sum := #sum + REAL_TO_LREAL(#samples[#i]);
+        END_FOR;
+
+        IF #count > 0 THEN
+            #average := LREAL_TO_REAL(#sum / INT_TO_LREAL(#count));
+        END_IF;
+    END_REGION
+
+    #FC_Statistics := #count;
+
+END_FUNCTION
+

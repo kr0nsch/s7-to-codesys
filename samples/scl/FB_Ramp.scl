@@ -1,0 +1,87 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   FB_Ramp.scl
+// Блок:   FUNCTION_BLOCK "FB_Ramp"
+// -----------------------------------------------------------------------------
+// Назначение
+//   Задатчик интенсивности: плавное изменение уставки давления при её смене
+//   оператором, чтобы регулятор не «бросал» насосы. Вызывается в OB
+//   "Cyclic interrupt". Экземпляр DB_RampSP.
+//
+// Логика (нормативное описание; один вызов = один период cycleTime)
+//   1. Первый вызов экземпляра (initDone = FALSE): rampValue := target,
+//      initDone := TRUE (без разгона с нуля).
+//   2. track = TRUE: rampValue := trackValue (мгновенно, приоритет над hold).
+//      Иначе hold = TRUE: rampValue не меняется.
+//      Иначе шаг вверх не больше rateUp * dt, вниз не больше rateDown * dt
+//      (dt — cycleTime в секундах; rateUp/rateDown — ед./с, отрицательные
+//      считаются нулём), без перескока через target.
+//   3. atTarget := rampValue = target; rising := в этом вызове был шаг вверх и
+//      цель ещё не достигнута; falling — то же вниз.
+// Что проверяет при конвертации
+//   MIN/MAX с именованными параметрами, TIME_TO_DINT, статический флаг первого
+//   вызова, ELSIF-цепочка, сравнение Real на равенство (требует проверки).
+// =============================================================================
+FUNCTION_BLOCK "FB_Ramp"
+TITLE = Setpoint ramp generator
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Control
+VERSION : 1.0
+   VAR_INPUT
+      target : Real;   // Целевое значение
+      rateUp : Real := 0.1;   // Скорость роста, ед./с
+      rateDown : Real := 0.2;   // Скорость снижения, ед./с
+      hold : Bool;   // Заморозить выход
+      track : Bool;   // Следовать за trackValue
+      trackValue : Real;   // Значение для слежения
+      cycleTime : Time := T#100MS;   // Период вызова
+   END_VAR
+
+   VAR_OUTPUT
+      rampValue : Real;   // Выход задатчика
+      atTarget : Bool;   // Выход равен цели
+      rising : Bool;   // Идёт рост
+      falling : Bool;   // Идёт снижение
+   END_VAR
+
+   VAR
+      initDone : Bool;   // Первый вызов выполнен
+   END_VAR
+
+   VAR_TEMP
+      dtSeconds : Real;
+      stepUp : Real;
+      stepDown : Real;
+      moving : Bool;
+   END_VAR
+
+
+BEGIN
+    #dtSeconds := DINT_TO_REAL(TIME_TO_DINT(#cycleTime)) / 1000.0;
+    #stepUp := MAX(IN1 := #rateUp, IN2 := 0.0) * #dtSeconds;
+    #stepDown := MAX(IN1 := #rateDown, IN2 := 0.0) * #dtSeconds;
+    #moving := FALSE;
+
+    IF NOT #initDone THEN
+        #rampValue := #target;
+        #initDone := TRUE;
+    ELSIF #track THEN
+        #rampValue := #trackValue;
+    ELSIF #hold THEN
+        ;
+    ELSIF #rampValue < #target THEN
+        #rampValue := MIN(IN1 := #rampValue + #stepUp, IN2 := #target);
+        #moving := TRUE;
+    ELSIF #rampValue > #target THEN
+        #rampValue := MAX(IN1 := #rampValue - #stepDown, IN2 := #target);
+        #moving := TRUE;
+    END_IF;
+
+    #atTarget := #rampValue = #target;
+    #rising := #moving AND #rampValue < #target;
+    #falling := #moving AND #rampValue > #target;
+
+END_FUNCTION_BLOCK
+

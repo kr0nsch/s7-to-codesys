@@ -1,0 +1,110 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:      FB_Totalizer.scl
+// Блок:      FUNCTION_BLOCK "FB_Totalizer"
+// Сценарии:  scenarios/FB_Totalizer.csv (модель scenarios/reference/model_fb_totalizer.py)
+// -----------------------------------------------------------------------------
+// Назначение
+//   Счётчик объёма по мгновенному расходу (интегрирование м3/ч -> м3).
+//   Вызывается в циклическом OB с постоянным периодом; период передаётся
+//   параметром cycleTime (в OB "Cyclic interrupt" — T#100MS). Экземпляр DB_FQ101.
+//   Объём за всё время хранится в сохраняемой статической переменной (VAR RETAIN).
+//
+// Логика (нормативное описание; один вызов = один период cycleTime)
+//   1. cutoffActive := flow < lowFlowCutoff (отрицательный расход тоже ниже отсечки).
+//   2. dt := cycleTime в секундах (TIME_TO_DINT(cycleTime) / 1000.0, LReal).
+//      dV := flow * dt / 3600.0 (м3, LReal), если enable = TRUE и cutoffActive = FALSE;
+//      иначе dV := 0.0.
+//   3. lifetimeAcc := lifetimeAcc + dV (RETAIN; reset на него не действует);
+//      lifetimeTotal := lifetimeAcc.
+//   4. pulse := FALSE.
+//      Если reset = TRUE (уровень): total := 0.0, pulseCount := 0, остаток импульса := 0.0;
+//      в таком вызове total не интегрируется.
+//      Иначе: total := total + dV; остаток := остаток + dV;
+//             если pulseVolume > 0 и остаток >= pulseVolume:
+//                 pulse := TRUE, pulseCount := pulseCount + 1, остаток := остаток - pulseVolume.
+//      Не больше одного импульса за вызов: при dV > pulseVolume импульсы «догоняют»
+//      в следующих вызовах.
+//   Начальное состояние экземпляра: все выходы 0 / FALSE, остаток 0.0, lifetimeAcc 0.0.
+// Что проверяет при конвертации
+//   LReal, TIME_TO_DINT, DINT_TO_LREAL, REAL_TO_LREAL, VAR RETAIN в ФБ
+//   (-> RETAIN/PERSISTENT в CODESYS), вызов с периодом из циклического OB.
+// =============================================================================
+FUNCTION_BLOCK "FB_Totalizer"
+TITLE = Flow totalizer
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Analog
+VERSION : 1.1
+//Интегратор расхода с отсечкой малых расходов и импульсным выходом
+   VAR_INPUT
+      flow : Real;   // Мгновенный расход, м3/ч
+      cycleTime : Time := T#100MS;   // Период вызова блока
+      lowFlowCutoff : Real := 0.5;   // Отсечка малых расходов, м3/ч
+      enable : Bool := TRUE;   // Интегрирование разрешено
+      reset : Bool;   // Сброс сменного счётчика (уровень)
+      pulseVolume : Real := 1.0;   // Объём на один импульс, м3
+   END_VAR
+
+   VAR_OUTPUT
+      total : LReal;   // Объём с последнего сброса, м3
+      lifetimeTotal : LReal;   // Объём за всё время, м3
+      pulseCount : DInt;   // Число импульсов с последнего сброса
+      pulse : Bool;   // Импульс на один вызов при каждом pulseVolume
+      cutoffActive : Bool;   // Расход ниже отсечки
+   END_VAR
+
+   VAR
+      pulseAcc : LReal;   // Остаток объёма до следующего импульса, м3
+   END_VAR
+   VAR RETAIN
+      lifetimeAcc : LReal;   // Объём за всё время, м3 (сохраняется при перезапуске)
+   END_VAR
+
+   VAR_TEMP
+      dtSeconds : LReal;
+      deltaVolume : LReal;
+   END_VAR
+
+   VAR CONSTANT
+      SECONDS_PER_HOUR : LReal := 3600.0;
+      MS_PER_SECOND : LReal := 1000.0;
+   END_VAR
+
+
+BEGIN
+    REGION Increment
+        #cutoffActive := #flow < #lowFlowCutoff;
+        #dtSeconds := DINT_TO_LREAL(TIME_TO_DINT(#cycleTime)) / #MS_PER_SECOND;
+        IF #enable AND NOT #cutoffActive THEN
+            #deltaVolume := REAL_TO_LREAL(#flow) * #dtSeconds / #SECONDS_PER_HOUR;
+        ELSE
+            #deltaVolume := 0.0;
+        END_IF;
+    END_REGION
+
+    REGION Lifetime total
+        #lifetimeAcc := #lifetimeAcc + #deltaVolume;
+        #lifetimeTotal := #lifetimeAcc;
+    END_REGION
+
+    REGION Resettable total and pulses
+        #pulse := FALSE;
+        IF #reset THEN
+            #total := 0.0;
+            #pulseCount := 0;
+            #pulseAcc := 0.0;
+        ELSE
+            #total := #total + #deltaVolume;
+            #pulseAcc := #pulseAcc + #deltaVolume;
+            IF #pulseVolume > 0.0 AND #pulseAcc >= REAL_TO_LREAL(#pulseVolume) THEN
+                #pulse := TRUE;
+                #pulseCount := #pulseCount + 1;
+                #pulseAcc := #pulseAcc - REAL_TO_LREAL(#pulseVolume);
+            END_IF;
+        END_IF;
+    END_REGION
+
+END_FUNCTION_BLOCK
+

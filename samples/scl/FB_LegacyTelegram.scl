@@ -1,0 +1,132 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   FB_LegacyTelegram.scl
+// Блок:   FUNCTION_BLOCK "FB_LegacyTelegram"
+// -----------------------------------------------------------------------------
+// Назначение
+//   Упаковка телеграммы для удалённой станции (обмен через коммуникационный
+//   процессор старой S7-300). Блок перенесён из STEP 7 V5.x без переработки и
+//   оставлен неоптимизированным (S7_Optimized_Access := 'FALSE').
+//   Экземпляр DB_LegacyTlg, буфер — DB_Telegram (DB30), архив — DB40.
+//   Блок НАМЕРЕННО собран из конструкций, которые автоматически не переносятся:
+//   AT-наложения, ANY-указатель и его разбор через AT-структуру, BLKMOV с
+//   P#-указателем, абсолютная адресация %DB30.DBW0, косвенная адресация
+//   WORD_TO_BLOCK_DB(...).DW[...], таймер S5 (S_ODT с номером таймера),
+//   GOTO и метки, ENO. Ожидаемый результат конвертации — MIGRATION-TODO
+//   с причиной по каждой конструкции; перенос — ручной, по описанию ниже.
+//
+// Логика (для ручного переноса)
+//   1. По фронту send (память sendMem) телеграмма формируется, иначе выход
+//      (GOTO lblExit), done := FALSE.
+//   2. Длина области source берётся из ANY-указателя (поле length
+//      AT-структуры). Больше 16 байт -> error := TRUE, ENO := FALSE, выход.
+//   3. BLKMOV копирует source в DB30, байты 4...19; retVal — код BLKMOV.
+//   4. Заголовок: %DB30.DBW0 := statusWord, %DB30.DBW2 := номер телеграммы
+//      (seqNo + 1).
+//   5. Если в statusWord бит 3 (авария станции) — слово дублируется в архив
+//      WORD_TO_BLOCK_DB(archiveDb).DW[0]; биты разбираются через AT-наложение
+//      массива Bool на копию слова.
+//   6. Ошибка BLKMOV -> error, ENO := FALSE, переход к повтору; без ошибки
+//      done := TRUE, retries := 0.
+//   7. Повтор: S_ODT (таймер "T_Retry" = T5, задержка retryDelay в S5Time);
+//      по истечении — retries + 1 (не больше 3) и сброс sendMem, чтобы
+//      следующий вызов с send = TRUE повторил отправку.
+// =============================================================================
+FUNCTION_BLOCK "FB_LegacyTelegram"
+TITLE = Legacy telegram packer
+{ S7_Optimized_Access := 'FALSE' }
+AUTHOR : WTP1
+FAMILY : Comm
+NAME : TLGPACK
+VERSION : 3.4
+//Перенесён из STEP 7 V5.5 без переработки
+   VAR_INPUT
+      send : Bool;   // Отправить (по фронту)
+      statusWord : Word;   // Слово состояния станции
+      source : Any;   // Область данных для отправки (не больше 16 байт)
+      archiveDb : Int;   // Номер DB архива
+      retryDelay : S5Time := S5T#2S;   // Задержка повтора
+   END_VAR
+
+   VAR_OUTPUT
+      done : Bool;   // Телеграмма сформирована
+      error : Bool;   // Ошибка
+      retVal : Int;   // Код возврата BLKMOV
+      retries : Int;   // Число повторов
+   END_VAR
+
+   VAR
+      seqNo : Int;   // Номер телеграммы
+      statusCopy : Word;   // Копия слова состояния
+      statusBits AT statusCopy : Array[0..15] of Bool;   // Наложение: биты слова
+      sendMem : Bool;   // Память фронта send
+   END_VAR
+
+   VAR_TEMP
+      srcPtr : Any;   // Копия ANY-указателя
+      srcView AT srcPtr : Struct   // Разбор ANY: 10 байт
+         syntaxId : Byte;
+         dataType : Byte;
+         length : Int;
+         dbNumber : Int;
+         areaPointer : DWord;
+      END_STRUCT;
+      remaining : S5Time;
+      retryElapsed : Bool;
+      timerValue : Word;
+   END_VAR
+
+
+BEGIN
+    #statusCopy := #statusWord;
+    #done := FALSE;
+
+    IF NOT (#send AND NOT #sendMem) THEN
+        #sendMem := #send;
+        GOTO lblExit;
+    END_IF;
+    #sendMem := #send;
+
+    #srcPtr := #source;
+    IF #srcView.length > 16 THEN
+        #error := TRUE;
+        ENO := FALSE;
+        GOTO lblExit;
+    END_IF;
+
+    #retVal := BLKMOV(SRCBLK := #source, DSTBLK => P#DB30.DBX4.0 BYTE 16);
+    %DB30.DBW0 := #statusCopy;
+    #seqNo := #seqNo + 1;
+    %DB30.DBW2 := INT_TO_WORD(#seqNo);
+
+    IF #statusBits[3] THEN
+        WORD_TO_BLOCK_DB(INT_TO_WORD(#archiveDb)).DW[0] := #statusCopy;
+    END_IF;
+
+    IF #retVal <> 0 THEN
+        #error := TRUE;
+        ENO := FALSE;
+        GOTO lblRetry;
+    END_IF;
+    #done := TRUE;
+    #error := FALSE;
+    #retries := 0;
+
+lblRetry:
+    #remaining := S_ODT(T_NO := "T_Retry",
+                        S := #error,
+                        TV := #retryDelay,
+                        R := #done,
+                        Q => #retryElapsed,
+                        BI => #timerValue);
+    IF #retryElapsed AND #retries < 3 THEN
+        #retries := #retries + 1;
+        #sendMem := FALSE;
+    END_IF;
+
+lblExit:
+    ;
+
+END_FUNCTION_BLOCK
+

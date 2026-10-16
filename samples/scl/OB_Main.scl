@@ -1,0 +1,207 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   OB_Main.scl
+// Блок:   ORGANIZATION_BLOCK "Main" (OB1, циклическая программа)
+// -----------------------------------------------------------------------------
+// Назначение
+//   Главный цикл станции: аналоговые входы, сигнализация, режим и группа
+//   насосов, промывка фильтра, дозирование, статистика расхода, журнал,
+//   старая телеграмма, слова состояния в меркерах для старой панели.
+//   Номер OB1 и класс события — свойства блока, в исходник не попадают
+//   (см. BlockProperties.csv).
+//
+// Логика (нормативное описание того, что делает OB)
+//   1. Копия аварийного стопа %I0.0; PT101 (%IW64) и LT101 ("LT101_Raw")
+//      через экземпляры FB_AnalogIn; прямое чтение периферии %IW272:P.
+//   2. Сигнализация давления: HH или неисправность канала PT101 с задержкой
+//      5 с; лампа "Lamp_Alarm" — сигнализация или нажат аварийный стоп;
+//      слово аварий "DB_Plant".alarmWord побитно (.%X0...%X4).
+//   3. Режим группы (FB_ModeSelect, слово команд HMI как VAR_IN_OUT), запрос
+//      числом гасится после вызова. Требуемое число насосов в авто: давление
+//      ниже уставки на 0,5 бар и более — 2; ниже уставки — 1; выше уставки
+//      на 0,3 бар — 0; между — без изменений (держится текущее число).
+//      Без аварийного стопа или не в авто — 0.
+//   4. Чередование и три насоса (FB_PumpAlternation + 3 x FB_Motor), выходы
+//      на контакторы — через присваивание и через "=>" в вызове.
+//   5. Промывка фильтра (FB_Sequencer), поплавок через FB_Debounce, задвижка
+//      подачи (FB_Valve).
+//   6. Дозирование (FB_BatchCounter), счётчики в %MD20.
+//   7. Раз в секунду (фронт меркера тактов "Clock_1Hz") — сдвиг выборки
+//      расхода и статистика FC_Statistics, отправка старой телеграммы.
+//   8. Журнал событий: код 101 — сигнализация PT101, 201...203 — аварии
+//      насосов, иначе 0.
+//   9. Слова состояния для старой панели: %MW10, %M12.0; счётчик жизни.
+// Что проверяет при конвертации
+//   OB1 -> PROGRAM + задача CODESYS; вызовы экземплярных DB ("DB_X"(...));
+//   %I/%Q/%IW/%QW/%MW/%MD/%M и символьные теги "Tag" -> слой ввода-вывода (GVL с AT);
+//   доступ к периферии :P; вызов FC с выходами "=>" и VAR_IN_OUT; P#-указатель
+//   в параметре ANY; чтение выходов экземпляров в одном цикле.
+// =============================================================================
+ORGANIZATION_BLOCK "Main"
+TITLE = "Main Program Sweep (Cycle)"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT
+      Initial_Call : Bool;   // Первый вызов OB после перехода в RUN
+      Remanence : Bool;   // TRUE, если сохраняемые данные доступны
+   END_VAR
+
+   VAR_TEMP
+      demandPumps : Int;   // Требуемое число насосов
+      shiftNow : Bool;   // Фронт тактового меркера 1 Гц
+      eventCode : Int;   // Код события для журнала
+   END_VAR
+
+
+BEGIN
+    IF #Initial_Call THEN
+        "DB_Plant".plantMode := 1;
+    END_IF;
+
+    REGION Safety and analog inputs
+        "DB_Plant".estopOk := %I0.0;
+        "DB_PT101"(raw := %IW64);
+        "DB_LT101"(raw := "LT101_Raw");
+        "DB_Plant".tankLevel := "DB_LT101".value;
+        "DB_Plant".pressureFastRaw := %IW272:P;   // прямое чтение периферии мимо образа процесса
+    END_REGION
+
+    REGION Alarms
+        "DB_AlarmPT101"(condition := "DB_PT101".alarmHH OR "DB_PT101".channelFault,
+                        ack := "DB_Hmi".alarmAck OR "Btn_Ack",
+                        onDelay := T#5S);
+        "Lamp_Alarm" := "DB_AlarmPT101".alarm OR NOT "DB_Plant".estopOk;
+        "DB_Plant".alarmWord.%X0 := "DB_AlarmPT101".active;
+        "DB_Plant".alarmWord.%X1 := "DB_P101".fault;
+        "DB_Plant".alarmWord.%X2 := "DB_P102".fault;
+        "DB_Plant".alarmWord.%X3 := "DB_P103".fault;
+        "DB_Plant".alarmWord.%X4 := "DB_Backwash".fault;
+    END_REGION
+
+    REGION Mode and pump group
+        "DB_Mode"(localSwitch := %I1.0,
+                  modeRequest := "DB_Hmi".modeRequest,
+                  hmiCmd := "DB_Hmi".cmdWord);
+        "DB_Hmi".modeRequest := -1;
+
+        IF NOT "DB_Plant".estopOk OR "DB_Mode".mode <> 2 THEN
+            #demandPumps := 0;
+        ELSIF "DB_PT101".value <= "DB_Hmi".setpointPressure - 0.5 THEN
+            #demandPumps := 2;
+        ELSIF "DB_PT101".value < "DB_Hmi".setpointPressure THEN
+            #demandPumps := 1;
+        ELSIF "DB_PT101".value > "DB_Hmi".setpointPressure + 0.3 THEN
+            #demandPumps := 0;
+        ELSE
+            #demandPumps := "DB_PumpAlt".runningCount;
+        END_IF;
+
+        "DB_PumpAlt"(demand := #demandPumps,
+                     available1 := NOT "DB_P101".fault AND %I0.2,
+                     available2 := NOT "DB_P102".fault AND "P102_ThermalOk",
+                     available3 := NOT "DB_P103".fault AND "P103_ThermalOk",
+                     alternate := FALSE);
+
+        "DB_P101"(autoMode := "DB_Mode".mode = 2,
+                  autoStart := "DB_PumpAlt".run1,
+                  manStart := "DB_Hmi".pump[1].startReq,
+                  manStop := "DB_Hmi".pump[1].stopReq OR "DB_Mode".mode = 0,
+                  feedback := "P101_Fbk",
+                  thermalOk := %I0.2,
+                  reset := "DB_Hmi".pump[1].resetReq,
+                  runCmd => "P101_Run");
+        "DB_P102"(autoMode := "DB_Mode".mode = 2,
+                  autoStart := "DB_PumpAlt".run2,
+                  manStart := "DB_Hmi".pump[2].startReq,
+                  manStop := "DB_Hmi".pump[2].stopReq OR "DB_Mode".mode = 0,
+                  feedback := "P102_Fbk",
+                  thermalOk := "P102_ThermalOk",
+                  reset := "DB_Hmi".pump[2].resetReq,
+                  runCmd => %Q0.1);
+        "DB_P103"(autoMode := "DB_Mode".mode = 2,
+                  autoStart := "DB_PumpAlt".run3,
+                  manStart := "DB_Hmi".pump[3].startReq,
+                  manStop := "DB_Hmi".pump[3].stopReq OR "DB_Mode".mode = 0,
+                  feedback := "P103_Fbk",
+                  thermalOk := "P103_ThermalOk",
+                  reset := "DB_Hmi".pump[3].resetReq);
+        "P103_Run" := "DB_P103".runCmd;
+
+        "DB_Plant".pumpStatus[1] := "DB_P101".status;
+        "DB_Plant".pumpStatus[2] := "DB_P102".status;
+        "DB_Plant".pumpStatus[3] := "DB_P103".status;
+    END_REGION
+
+    REGION Filter backwash
+        "DB_LS201"(raw := %I0.5,
+                   onDelayS5 := S5T#300MS);
+        "DB_Backwash"(start := "DB_Hmi".backwashStart,
+                      stop := "DB_Hmi".backwashStop OR NOT "DB_Plant".estopOk,
+                      permissive := "DB_Plant".tankLevel > 1.5,
+                      levelLow := "DB_LS201".debounced,
+                      levelHigh := %I0.6,
+                      reset := "DB_Hmi".alarmAck);
+        %Q0.4 := "DB_Backwash".drainValve;
+        "Q_AirBlower" := "DB_Backwash".airBlower;
+        "Q_WashPump" := "DB_Backwash".washPump;
+
+        "DB_XV201"(cmdOpen := "DB_Backwash".inletValve,
+                   cmdClose := NOT "DB_Backwash".inletValve,
+                   limitOpen := "XV201_Opened",
+                   limitClosed := "XV201_Closed",
+                   reset := "DB_Hmi".alarmAck);
+        %Q1.0 := "DB_XV201".coilOpen;
+        %Q1.1 := "DB_XV201".coilClose;
+    END_REGION
+
+    REGION Dosing
+        "DB_Dosing"(pulseInput := %I3.0,
+                    reset := "DB_Hmi".resetTotal);
+        %MD20 := "DB_Dosing".packedCounters;
+    END_REGION
+
+    REGION Flow statistics once per second
+        #shiftNow := "Clock_1Hz" AND NOT "DB_Plant".clockMem;
+        "DB_Plant".clockMem := "Clock_1Hz";
+        "DB_Plant".flowSampleCount := "FC_Statistics"(newSample := "DB_FT101".value,
+                                                       shift := #shiftNow,
+                                                       validLow := 0.0,
+                                                       validHigh := 1200.0,
+                                                       minValue => "DB_Plant".flowMin,
+                                                       maxValue => "DB_Plant".flowMax,
+                                                       average => "DB_Plant".flowAvg,
+                                                       samples := "DB_Plant".flowSamples);
+    END_REGION
+
+    REGION Event log and legacy telegram
+        IF "DB_AlarmPT101".active THEN
+            #eventCode := 101;
+        ELSIF "DB_P101".fault THEN
+            #eventCode := 201;
+        ELSIF "DB_P102".fault THEN
+            #eventCode := 202;
+        ELSIF "DB_P103".fault THEN
+            #eventCode := 203;
+        ELSE
+            #eventCode := 0;
+        END_IF;
+        "DB_Logger"(eventCode := #eventCode,
+                    eventText := 'PLANT EVENT',
+                    extraInfo := "DB_P101".status.faultCode,
+                    clear := FALSE);
+
+        "DB_LegacyTlg"(send := #shiftNow,
+                       statusWord := "DB_Plant".alarmWord,
+                       source := P#M100.0 BYTE 16,
+                       archiveDb := 40);
+    END_REGION
+
+    REGION Legacy HMI memory words
+        %MW10 := "DB_PT101".statusWord;
+        %M12.0 := "DB_P101".status.running;
+        "DB_Plant".heartbeat := INT_TO_BYTE(BYTE_TO_INT("DB_Plant".heartbeat) + 1);
+    END_REGION
+
+END_ORGANIZATION_BLOCK
+

@@ -1,0 +1,110 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:      FB_AlarmDelay.scl
+// Блок:      FUNCTION_BLOCK "FB_AlarmDelay"
+// Сценарии:  scenarios/FB_AlarmDelay.csv (модель scenarios/reference/model_fb_alarm_delay.py)
+// -----------------------------------------------------------------------------
+// Назначение
+//   Технологическая сигнализация с задержкой появления, задержкой снятия и
+//   квитированием. Состояния в духе ISA-18.2 (норма, активна неквитирована,
+//   активна квитирована, снята неквитирована). Экземпляр DB_AlarmPT101.
+//
+// Логика (нормативное описание; порядок шагов внутри вызова важен)
+//   1. Фронт квитирования: R_TRIG(ack).
+//   2. Задержка появления: TON_TIME (IN := condition AND enable, PT := onDelay).
+//   3. Задержка снятия:    TOF_TIME (IN := выход Q таймера п. 2, PT := offDelay).
+//      active := Q таймера п. 3 AND enable.
+//   4. Если в этом вызове фронт квитирования: unacked := FALSE.
+//   5. Фронт active (R_TRIG): unacked := TRUE, count := count + 1.
+//      (Квитирование обрабатывается раньше: сигнал, появившийся в вызове с
+//      фронтом ack, остаётся неквитированным.)
+//   6. Если enable = FALSE: unacked := FALSE (сигнал выведен из работы).
+//   7. alarm := active OR unacked.
+//   8. state: 1 — active и unacked; 2 — active и NOT unacked;
+//             3 — NOT active и unacked; 0 — иначе.
+//   Начальное состояние экземпляра: все выходы FALSE / 0.
+// Что проверяет при конвертации
+//   TON_TIME + TOF_TIME в цепочке, R_TRIG по выходу самого ФБ, IF/ELSIF.
+// =============================================================================
+FUNCTION_BLOCK "FB_AlarmDelay"
+TITLE = Alarm with delays and acknowledge
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Alarms
+VERSION : 1.0
+//Сигнализация: задержка появления, задержка снятия, квитирование
+   VAR_INPUT
+      condition : Bool;   // Условие сигнала (без задержек)
+      enable : Bool := TRUE;   // Сигнал в работе
+      ack : Bool;   // Квитирование (по фронту)
+      onDelay : Time := T#5S;   // Задержка появления
+      offDelay : Time := T#2S;   // Задержка снятия
+   END_VAR
+
+   VAR_OUTPUT
+      active : Bool;   // Сигнал активен (с учётом задержек)
+      unacked : Bool;   // Требует квитирования
+      alarm : Bool;   // Индикация: активен или не квитирован
+      state : Int;   // 0 — норма, 1 — активен/неквит., 2 — активен/квит., 3 — снят/неквит.
+      count : DInt;   // Число появлений
+   END_VAR
+
+   VAR
+      tonOn {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : TON_TIME;
+      tofOff {InstructionName := 'TOF_TIME'; LibVersion := '1.0'} : TOF_TIME;
+      edgeAck {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+      edgeActive {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+   END_VAR
+
+   VAR CONSTANT
+      STATE_NORMAL : Int := 0;
+      STATE_ACTIVE_UNACKED : Int := 1;
+      STATE_ACTIVE_ACKED : Int := 2;
+      STATE_CLEARED_UNACKED : Int := 3;
+   END_VAR
+
+
+BEGIN
+    #edgeAck(CLK := #ack);
+
+    REGION Delays
+        #tonOn(IN := #condition AND #enable,
+               PT := #onDelay);
+        #tofOff(IN := #tonOn.Q,
+                PT := #offDelay);
+        #active := #tofOff.Q AND #enable;
+    END_REGION
+
+    REGION Acknowledge
+        IF #edgeAck.Q THEN
+            #unacked := FALSE;
+        END_IF;
+
+        #edgeActive(CLK := #active);
+        IF #edgeActive.Q THEN
+            #unacked := TRUE;
+            #count := #count + 1;
+        END_IF;
+
+        IF NOT #enable THEN
+            #unacked := FALSE;
+        END_IF;
+    END_REGION
+
+    REGION Outputs
+        #alarm := #active OR #unacked;
+
+        IF #active AND #unacked THEN
+            #state := #STATE_ACTIVE_UNACKED;
+        ELSIF #active THEN
+            #state := #STATE_ACTIVE_ACKED;
+        ELSIF #unacked THEN
+            #state := #STATE_CLEARED_UNACKED;
+        ELSE
+            #state := #STATE_NORMAL;
+        END_IF;
+    END_REGION
+
+END_FUNCTION_BLOCK
+

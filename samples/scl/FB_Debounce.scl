@@ -1,0 +1,80 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   FB_Debounce.scl
+// Блок:   FUNCTION_BLOCK "FB_Debounce"
+// -----------------------------------------------------------------------------
+// Назначение
+//   Фильтр дребезга дискретного сигнала (поплавок, концевик). Блок перенесён со
+//   старой S7-300: задержки по-прежнему задаются в S5Time и переводятся в Time
+//   функцией S5TI_TIM. Экземпляр DB_LS201 (поплавок «фильтр опорожнён»),
+//   мультиэкземпляры в FB_Valve (концевики задвижки).
+//
+// Логика (нормативное описание)
+//   1. signal := raw XOR invert (invert = TRUE для нормально замкнутого контакта).
+//   2. onDelay := S5TI_TIM(onDelayS5), offDelay := S5TI_TIM(offDelayS5).
+//   3. debounced := TOF_TIME(IN := TON_TIME(IN := signal, PT := onDelay).Q,
+//                            PT := offDelay).Q
+//      — TRUE после onDelay непрерывного signal = TRUE; FALSE через offDelay после
+//      того, как выход задержки включения стал FALSE.
+//   4. rising / falling — импульс на один вызов по фронту / спаду debounced
+//      (R_TRIG / F_TRIG); changeCount (UDInt) — число смен debounced.
+// Что проверяет при конвертации
+//   S5Time и литералы S5T# -> TIME с пометкой о точности S5Time (шаг 10 мс...10 с);
+//   S5TI_TIM (нет в CODESYS: преобразование не нужно, если тип стал TIME);
+//   TOF_TIME, F_TRIG, UDInt, XOR.
+// =============================================================================
+FUNCTION_BLOCK "FB_Debounce"
+TITLE = Debounce filter
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP1
+FAMILY : Signals
+VERSION : 1.0
+//Фильтр дребезга с задержками в S5Time
+   VAR_INPUT
+      raw : Bool;   // Сигнал с входа
+      invert : Bool;   // Инверсия (НЗ контакт)
+      onDelayS5 : S5Time := S5T#200MS;   // Задержка включения
+      offDelayS5 : S5Time := S5T#500MS;   // Задержка выключения
+   END_VAR
+
+   VAR_OUTPUT
+      debounced : Bool;   // Отфильтрованный сигнал
+      rising : Bool;   // Фронт debounced (один вызов)
+      falling : Bool;   // Спад debounced (один вызов)
+      changeCount : UDInt;   // Число смен состояния
+   END_VAR
+
+   VAR
+      tonOn {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : TON_TIME;
+      tofOff {InstructionName := 'TOF_TIME'; LibVersion := '1.0'} : TOF_TIME;
+      edgeUp {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+      edgeDown {InstructionName := 'F_TRIG'; LibVersion := '1.0'} : F_TRIG;
+   END_VAR
+
+   VAR_TEMP
+      signal : Bool;
+      onDelay : Time;
+      offDelay : Time;
+   END_VAR
+
+
+BEGIN
+    #signal := #raw XOR #invert;
+    #onDelay := S5TI_TIM(#onDelayS5);
+    #offDelay := S5TI_TIM(#offDelayS5);
+
+    #tonOn(IN := #signal, PT := #onDelay);
+    #tofOff(IN := #tonOn.Q, PT := #offDelay);
+    #debounced := #tofOff.Q;
+
+    #edgeUp(CLK := #debounced);
+    #edgeDown(CLK := #debounced);
+    #rising := #edgeUp.Q;
+    #falling := #edgeDown.Q;
+    IF #rising OR #falling THEN
+        #changeCount := #changeCount + 1;
+    END_IF;
+
+END_FUNCTION_BLOCK
+

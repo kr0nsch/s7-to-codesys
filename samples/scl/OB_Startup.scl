@@ -1,0 +1,86 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   OB_Startup.scl
+// Блоки:  ORGANIZATION_BLOCK "Startup" (OB100, запуск),
+//         ORGANIZATION_BLOCK "Diagnostic error interrupt" (OB82)
+// -----------------------------------------------------------------------------
+// Назначение
+//   "Startup": инициализация после перехода CPU в RUN — режим станции, слово
+//   команд HMI; при потере сохраняемых данных — обнуление накопленных величин;
+//   при потере часов — установка времени по умолчанию (WR_SYS_T, тип DTL).
+//   "Diagnostic error interrupt": счётчик диагностических событий модулей и
+//   последние HW-идентификатор, канал, IO_State.
+//   Состав входов OB (LostRetentive, LostRTC; IO_State, LADDR, Channel,
+//   MultiError) приведён по памяти — сверить с документацией TIA Portal.
+//
+// Логика (нормативное описание)
+//   Startup:
+//     1. plantMode := 0, cmdWord := 0, modeRequest := -1.
+//     2. LostRetentive: totalVolume := 0, backwashCount := 0,
+//        filterRuntime[1..4] := T#0MS.
+//     3. LostRTC: clockLost := TRUE, WR_SYS_T(defaultClock).
+//   Diagnostic error interrupt:
+//     diagCount + 1; diagLastLaddr := LADDR; diagLastChannel := Channel;
+//     diagIoState := IO_State.
+// Что проверяет при конвертации
+//   OB100 -> код инициализации (в CODESYS нет OB запуска: флаг первого цикла,
+//   FB_init или системное событие — решение вручную); OB82 и HW_ANY — без
+//   аналога (диагностика в CODESYS через драйверы/IoDrv — ручная работа);
+//   WR_SYS_T и DTL — системные, MIGRATION-TODO.
+// =============================================================================
+ORGANIZATION_BLOCK "Startup"
+TITLE = "Complete Restart"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT
+      LostRetentive : Bool;   // TRUE, если сохраняемые данные потеряны
+      LostRTC : Bool;   // TRUE, если часы реального времени потеряны
+   END_VAR
+
+   VAR_TEMP
+      i : Int;
+      ret : Int;
+   END_VAR
+
+
+BEGIN
+    "DB_Plant".plantMode := 0;
+    "DB_Hmi".cmdWord := 16#0000;
+    "DB_Hmi".modeRequest := -1;
+
+    IF #LostRetentive THEN
+        "DB_Plant".totalVolume := 0.0;
+        "DB_Plant".backwashCount := 0;
+        FOR #i := 1 TO 4 DO
+            "DB_Plant".filterRuntime[#i] := T#0MS;
+        END_FOR;
+    END_IF;
+
+    IF #LostRTC THEN
+        "DB_Plant".clockLost := TRUE;
+        #ret := WR_SYS_T("DB_Plant".defaultClock);
+    END_IF;
+
+END_ORGANIZATION_BLOCK
+
+ORGANIZATION_BLOCK "Diagnostic error interrupt"
+TITLE = Diagnostic error interrupt
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT
+      IO_State : Word;   // Состояние ввода-вывода объекта
+      LADDR : HW_ANY;   // Аппаратный идентификатор
+      Channel : UInt;   // Номер канала
+      MultiError : Bool;   // TRUE, если ошибок несколько
+   END_VAR
+
+
+BEGIN
+    "DB_Plant".diagCount := "DB_Plant".diagCount + 1;
+    "DB_Plant".diagLastLaddr := #LADDR;
+    "DB_Plant".diagLastChannel := #Channel;
+    "DB_Plant".diagIoState := #IO_State;
+
+END_ORGANIZATION_BLOCK
+

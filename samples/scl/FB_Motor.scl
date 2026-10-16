@@ -1,0 +1,158 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:      FB_Motor.scl
+// Блок:      FUNCTION_BLOCK "FB_Motor"
+// Сценарии:  scenarios/FB_Motor.csv (модель scenarios/reference/model_fb_motor.py)
+// -----------------------------------------------------------------------------
+// Назначение
+//   Управление нерегулируемым насосом (прямой пуск контактором): режимы авто и
+//   ручной, контроль обратной связи по времени, тепловая защита, защёлка аварии
+//   с кодом, счётчик пусков, состояние для HMI в "UDT_DeviceStatus".
+//   Экземпляры: DB_P101, DB_P102, DB_P103 (насосы II подъёма).
+//
+// Логика (нормативное описание; порядок шагов внутри вызова важен)
+//   Коды аварии: 0 — нет, 1 — нет обратной связи после пуска, 2 — обратная связь
+//   пропала в работе, 3 — тепловая защита, 4 — обратная связь без команды.
+//   Правило «первая авария»: код записывается, только если fault = FALSE.
+//   1. Сброс: по фронту reset (R_TRIG), если thermalOk = TRUE:
+//      fault := FALSE, код := 0.
+//   2. Тепловая защита: если thermalOk = FALSE и fault = FALSE: fault := TRUE, код := 3.
+//   3. Ручная защёлка manRun:
+//        autoMode = TRUE:  manRun := autoStart (слежение: переход авто -> ручной безударный);
+//        autoMode = FALSE: если manStop или fault -> manRun := FALSE,
+//                          иначе если manStart -> manRun := TRUE, иначе без изменений.
+//   4. demand := autoStart в авто, manRun в ручном; runCmd := demand AND NOT fault.
+//   5. feedbackSeen := FALSE, если runCmd = FALSE; := TRUE, если runCmd и feedback;
+//      иначе без изменений.
+//   6. Рассогласование: TON_TIME (IN := runCmd XOR feedback, PT := feedbackTime).
+//      Если Q = TRUE и fault = FALSE: fault := TRUE; код := 4, если runCmd = FALSE;
+//      иначе 2, если feedbackSeen; иначе 1. В этом же вызове runCmd := FALSE.
+//   7. startCount (DInt) увеличивается на 1 по фронту итогового runCmd (R_TRIG).
+//   8. status: running := runCmd AND feedback; fault; autoMode := вход autoMode;
+//      faultCode; startCount.
+//   Сброс не снимает аварию 4, пока обратная связь без команды держится дольше
+//   feedbackTime: таймер п. 6 остаётся в Q = TRUE и снова ставит аварию в том же вызове.
+// Что проверяет при конвертации
+//   TON_TIME/R_TRIG как мультиэкземпляры (атрибуты InstructionName/LibVersion),
+//   вызов с переносом параметров на несколько строк, XOR, выход типа UDT,
+//   локальные константы.
+// =============================================================================
+FUNCTION_BLOCK "FB_Motor"
+TITLE = Motor with feedback monitoring
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Drives
+VERSION : 2.1
+//Насос прямого пуска: авто/ручной, контроль обратной связи, тепловая защита
+   VAR_INPUT
+      autoMode : Bool;   // TRUE — авто, FALSE — ручной
+      autoStart : Bool;   // Команда пуска от автоматики (уровень)
+      manStart : Bool;   // Пуск оператором в ручном режиме
+      manStop : Bool;   // Стоп оператором в ручном режиме, приоритет над пуском
+      feedback : Bool;   // Обратная связь «в работе» от контактора
+      thermalOk : Bool := TRUE;   // Тепловое реле в норме
+      reset : Bool;   // Сброс аварии (по фронту)
+      feedbackTime : Time := T#3S;   // Допустимое рассогласование команды и обратной связи
+   END_VAR
+
+   VAR_OUTPUT
+      runCmd : Bool;   // Команда на контактор
+      fault : Bool;   // Авария (защёлка)
+      status : "UDT_DeviceStatus";   // Состояние для HMI
+   END_VAR
+
+   VAR
+      manRun : Bool;   // Защёлка ручного пуска
+      feedbackSeen : Bool;   // Обратная связь была после подачи команды
+      faultCode : Int;   // Код аварии
+      startCount : DInt;   // Число пусков
+      tonFeedback {InstructionName := 'TON_TIME'; LibVersion := '1.0'} : TON_TIME;
+      edgeReset {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+      edgeRun {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+   END_VAR
+
+   VAR_TEMP
+      demand : Bool;
+   END_VAR
+
+   VAR CONSTANT
+      FAULT_NONE : Int := 0;
+      FAULT_NO_FEEDBACK : Int := 1;
+      FAULT_FEEDBACK_LOST : Int := 2;
+      FAULT_THERMAL : Int := 3;
+      FAULT_UNEXPECTED_FEEDBACK : Int := 4;
+   END_VAR
+
+
+BEGIN
+    REGION Fault reset
+        #edgeReset(CLK := #reset);
+        IF #edgeReset.Q AND #thermalOk THEN
+            #fault := FALSE;
+            #faultCode := #FAULT_NONE;
+        END_IF;
+    END_REGION
+
+    REGION Thermal protection
+        IF NOT #thermalOk AND NOT #fault THEN
+            #fault := TRUE;
+            #faultCode := #FAULT_THERMAL;
+        END_IF;
+    END_REGION
+
+    REGION Mode and demand
+        IF #autoMode THEN
+            #manRun := #autoStart;   // слежение за командой авто
+        ELSIF #manStop OR #fault THEN
+            #manRun := FALSE;
+        ELSIF #manStart THEN
+            #manRun := TRUE;
+        END_IF;
+
+        IF #autoMode THEN
+            #demand := #autoStart;
+        ELSE
+            #demand := #manRun;
+        END_IF;
+        #runCmd := #demand AND NOT #fault;
+    END_REGION
+
+    REGION Feedback monitoring
+        IF NOT #runCmd THEN
+            #feedbackSeen := FALSE;
+        ELSIF #feedback THEN
+            #feedbackSeen := TRUE;
+        END_IF;
+
+        #tonFeedback(IN := #runCmd XOR #feedback,
+                     PT := #feedbackTime);
+
+        IF #tonFeedback.Q AND NOT #fault THEN
+            #fault := TRUE;
+            IF NOT #runCmd THEN
+                #faultCode := #FAULT_UNEXPECTED_FEEDBACK;
+            ELSIF #feedbackSeen THEN
+                #faultCode := #FAULT_FEEDBACK_LOST;
+            ELSE
+                #faultCode := #FAULT_NO_FEEDBACK;
+            END_IF;
+            #runCmd := FALSE;
+        END_IF;
+    END_REGION
+
+    REGION Statistics and HMI status
+        #edgeRun(CLK := #runCmd);
+        IF #edgeRun.Q THEN
+            #startCount := #startCount + 1;
+        END_IF;
+
+        #status.running := #runCmd AND #feedback;
+        #status.fault := #fault;
+        #status.autoMode := #autoMode;
+        #status.faultCode := #faultCode;
+        #status.startCount := #startCount;
+    END_REGION
+
+END_FUNCTION_BLOCK
+

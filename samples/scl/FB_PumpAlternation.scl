@@ -1,0 +1,135 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:      FB_PumpAlternation.scl
+// Блок:      FUNCTION_BLOCK "FB_PumpAlternation"
+// Сценарии:  scenarios/FB_PumpAlternation.csv
+//            (модель scenarios/reference/model_fb_pump_alternation.py)
+// -----------------------------------------------------------------------------
+// Назначение
+//   Чередование трёх насосов (рабочий/резервный): равномерная наработка за счёт
+//   смены ведущего насоса, подхват резервным при недоступности, нехватка насосов.
+//   Экземпляр DB_PumpAlt; requests runN уходят в autoStart экземпляров FB_Motor.
+//
+// Логика (нормативное описание; порядок шагов внутри вызова важен)
+//   Насосы 1...3. Порядок обхода от ведущего lead циклический: lead, lead+1, ...
+//   (после 3 идёт 1). Начальное значение lead = 1.
+//   1. required := LIMIT(0, demand, 3).
+//   2. Событие смены ведущего rotate := фронт alternate (R_TRIG)
+//      OR (спад условия required > 0 (F_TRIG) AND rotateOnStop).
+//      Спад — переход required от > 0 к 0 между двумя вызовами; на первом вызове
+//      экземпляра спада нет, даже если required = 0.
+//   3. Если lead вне 1...3: lead := 1. Если rotate: ищется следующий доступный
+//      насос после lead по кругу (не больше трёх шагов: lead+1, lead+2, lead);
+//      найденный становится lead; если доступных нет — lead не меняется.
+//      Пока событий нет, lead не меняется, даже если ведущий недоступен.
+//   4. Назначение: обход от lead по кругу, runN := availableN AND (назначено < required);
+//      назначено считается по уже включённым в этом обходе. Недоступный ведущий
+//      пропускается — его подхватывает следующий доступный.
+//   5. leadPump := lead; runningCount := число назначенных; shortage := назначено < required.
+// Что проверяет при конвертации
+//   Array[1..3] of Bool, FOR, REPEAT ... UNTIL, MOD, F_TRIG с выражением на CLK,
+//   LIMIT. Внимание: начальное состояние памяти F_TRIG в S7 и CODESYS сверить —
+//   первая строка сценариев проверяет, что на первом вызове спада нет.
+// =============================================================================
+FUNCTION_BLOCK "FB_PumpAlternation"
+TITLE = Duty/standby alternation of 3 pumps
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Pumps
+VERSION : 1.4
+//Чередование насосов II подъёма
+   VAR_INPUT
+      demand : Int;   // Требуемое число насосов 0...3
+      available1 : Bool;   // Насос 1 готов (авто, нет аварии)
+      available2 : Bool;   // Насос 2 готов
+      available3 : Bool;   // Насос 3 готов
+      alternate : Bool;   // Принудительная смена ведущего (по фронту)
+      rotateOnStop : Bool := TRUE;   // Менять ведущего при каждом останове группы
+   END_VAR
+
+   VAR_OUTPUT
+      run1 : Bool;   // Запрос работы насоса 1
+      run2 : Bool;   // Запрос работы насоса 2
+      run3 : Bool;   // Запрос работы насоса 3
+      leadPump : Int;   // Номер ведущего насоса
+      runningCount : Int;   // Число назначенных насосов
+      shortage : Bool;   // Доступных насосов меньше, чем требуется
+   END_VAR
+
+   VAR
+      lead : Int := 1;   // Ведущий насос
+      avail : Array[1..3] of Bool;   // Готовность насосов
+      runReq : Array[1..3] of Bool;   // Назначение насосов
+      edgeAlternate {InstructionName := 'R_TRIG'; LibVersion := '1.0'} : R_TRIG;
+      edgeStop {InstructionName := 'F_TRIG'; LibVersion := '1.0'} : F_TRIG;
+   END_VAR
+
+   VAR_TEMP
+      k : Int;
+      idx : Int;
+      candidate : Int;
+      tries : Int;
+      required : Int;
+      assigned : Int;
+      rotate : Bool;
+   END_VAR
+
+   VAR CONSTANT
+      PUMP_COUNT : Int := 3;
+   END_VAR
+
+
+BEGIN
+    REGION Inputs
+        #avail[1] := #available1;
+        #avail[2] := #available2;
+        #avail[3] := #available3;
+        #required := LIMIT(MN := 0, IN := #demand, MX := #PUMP_COUNT);
+    END_REGION
+
+    REGION Lead rotation
+        #edgeAlternate(CLK := #alternate);
+        #edgeStop(CLK := #required > 0);
+        #rotate := #edgeAlternate.Q OR (#edgeStop.Q AND #rotateOnStop);
+
+        IF #lead < 1 OR #lead > #PUMP_COUNT THEN
+            #lead := 1;
+        END_IF;
+
+        IF #rotate THEN
+            #candidate := #lead;
+            #tries := 0;
+            REPEAT
+                #candidate := #candidate MOD #PUMP_COUNT + 1;
+                #tries := #tries + 1;
+            UNTIL #avail[#candidate] OR #tries >= #PUMP_COUNT
+            END_REPEAT;
+            IF #avail[#candidate] THEN
+                #lead := #candidate;
+            END_IF;
+        END_IF;
+    END_REGION
+
+    REGION Assignment
+        #assigned := 0;
+        FOR #k := 0 TO #PUMP_COUNT - 1 DO
+            #idx := (#lead - 1 + #k) MOD #PUMP_COUNT + 1;
+            #runReq[#idx] := #avail[#idx] AND #assigned < #required;
+            IF #runReq[#idx] THEN
+                #assigned := #assigned + 1;
+            END_IF;
+        END_FOR;
+    END_REGION
+
+    REGION Outputs
+        #run1 := #runReq[1];
+        #run2 := #runReq[2];
+        #run3 := #runReq[3];
+        #leadPump := #lead;
+        #runningCount := #assigned;
+        #shortage := #assigned < #required;
+    END_REGION
+
+END_FUNCTION_BLOCK
+

@@ -1,0 +1,6 @@
+{
+  "Main": {"number": 1, "kind": "main"},
+  "Cyclic interrupt": {"number": 30, "kind": "cyclic", "interval_ms": 100},
+  "Startup": {"number": 100, "kind": "startup"},
+  "Diagnostic error interrupt": {"number": 82, "kind": "event"}
+}

@@ -1,0 +1,161 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:      FB_AnalogIn.scl
+// Блок:      FUNCTION_BLOCK "FB_AnalogIn"
+// Сценарии:  scenarios/FB_AnalogIn.csv (эталонная модель
+//            scenarios/reference/model_fb_analog_in.py написана по этому описанию)
+// -----------------------------------------------------------------------------
+// Назначение
+//   Обработка аналогового входа: перевод значения канала S7 (номинал 0...27648)
+//   в инженерные единицы через NORM_X/SCALE_X, диагностика канала, четыре уставки
+//   с гистерезисом, имитация, слово состояния для HMI.
+//   Экземпляры: DB_PT101 (давление в коллекторе 0...16 бар), DB_LT101 (уровень
+//   РЧВ), DB_FT101 (расход).
+//
+// Логика (нормативное описание; один вызов ФБ — один шаг)
+//   1. Диагностика по сырому значению raw (границы — представление аналоговых
+//      величин S7 для диапазонов 0...20 / 4...20 мА; сверить с руководством на модуль):
+//        channelFault := raw > 32511 OR raw < -4864
+//                        (вне зон перегрузки: 32767 — переполнение/обрыв,
+//                        -32768 — антипереполнение);
+//        overrange    := NOT channelFault AND raw > 27648;
+//        underrange   := NOT channelFault AND raw < 0.
+//   2. Значение value и достоверность valid:
+//        simulation = TRUE      -> value := simValue, valid := TRUE
+//                                  (флаги п. 1 считаются, но на value не влияют);
+//        иначе channelFault     -> value := substitute, valid := FALSE;
+//        иначе                  -> rawClamped := LIMIT(0, raw, 27648);
+//                                  value := SCALE_X(rangeLow, NORM_X(0, rawClamped, 27648), rangeHigh),
+//                                  т. е. value = rangeLow + (rangeHigh - rangeLow) * rawClamped / 27648;
+//                                  valid := TRUE.
+//   3. Уставки с гистерезисом hysteresis. Если valid = FALSE, все четыре флага := FALSE.
+//      Иначе каждый флаг меняется независимо, между порогами сохраняет значение:
+//        alarmHH: TRUE при value >= limitHH; FALSE при value < limitHH - hysteresis;
+//        warnH:   TRUE при value >= limitH;  FALSE при value < limitH - hysteresis;
+//        warnL:   TRUE при value <= limitL;  FALSE при value > limitL + hysteresis;
+//        alarmLL: TRUE при value <= limitLL; FALSE при value > limitLL + hysteresis.
+//   4. statusWord: бит 0 — valid, 1 — channelFault, 2 — overrange, 3 — underrange,
+//      4 — alarmHH, 5 — warnH, 6 — warnL, 7 — alarmLL, 8 — simulation; биты 9...15 = 0.
+//   Начальное состояние экземпляра: все выходы FALSE / 0.
+// Что проверяет при конвертации
+//   NORM_X/SCALE_X -> F_NormX/F_ScaleX; LIMIT с именованными параметрами MN/IN/MX;
+//   локальные константы #CONST; REGION; запись битов Word через .%Xn.
+// =============================================================================
+FUNCTION_BLOCK "FB_AnalogIn"
+TITLE = Analog input scaling with limits
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Analog
+VERSION : 1.3
+//Масштабирование канала 0...27648 в инженерные единицы, уставки с гистерезисом
+   VAR_INPUT
+      raw : Int;   // Значение канала модуля AI
+      rangeLow : Real := 0.0;   // Инж. значение при raw = 0
+      rangeHigh : Real := 16.0;   // Инж. значение при raw = 27648
+      limitHH : Real := 14.0;   // Уставка аварийно высокого значения
+      limitH : Real := 12.0;   // Уставка предупредительно высокого значения
+      limitL : Real := 2.0;   // Уставка предупредительно низкого значения
+      limitLL : Real := 1.0;   // Уставка аварийно низкого значения
+      hysteresis : Real := 0.5;   // Гистерезис уставок, инж. ед.
+      substitute : Real := 0.0;   // Значение при неисправности канала
+      simulation : Bool;   // Режим имитации
+      simValue : Real;   // Значение имитации, инж. ед.
+   END_VAR
+
+   VAR_OUTPUT
+      value : Real;   // Значение, инж. ед.
+      valid : Bool;   // Значение достоверно
+      channelFault : Bool;   // Неисправность канала: обрыв, КЗ, переполнение
+      overrange : Bool;   // Выше номинала (27649...32511)
+      underrange : Bool;   // Ниже номинала (-4864...-1)
+      alarmHH : Bool;   // Аварийно высокое
+      warnH : Bool;   // Предупредительно высокое
+      warnL : Bool;   // Предупредительно низкое
+      alarmLL : Bool;   // Аварийно низкое
+      statusWord : Word;   // Слово состояния для HMI
+   END_VAR
+
+   VAR_TEMP
+      rawClamped : Int;
+      normalized : Real;
+   END_VAR
+
+   VAR CONSTANT
+      RAW_NOMINAL_LOW : Int := 0;
+      RAW_NOMINAL_HIGH : Int := 27648;
+      RAW_OVERSHOOT_MAX : Int := 32511;
+      RAW_UNDERSHOOT_MIN : Int := -4864;
+   END_VAR
+
+
+BEGIN
+    REGION Channel diagnostics
+        #channelFault := #raw > #RAW_OVERSHOOT_MAX OR #raw < #RAW_UNDERSHOOT_MIN;
+        #overrange := NOT #channelFault AND #raw > #RAW_NOMINAL_HIGH;
+        #underrange := NOT #channelFault AND #raw < #RAW_NOMINAL_LOW;
+    END_REGION
+
+    REGION Scaling
+        IF #simulation THEN
+            #value := #simValue;
+            #valid := TRUE;
+        ELSIF #channelFault THEN
+            #value := #substitute;
+            #valid := FALSE;
+        ELSE
+            #rawClamped := LIMIT(MN := #RAW_NOMINAL_LOW, IN := #raw, MX := #RAW_NOMINAL_HIGH);
+            #normalized := NORM_X(MIN := #RAW_NOMINAL_LOW, VALUE := #rawClamped, MAX := #RAW_NOMINAL_HIGH);
+            #value := SCALE_X(MIN := #rangeLow, VALUE := #normalized, MAX := #rangeHigh);
+            #valid := TRUE;
+        END_IF;
+    END_REGION
+
+    REGION Limits with hysteresis
+        IF #valid THEN
+            IF #value >= #limitHH THEN
+                #alarmHH := TRUE;
+            ELSIF #value < #limitHH - #hysteresis THEN
+                #alarmHH := FALSE;
+            END_IF;
+
+            IF #value >= #limitH THEN
+                #warnH := TRUE;
+            ELSIF #value < #limitH - #hysteresis THEN
+                #warnH := FALSE;
+            END_IF;
+
+            IF #value <= #limitL THEN
+                #warnL := TRUE;
+            ELSIF #value > #limitL + #hysteresis THEN
+                #warnL := FALSE;
+            END_IF;
+
+            IF #value <= #limitLL THEN
+                #alarmLL := TRUE;
+            ELSIF #value > #limitLL + #hysteresis THEN
+                #alarmLL := FALSE;
+            END_IF;
+        ELSE
+            #alarmHH := FALSE;
+            #warnH := FALSE;
+            #warnL := FALSE;
+            #alarmLL := FALSE;
+        END_IF;
+    END_REGION
+
+    REGION Status word
+        #statusWord := 16#0000;
+        #statusWord.%X0 := #valid;
+        #statusWord.%X1 := #channelFault;
+        #statusWord.%X2 := #overrange;
+        #statusWord.%X3 := #underrange;
+        #statusWord.%X4 := #alarmHH;
+        #statusWord.%X5 := #warnH;
+        #statusWord.%X6 := #warnL;
+        #statusWord.%X7 := #alarmLL;
+        #statusWord.%X8 := #simulation;
+    END_REGION
+
+END_FUNCTION_BLOCK
+

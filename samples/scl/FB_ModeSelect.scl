@@ -1,0 +1,121 @@
+// =============================================================================
+// s7-to-codesys — корпус SCL. Написан с нуля, объект вымышленный (ВОС «Северная»).
+//
+// Файл:   FB_ModeSelect.scl
+// Блок:   FUNCTION_BLOCK "FB_ModeSelect"
+// -----------------------------------------------------------------------------
+// Назначение
+//   Выбор режима группы насосов: вывод из работы (0), ручной (1), авто (2),
+//   местный (3). Запросы приходят с HMI битами слова команд (VAR_IN_OUT —
+//   блок сам сбрасывает обработанные биты) или числом modeRequest.
+//   Экземпляр DB_Mode, слово команд — "DB_Hmi".cmdWord.
+//
+// Логика (нормативное описание)
+//   Биты hmiCmd: .%X0 — в авто, .%X1 — в ручной, .%X2 — вывести из работы,
+//   .%X3 — ввести в работу (из 0 в ручной).
+//   1. localSwitch = TRUE (ключ «Местное» на шкафу): mode := 3, все биты
+//      запросов сбрасываются без исполнения. При возврате ключа mode := 1.
+//   2. Иначе приоритет запросов: бит 2 -> 0; бит 3 при mode = 0 -> 1;
+//      бит 1 при mode <> 0 -> 1; бит 0 при mode <> 0 -> 2.
+//      Биты 0...3 после обработки сбрасываются (hmiCmd AND 16#FFF0).
+//   3. modeRequest (Int, -1 — нет запроса), обрабатывается после битов:
+//        0      -> mode := 0;
+//        1, 2   -> mode := modeRequest, если mode <> 0;
+//        3..99  -> отказ (rejectCount + 1): местный режим только ключом;
+//        другое -> без действий.
+//   4. statusWord: биты 0...3 — mode = 0...3 (унитарный код), бит 8 — localSwitch,
+//      старший байт .%B1 дополнительно копируется в statusHigh.
+//   modeText — 'OOS', 'MANUAL', 'AUTO', 'LOCAL'.
+// Что проверяет при конвертации
+//   VAR_IN_OUT типа Word, чтение и запись битов через .%Xn, маски 16#...,
+//   CASE с перечислением меток (1, 2:) и диапазоном (3..99:), String.
+// =============================================================================
+FUNCTION_BLOCK "FB_ModeSelect"
+TITLE = Operating mode selection
+{ S7_Optimized_Access := 'TRUE' }
+AUTHOR : WTP2
+FAMILY : Pumps
+VERSION : 1.0
+   VAR_INPUT
+      localSwitch : Bool;   // Ключ «Местное» на шкафу
+      modeRequest : Int := -1;   // Запрос режима числом (-1 — нет)
+   END_VAR
+
+   VAR_OUTPUT
+      mode : Int;   // 0 — вывод из работы, 1 — ручной, 2 — авто, 3 — местный
+      modeText : String[10];   // Название режима
+      statusWord : Word;   // Слово состояния
+      statusHigh : Byte;   // Старший байт statusWord
+      rejectCount : Int;   // Отклонённые запросы
+   END_VAR
+
+   VAR_IN_OUT
+      hmiCmd : Word;   // Слово команд HMI
+   END_VAR
+
+   VAR
+      wasLocal : Bool;   // На прошлом вызове был местный режим
+   END_VAR
+
+
+BEGIN
+    REGION Local switch
+        IF #localSwitch THEN
+            #mode := 3;
+            #wasLocal := TRUE;
+            #hmiCmd := #hmiCmd AND 16#FFF0;
+        ELSIF #wasLocal THEN
+            #mode := 1;
+            #wasLocal := FALSE;
+        END_IF;
+    END_REGION
+
+    REGION HMI request bits
+        IF NOT #localSwitch THEN
+            IF #hmiCmd.%X2 THEN
+                #mode := 0;
+            ELSIF #hmiCmd.%X3 AND #mode = 0 THEN
+                #mode := 1;
+            ELSIF #hmiCmd.%X1 AND #mode <> 0 THEN
+                #mode := 1;
+            ELSIF #hmiCmd.%X0 AND #mode <> 0 THEN
+                #mode := 2;
+            END_IF;
+            #hmiCmd := #hmiCmd AND 16#FFF0;
+
+            CASE #modeRequest OF
+                0:
+                    #mode := 0;
+                1, 2:
+                    IF #mode <> 0 THEN
+                        #mode := #modeRequest;
+                    END_IF;
+                3..99:
+                    #rejectCount := #rejectCount + 1;
+            END_CASE;
+        END_IF;
+    END_REGION
+
+    REGION Status
+        #statusWord := 16#0000;
+        #statusWord.%X0 := #mode = 0;
+        #statusWord.%X1 := #mode = 1;
+        #statusWord.%X2 := #mode = 2;
+        #statusWord.%X3 := #mode = 3;
+        #statusWord.%X8 := #localSwitch;
+        #statusHigh := #statusWord.%B1;
+
+        CASE #mode OF
+            0:
+                #modeText := 'OOS';
+            1:
+                #modeText := 'MANUAL';
+            2:
+                #modeText := 'AUTO';
+            3:
+                #modeText := 'LOCAL';
+        END_CASE;
+    END_REGION
+
+END_FUNCTION_BLOCK
+
