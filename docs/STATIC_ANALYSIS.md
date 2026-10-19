@@ -230,7 +230,7 @@ pytest добавлял объявление `TIME_TO_DINT` сам).
 |---|---|
 | `test_st_lint.py::test_template_toml_matches_defaults` | умолчания `st_lint.py` против эталона шаблона `tools/tests/fixtures/st_lint_template.toml` (`st_lint.toml` проекта не сравнивается) |
 | `test_st_lint.py::test_repository_toml_is_valid` | `st_lint.toml` проекта разбирается, каждый ключ известен |
-| `test_run_iec_checker.py::test_integration_repository_sources` (`src`, `src+tests`) | `src/` и `tests/` проходят iec_checker с `tools/check/iec_checker_allow.toml` проекта: `ParserError` 0, необоснованных 0, с `tests/` каждое обоснование используется |
+| `test_run_iec_checker.py::test_integration_repository_sources` (`src`, `src+tests`) | `src/` и `tests/` проходят iec_checker с `tools/check/iec_checker_allow.toml` проекта: `ParserError` 0, необоснованных 0, с `tests/` используется каждое обоснование, кроме записей `checker = "nightly"` |
 | `test_run_rusty.py::test_repository_exclude_file_is_valid` | у каждой строки `rusty_exclude.txt` есть причина |
 
 Что проект отличается от шаблона ровно задуманным, проверяет `tools_project/test_repo_config.py`:

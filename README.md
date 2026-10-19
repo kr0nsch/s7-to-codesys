@@ -11,7 +11,7 @@
   <a href="LICENSE"><img alt="Лицензия MIT" src="https://img.shields.io/badge/license-MIT-56677D?style=flat-square&labelColor=1B2736"></a>
   <img alt="CODESYS 3.5.17" src="https://img.shields.io/badge/CODESYS-3.5.17-C2410C?style=flat-square&labelColor=1B2736">
   <img alt="IEC 61131-3" src="https://img.shields.io/badge/IEC%2061131--3-56677D?style=flat-square">
-  <a href="#тесты-и-проверки"><img alt="Тесты: coUnit 74 из 74 в CODESYS Control Win, pytest 1024" src="https://img.shields.io/badge/tests-coUnit%2074%2F74%20%C2%B7%20pytest%201024-3A4B60?style=flat-square&labelColor=1B2736"></a>
+  <a href="#тесты-и-проверки"><img alt="Тесты: coUnit 74 из 74 в CODESYS Control Win, pytest 1027" src="https://img.shields.io/badge/tests-coUnit%2074%2F74%20%C2%B7%20pytest%201027-3A4B60?style=flat-square&labelColor=1B2736"></a>
   <img alt="Язык: Python" src="https://img.shields.io/badge/Python-3A4B60?style=flat-square&logo=python&logoColor=white">
   <img alt="Язык: Structured Text" src="https://img.shields.io/badge/Structured%20Text-3A4B60?style=flat-square">
 </p>
@@ -232,7 +232,7 @@ C0195, сужение — ошибка C0032) — [docs/STATIC_ANALYSIS.md](docs
 | Проверка | Итог |
 |---|---|
 | ruff, `ruff format --check`, mypy (strict, 63 файла) | без замечаний |
-| pytest | 1024 теста: разбор, эмиттер, генератор тестов, снапшоты фикстур, снапшот корпуса, RuSTy и iec_checker по всему `src/` и `tests/` (если инструмент установлен), интерпретатор ST `stsim` — те же наборы coUnit против сконвертированного кода и мутации логики |
+| pytest | 1027 тестов: разбор, эмиттер, генератор тестов, снапшоты фикстур, снапшот корпуса, RuSTy и iec_checker по всему `src/` и `tests/` (если инструмент установлен), интерпретатор ST `stsim` — те же наборы coUnit против сконвертированного кода и мутации логики |
 | `s7conv build-corpus --check`, `gen-tests --check` | сгенерированное совпадает с конвертером побайтно |
 | `st_lint --strict` | 242 файла, 0 замечаний |
 | iec_checker 0.4 (`run_iec_checker.py --tests`) | `ParserError` 0, необоснованных находок 0; обоснования — в STATIC_ANALYSIS.md |
