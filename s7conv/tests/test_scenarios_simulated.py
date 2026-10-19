@@ -1,4 +1,4 @@
-"""Тесты coUnit, исполненные интерпретатором ST (s7conv/tests/stsim.py) без CODESYS.
+"""Тесты coUnit, исполненные интерпретатором ST (s7conv/sim/stsim.py) без CODESYS.
 
 Исполняются закоммиченные файлы: сгенерированные наборы tests/POUs/Scenarios против сконвертированного
 кода src/*/Converted и слоя S7Compat, рукописные наборы tests/POUs/S7Compat. Это предварительная
@@ -18,8 +18,8 @@ import copy
 import pytest
 
 from s7conv.layout import L
+from s7conv.sim.stsim import F_TRIG_IEC_M_FALSE, F_TRIG_S7, Sim, SuiteOutcome
 from s7conv.tests.conftest import REPO_ROOT
-from s7conv.tests.stsim import F_TRIG_IEC_M_FALSE, F_TRIG_S7, Sim, SuiteOutcome
 
 SCENARIO_SUITES = [
     "FB_AlarmDelay_ScenarioTest",
