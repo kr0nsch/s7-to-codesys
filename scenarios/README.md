@@ -153,6 +153,11 @@ scenario,cycle,t_ms,<столбцы данных>,boundary,comment
 `GVL_S7Clock.tSimNow` на `t_ms` строки. Тесты генерирует `s7conv gen-tests scenarios --out tests`
 (папка `tests/POUs/Scenarios`).
 
+**Сценарии своих блоков.** Тот же формат, каталог — свой: `python -m s7conv gen-tests my_plc/scenarios
+--out build/my_plc/tests --corpus my_plc/scl`, где `--corpus` — каталог ваших исходников SCL. Запуск — из
+корня репозитория с относительными путями; код для таких тестов конвертируется с `--timers s7compat`.
+Пример сценария, посчитанного вручную, и порядок работы — [docs/USAGE.md](../docs/USAGE.md), шаг 6.
+
 ## Допуски и точность
 
 - REAL — `0.001`, LREAL — `0.000001`. Допуски с запасом: значения подобраны так, что точно

@@ -3,9 +3,10 @@
 # правила, которые предлагают синтаксис Python 3 (pyupgrade и др.).
 
 [project]
-name = "plc-repo-template-tools"
+# Версия пакета — версия конвертера s7conv (s7conv --version); версия репозитория — в CHANGELOG.md
+name = "s7-to-codesys"
 version = "0.1.0"
-description = "Инструменты шаблона ПЛК-репозитория: раскладка ST, сборка, линтер, проверки; конвертер SCL → ST s7conv"
+description = "Конвертер s7conv из SCL Siemens S7 (TIA Portal) в ST CODESYS V3.5; инструменты ПЛК-репозитория: раскладка ST, сборка, линтер, проверки"
 requires-python = ">=3.11"
 
 # Конвертер s7conv (пакет s7conv/): python -m pip install -e . даёт консольную команду s7conv;

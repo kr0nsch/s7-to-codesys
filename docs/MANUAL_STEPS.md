@@ -2,7 +2,7 @@
 
 Что делает человек: установка CODESYS и coUnit, импорт в проект, сборка и тесты в CODESYS Control Win,
 ручные объекты проекта. Всё, что выполняется без CODESYS (конвертер, линтер, статанализ, RuSTy), — в
-[README](../README.md#быстрый-старт-без-железа) и в CI.
+[README](../README.md#быстрый-старт) и в CI; перенос своей программы S7 по шагам — в [USAGE.md](USAGE.md).
 
 Команды CODESYS выполняет `tools/codesys/cds.py` (подробно — [tools/README.md](../tools/README.md),
 раздел «codesys/cds.py»). Проект s7-to-codesys собран и протестирован в CODESYS 3.5.17.30 с
@@ -16,8 +16,8 @@ CODESYS Control Win V3 (2026-10-16): сборка — 0 ошибок и 0 пре
    сверить с прошивкой ПЛК.
 3. Библиотека coUnit 1.2.0.0 (CfUnit, MIT; в коде пространство имён `coUnit`) — в репозиторий
    библиотек `System`. Если её нет, `cds.py` установит её из файла, заданного переменной
-   `COUNIT_LIBRARY`. Параметры библиотеки — по умолчанию (на Control Win собирается без C0106 —
-   [ASSUMPTIONS.md](ASSUMPTIONS.md), C7).
+   `COUNIT_LIBRARY`. Параметры библиотеки — по умолчанию: на Control Win проект собирается без ошибки
+   C0106 (проверено зондом; [ASSUMPTIONS.md](ASSUMPTIONS.md), запись C7 о параметрах coUnit).
 4. Переменные окружения пользователя (через `setx` их видит `cds.py` и без перезапуска консоли):
 
    | Переменная | Значение |
@@ -186,13 +186,15 @@ retain-памяти весь экземпляр, пометка `section.fb_reta
 1. `python tools/codesys/cds.py report` и разбор упавших тестов в [TEST_REPORT.md](TEST_REPORT.md)
    (разделы «Разбор результатов первого прогона», «Упавшие тесты»).
 2. **F_TRIG на другой версии CODESYS или Standard** (например, на ПЛК210 с другим таргет-файлом). На
-   3.5.17.30 со Standard 3.5.17.0 ложного спада на первом вызове нет (ASSUMPTIONS.md, S4). Если падает
-   тест `FB_S7FTrig_Test.StandardFTrigMatchesS7` или строка 1 сценария `FB_PumpAlternation/RotateOnStop`
-   (`leadPump` = 2 вместо 1): в `s7conv/corpus.py` в `corpus_options` поставить `f_trig=M.S7COMPAT`,
-   выполнить `python -m s7conv build-corpus`, повторить `cds.py test`, записать вывод в ASSUMPTIONS.md
-   (S4, K18) и MAPPING.md (`fb.f_trig`).
+   3.5.17.30 со Standard 3.5.17.0 ложного спада на первом вызове нет (ASSUMPTIONS.md, запись S4 о
+   семантике F_TRIG). Если падает тест `FB_S7FTrig_Test.StandardFTrigMatchesS7` или строка 1 сценария
+   `FB_PumpAlternation/RotateOnStop` (`leadPump` = 2 вместо 1): в `s7conv/corpus.py` в `corpus_options`
+   поставить `f_trig=M.S7COMPAT`, выполнить `python -m s7conv build-corpus`, повторить `cds.py test`, записать
+   вывод в ASSUMPTIONS.md (записи S4 и K18 — семантика F_TRIG и выбор Standard `F_TRIG` для корпуса) и
+   MAPPING.md (`fb.f_trig`).
 3. Тесты `MatchesStandardInRealTime` сверяют таймеры S7Compat со Standard: расхождение — разобрать по
-   семантике в объявлении блока (ASSUMPTIONS.md, K19), при необходимости поправить блок S7Compat.
+   семантике в объявлении блока (ASSUMPTIONS.md, запись K19 о семантике таймеров S7Compat), при
+   необходимости поправить блок S7Compat.
 4. Обновить таблицы «Последний прогон» в [STATIC_ANALYSIS.md](STATIC_ANALYSIS.md) результатами CI.
 
 ## 6. Экспорт перед коммитом
@@ -209,15 +211,5 @@ python -m s7conv build-corpus --check
 конвертер или корпус. Цикл «импорт → экспорт» без правок не должен давать диффа
 (`python tools\codesys\cds.py roundtrip`).
 
-## 7. Зеркало на GitVerse или GitFlic
-
-```bash
-git remote add mirror <url-зеркала>
-git push mirror --all
-git push mirror --tags
-```
-
-## 8. Оформление репозитория на GitHub
-
-Картинки README лежат в `docs/media/`. Превью для ссылок GitHub не берёт из репозитория — его
-загружают вручную: Settings → General → Social preview → `docs/media/social-preview.png` (1280 × 640).
+Сопровождение самого репозитория (зеркало, превью для ссылок GitHub) — в
+[CONTRIBUTING.md](../CONTRIBUTING.md), раздел «Сопровождение репозитория».
