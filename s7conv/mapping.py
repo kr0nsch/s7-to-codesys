@@ -184,6 +184,8 @@ SUPPORT_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     "F_S7Now": ("GVL_S7Clock",),
     "GVL_S7Clock": (),
     "FB_S7FTrig": (),
+    # ENO арифметики S7 для LAD/FBD (lower/net_to_ast.py, правило lad.eno_error)
+    **{f"F_S7Eno{op}{ty}": () for op in ("Add", "Sub", "Mul") for ty in ("Int", "Dint")},
 }
 
 
@@ -327,6 +329,17 @@ FUNCTIONS: dict[str, FuncRule] = {
     "TIME_TCK": FuncRule(
         "TIME", "func.time_tck", (), CHECK, "TIME_TCK → TIME(): системное время в мс, переполнение UDINT/DINT сверить"
     ),
+    # ENO арифметики S7 (S7Compat): вызов вставляет понижение LAD/FBD, а не исходник SCL
+    **{
+        f"F_S7ENO{op.upper()}{ty.upper()}": FuncRule(
+            f"F_S7Eno{op}{ty}",
+            "func.s7compat_eno",
+            ("IN1", "IN2"),
+            named=(f"{prefix}In1", f"{prefix}In2"),
+        )
+        for op in ("Add", "Sub", "Mul")
+        for ty, prefix in (("Int", "i"), ("Dint", "di"))
+    },
     "UPPER_BOUND": FuncRule(
         "UPPER_BOUND", "func.bound", ("ARR", "DIM"), CHECK, "UPPER_BOUND: в CODESYS — для ARRAY[*], сверить"
     ),

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- s7-to-codesys, корпус всех языков: собрано samples/lang/build_xml.py из samples/lang/blocks.py, руками не править -->
+<Document>
+  <Engineering version="V21" />
+  <SW.Blocks.FC ID="0">
+    <AttributeList>
+      <AutoNumber>false</AutoNumber>
+      <HeaderAuthor>WTP2</HeaderAuthor>
+      <HeaderFamily>Utils</HeaderFamily>
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface>
+        <Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+          <Section Name="Input">
+            <Member Name="iIn" Datatype="Int">
+              <Comment><MultiLanguageText Lang="ru-RU">Значение</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="iMin" Datatype="Int">
+              <Comment><MultiLanguageText Lang="ru-RU">Нижний предел</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="iMax" Datatype="Int">
+              <Comment><MultiLanguageText Lang="ru-RU">Верхний предел</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="Output" />
+          <Section Name="InOut" />
+          <Section Name="Temp" />
+          <Section Name="Constant" />
+          <Section Name="Return">
+            <Member Name="Ret_Val" Datatype="Int" />
+          </Section>
+        </Sections>
+      </Interface>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>FC_ClampPctLad</Name>
+      <Number>111</Number>
+      <ProgrammingLanguage>LAD</ProgrammingLanguage>
+      <SetENOAutomatically>false</SetENOAutomatically>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Результат: iIn, ограниченный снизу iMin и сверху iMax (сначала верхний предел, затем нижний). ENO не пишется: ENO = EN.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+              <Parts>
+                <Part Name="Move" UId="21" DisabledENO="true">
+                  <TemplateValue Name="Card" Type="Cardinality">1</TemplateValue>
+                </Part>
+                <Access Scope="LocalVariable" UId="22"><Symbol><Component Name="iIn" /></Symbol></Access>
+                <Access Scope="LocalVariable" UId="23"><Symbol><Component Name="Ret_Val" /></Symbol></Access>
+              </Parts>
+              <Wires>
+                <Wire UId="24"><Powerrail /><NameCon UId="21" Name="en" /></Wire>
+                <Wire UId="25"><IdentCon UId="22" /><NameCon UId="21" Name="in" /></Wire>
+                <Wire UId="26"><NameCon UId="21" Name="out1" /><IdentCon UId="23" /></Wire>
+              </Wires>
+            </FlgNet>
+          </NetworkSource>
+          <ProgrammingLanguage>LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Значение по умолчанию</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="8" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+              <Parts>
+                <Part Name="Gt" UId="21">
+                  <TemplateValue Name="SrcType" Type="Type">Int</TemplateValue>
+                </Part>
+                <Access Scope="LocalVariable" UId="22"><Symbol><Component Name="iIn" /></Symbol></Access>
+                <Access Scope="LocalVariable" UId="23"><Symbol><Component Name="iMax" /></Symbol></Access>
+                <Part Name="Move" UId="24" DisabledENO="true">
+                  <TemplateValue Name="Card" Type="Cardinality">1</TemplateValue>
+                </Part>
+                <Access Scope="LocalVariable" UId="25"><Symbol><Component Name="iMax" /></Symbol></Access>
+                <Access Scope="LocalVariable" UId="26"><Symbol><Component Name="Ret_Val" /></Symbol></Access>
+              </Parts>
+              <Wires>
+                <Wire UId="27"><Powerrail /><NameCon UId="21" Name="pre" /></Wire>
+                <Wire UId="28"><IdentCon UId="22" /><NameCon UId="21" Name="in1" /></Wire>
+                <Wire UId="29"><IdentCon UId="23" /><NameCon UId="21" Name="in2" /></Wire>
+                <Wire UId="30"><NameCon UId="21" Name="out" /><NameCon UId="24" Name="en" /></Wire>
+                <Wire UId="31"><IdentCon UId="25" /><NameCon UId="24" Name="in" /></Wire>
+                <Wire UId="32"><NameCon UId="24" Name="out1" /><IdentCon UId="26" /></Wire>
+              </Wires>
+            </FlgNet>
+          </NetworkSource>
+          <ProgrammingLanguage>LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="9" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="B" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="C" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Выше максимума</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="D" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+              <Parts>
+                <Part Name="Lt" UId="21">
+                  <TemplateValue Name="SrcType" Type="Type">Int</TemplateValue>
+                </Part>
+                <Access Scope="LocalVariable" UId="22"><Symbol><Component Name="iIn" /></Symbol></Access>
+                <Access Scope="LocalVariable" UId="23"><Symbol><Component Name="iMin" /></Symbol></Access>
+                <Part Name="Move" UId="24" DisabledENO="true">
+                  <TemplateValue Name="Card" Type="Cardinality">1</TemplateValue>
+                </Part>
+                <Access Scope="LocalVariable" UId="25"><Symbol><Component Name="iMin" /></Symbol></Access>
+                <Access Scope="LocalVariable" UId="26"><Symbol><Component Name="Ret_Val" /></Symbol></Access>
+              </Parts>
+              <Wires>
+                <Wire UId="27"><Powerrail /><NameCon UId="21" Name="pre" /></Wire>
+                <Wire UId="28"><IdentCon UId="22" /><NameCon UId="21" Name="in1" /></Wire>
+                <Wire UId="29"><IdentCon UId="23" /><NameCon UId="21" Name="in2" /></Wire>
+                <Wire UId="30"><NameCon UId="21" Name="out" /><NameCon UId="24" Name="en" /></Wire>
+                <Wire UId="31"><IdentCon UId="25" /><NameCon UId="24" Name="in" /></Wire>
+                <Wire UId="32"><NameCon UId="24" Name="out1" /><IdentCon UId="26" /></Wire>
+              </Wires>
+            </FlgNet>
+          </NetworkSource>
+          <ProgrammingLanguage>LAD</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="E" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="F" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="10" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="11" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Ниже минимума</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="12" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="13" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Ограничение значения пределами (LAD)</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FC>
+</Document>

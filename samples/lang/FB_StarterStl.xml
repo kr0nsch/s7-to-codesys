@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- s7-to-codesys, корпус всех языков: собрано samples/lang/build_xml.py из samples/lang/blocks.py, руками не править -->
+<Document>
+  <Engineering version="V21" />
+  <SW.Blocks.FB ID="0">
+    <AttributeList>
+      <AutoNumber>false</AutoNumber>
+      <HeaderAuthor>WTP2</HeaderAuthor>
+      <HeaderFamily>Drives</HeaderFamily>
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface>
+        <Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+          <Section Name="Input">
+            <Member Name="xStart" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Пуск (кнопка)</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xStop" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Стоп (кнопка, TRUE — нажата)</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xInterlock" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Блокировки в норме, пуск разрешён</MultiLanguageText></Comment>
+              <StartValue>TRUE</StartValue>
+            </Member>
+            <Member Name="xFeedback" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Обратная связь контактора</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="tFeedbackTime" Datatype="Time">
+              <Comment><MultiLanguageText Lang="ru-RU">Допустимое время без обратной связи</MultiLanguageText></Comment>
+              <StartValue>T#2S</StartValue>
+            </Member>
+            <Member Name="xReset" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Сброс аварии</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="Output">
+            <Member Name="xRun" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Команда контактору</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xFault" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Авария: нет обратной связи</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="iStarts" Datatype="Int">
+              <Comment><MultiLanguageText Lang="ru-RU">Число пусков</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="InOut" />
+          <Section Name="Static">
+            <Member Name="xRunMem" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Бит-операнд SR пуска</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xEdgeMem" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Бит памяти фронта xRun</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="tonFeedback" Datatype="TON_TIME" Version="1.0">
+              <Comment><MultiLanguageText Lang="ru-RU">Таймер контроля обратной связи</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="Temp">
+            <Member Name="xTonIn" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Вход таймера</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xTonQ" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Выход таймера</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="Constant" />
+        </Sections>
+      </Interface>
+      <MemoryLayout>Standard</MemoryLayout>
+      <Name>FB_StarterStl</Name>
+      <Number>103</Number>
+      <ProgrammingLanguage>STL</ProgrammingLanguage>
+      <SetENOAutomatically>false</SetENOAutomatically>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Пускатель насоса с контролем обратной связи (один блок на LAD, FBD, STL, SCL).
+1. Пуск/стоп — SR с битом-операндом xRunMem: S = xStart AND xInterlock; R1 = xStop OR NOT xInterlock OR xFault.
+   SR S7: сначала S, затем R1 — при S = R1 = 1 (Пуск и Стоп одновременно) бит сброшен. xRun := xRunMem.
+2. Контроль обратной связи: TON tonFeedback (IN = xRun AND NOT xFeedback, PT = tFeedbackTime).
+3. Авария с самоподхватом: xFault := (tonFeedback.Q OR xFault) AND NOT xReset.
+4. Счётчик пусков: по фронту xRun (бит памяти xEdgeMem) iStarts := iStarts + 1.
+Порядок сетей 1-4; xFault в сети 1 — значение прошлого вызова.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <StatementList xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StatementList/v5">
+              <StlStatement><StlToken Text="A" /><Access Scope="LocalVariable"><Symbol><Component Name="xStart" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="A" /><Access Scope="LocalVariable"><Symbol><Component Name="xInterlock" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="S" /><Access Scope="LocalVariable"><Symbol><Component Name="xRunMem" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="A" /><Access Scope="LocalVariable"><Symbol><Component Name="xStop" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="ON" /><Access Scope="LocalVariable"><Symbol><Component Name="xInterlock" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="O" /><Access Scope="LocalVariable"><Symbol><Component Name="xFault" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="R" /><Access Scope="LocalVariable"><Symbol><Component Name="xRunMem" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="A" /><Access Scope="LocalVariable"><Symbol><Component Name="xRunMem" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="Assign" /><Access Scope="LocalVariable"><Symbol><Component Name="xRun" /></Symbol></Access></StlStatement>
+            </StatementList>
+          </NetworkSource>
+          <ProgrammingLanguage>STL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Пуск/стоп: SR, сброс главнее</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="8" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <StatementList xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StatementList/v5">
+              <StlStatement><StlToken Text="A" /><Access Scope="LocalVariable"><Symbol><Component Name="xRun" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="AN" /><Access Scope="LocalVariable"><Symbol><Component Name="xFeedback" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="Assign" /><Access Scope="LocalVariable"><Symbol><Component Name="xTonIn" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="CALL" /><Access Scope="Call"><Instruction Name="TON" Version="1.0"><TemplateValue Name="time_type" Type="Type">Time</TemplateValue><Instance Scope="LocalVariable"><Component Name="tonFeedback" /></Instance><Parameter Name="IN" Section="Input" Type="Bool"><Access Scope="LocalVariable"><Symbol><Component Name="xTonIn" /></Symbol></Access></Parameter><Parameter Name="PT" Section="Input" Type="Time"><Access Scope="LocalVariable"><Symbol><Component Name="tFeedbackTime" /></Symbol></Access></Parameter><Parameter Name="Q" Section="Output" Type="Bool"><Access Scope="LocalVariable"><Symbol><Component Name="xTonQ" /></Symbol></Access></Parameter><Parameter Name="ET" Section="Output" Type="Time" /></Instruction></Access></StlStatement>
+            </StatementList>
+          </NetworkSource>
+          <ProgrammingLanguage>STL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="9" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="A" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="B" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="C" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Контроль обратной связи</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="D" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <StatementList xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StatementList/v5">
+              <StlStatement><StlToken Text="A_BRACK" /></StlStatement>
+              <StlStatement><StlToken Text="O" /><Access Scope="LocalVariable"><Symbol><Component Name="xTonQ" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="O" /><Access Scope="LocalVariable"><Symbol><Component Name="xFault" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="BRACKET" /></StlStatement>
+              <StlStatement><StlToken Text="AN" /><Access Scope="LocalVariable"><Symbol><Component Name="xReset" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="Assign" /><Access Scope="LocalVariable"><Symbol><Component Name="xFault" /></Symbol></Access></StlStatement>
+            </StatementList>
+          </NetworkSource>
+          <ProgrammingLanguage>STL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="E" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="F" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="10" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="11" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Авария с самоподхватом</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <SW.Blocks.CompileUnit ID="12" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <StatementList xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StatementList/v5">
+              <StlStatement><StlToken Text="A" /><Access Scope="LocalVariable"><Symbol><Component Name="xRun" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="Rise" /><Access Scope="LocalVariable"><Symbol><Component Name="xEdgeMem" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="JCN" /><Access Scope="Label"><Label Name="M001" /></Access></StlStatement>
+              <StlStatement><StlToken Text="L" /><Access Scope="LocalVariable"><Symbol><Component Name="iStarts" /></Symbol></Access></StlStatement>
+              <StlStatement><StlToken Text="L" /><Access Scope="LiteralConstant"><Constant><ConstantType>Int</ConstantType><ConstantValue>1</ConstantValue></Constant></Access></StlStatement>
+              <StlStatement><StlToken Text="ADD_I" /></StlStatement>
+              <StlStatement><StlToken Text="T" /><Access Scope="LocalVariable"><Symbol><Component Name="iStarts" /></Symbol></Access></StlStatement>
+              <StlStatement><LabelDeclaration><Label Name="M001" /></LabelDeclaration><StlToken Text="NOP_0" /></StlStatement>
+            </StatementList>
+          </NetworkSource>
+          <ProgrammingLanguage>STL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="13" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="14" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="15" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="16" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Счётчик пусков по фронту xRun</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="17" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="18" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Пускатель насоса (STL)</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FB>
+</Document>

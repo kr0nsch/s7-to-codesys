@@ -51,6 +51,8 @@ from s7conv.nodes import (
     Label,
     Literal,
     LocalRef,
+    Lowering,
+    LowerNote,
     Member,
     NamedType,
     ParseIssue,
@@ -160,6 +162,13 @@ class Options:
     timers: str = M.STANDARD
     # F_TRIG: "standard" — CODESYS Standard; "s7compat" — FB_S7FTrig (семантика S7 на первом вызове)
     f_trig: str = M.STANDARD
+    # суффикс генерируемых глобальных объектов (GVL_IO, GVL_InstanceDBs ...): второй корпус в том же
+    # проекте CODESYS не сталкивается с первым по именам (корпус всех языков — "_Lang")
+    global_suffix: str = ""
+    # профиль CPU для STL: s7-300 | s7-1500 | None — по MemoryLayout блока SimaticML
+    cpu: str | None = None
+    # переходы STL: structured — IF/WHILE/CASE; pc — автомат WHILE/CASE для всего блока
+    stl_jumps: str = "structured"
 
 
 @dataclass(frozen=True)
@@ -188,6 +197,14 @@ class FileResult:
     notes: list[Note] = field(default_factory=list)
     rules: Counter[str] = field(default_factory=Counter)
     parse_issues: list[ParseIssue] = field(default_factory=list)
+    # SimaticML/AWL: происхождение строк синтезированного SCL, языки блоков, единицы учёта языков
+    lowering: Lowering | None = None
+
+    def where(self, line: int) -> str:
+        """Место пометки: номер строки SCL или трасса понижения («сеть 3, UId 27»)."""
+        if self.lowering is not None and line in self.lowering.trace:
+            return self.lowering.trace[line]
+        return str(line) if line else "—"
 
     def count(self, status: str, category: str | None = None) -> int:
         return sum(1 for i in self.items if i.status == status and (category is None or i.category == category))
@@ -551,6 +568,10 @@ class Emitter:
         self.result: FileResult | None = None
         self._line_hint = 0
 
+    def g(self, name: str) -> str:
+        """Имя генерируемого глобального объекта с суффиксом --global-suffix."""
+        return f"{name}{self.o.global_suffix}" if name in S.GENERATED_GVLS else name
+
     # -- пометки и кадры ------------------------------------------------------------
     def push(self) -> None:
         self.frames.append(Frame())
@@ -599,9 +620,12 @@ class Emitter:
 
     def note_lines(self, notes: Sequence[Note], ind: str) -> list[str]:
         out: list[str] = []
+        lowering = self.cur.file.lowering if self.cur is not None else None
         for n in notes:
             tag = "MIGRATION-TODO" if n.severity == TODO else "MIGRATION-CHECK"
             where = f" (стр. {n.line})" if n.line else ""
+            if lowering is not None and self.cur is not None and n.line in lowering.trace:
+                where = f" ({self.cur.display.rsplit('/', 1)[-1]}, {lowering.trace[n.line]})"
             out.extend(_wrap_comment(f"// {tag}: ", f"{n.message}{where}", ind))
         return out
 
@@ -632,7 +656,9 @@ class Emitter:
         self.prepass(files)
         results: list[FileResult] = []
         for sf in files:
-            self.result = FileResult(path=display.get(sf.path, sf.path), parse_issues=list(sf.issues))
+            self.result = FileResult(
+                path=display.get(sf.path, sf.path), parse_issues=list(sf.issues), lowering=sf.lowering
+            )
             for blk in sf.blocks:
                 if isinstance(blk, RawBlock):
                     self.raw_block(blk, sf)
@@ -847,12 +873,14 @@ class Emitter:
         assert self.cur is not None
         blk = sym.block
         desc = [strip_comment_marks(c) for c in blk.comments if strip_comment_marks(c)]
+        lowering = self.cur.file.lowering
+        lang = lowering.langs.get(blk.name.lower(), "SCL") if lowering is not None else "SCL"
         if blk.title:
             purpose = blk.title
         elif desc:
             purpose = desc.pop(0)
         else:
-            purpose = f"{what} «{blk.name}», сконвертирован из SCL"
+            purpose = f"{what} «{blk.name}», сконвертирован из {lang}"
         lines = _wrap_comment("// Назначение: ", purpose, "")
         for d in desc[:8]:
             lines.extend(_wrap_comment("//             ", d, ""))
@@ -862,14 +890,10 @@ class Emitter:
         lines.append(f"// Автор:      {author} (исходный блок S7); перевод в ST — s7conv {__version__}")
         lines.append(f"// Версия:     {version} (исходный блок S7)")
         lines.append("// Документ:   docs/CONVERSION_REPORT.md, docs/MAPPING.md")
-        lines.extend(
-            _wrap_comment(
-                "// Источник:   ",
-                f'{self.cur.display}, строки {blk.span.line}–{blk.span.end_line}, {blk.kind} "{blk.name}"'
-                + (f", FAMILY {family}" if family else ""),
-                "",
-            )
-        )
+        source = f'{self.cur.display}, строки {blk.span.line}–{blk.span.end_line}, {blk.kind} "{blk.name}"'
+        if lowering is not None:
+            source = f"{self.cur.display}, {lowering.origin.get(blk.name.lower(), lang)}"
+        lines.extend(_wrap_comment("// Источник:   ", source + (f", FAMILY {family}" if family else ""), ""))
         lines.append("// Сгенерировано s7conv: пометки MIGRATION-CHECK и MIGRATION-TODO требуют ручного разбора.")
         lines.extend(self.note_lines(extra_notes, ""))
         if blk.preamble:
@@ -929,7 +953,7 @@ class Emitter:
         notes = list(self.frames[-1].notes)
         decl_type = type_text + (f" := {init}" if init else "")
         self.instances.append((sym.st_name, decl_type, f"{self.cur.display}:{blk.span.line}", notes, retain))
-        self.result.blocks.append((blk.kind, sym.name, f"{S.GVL_INSTANCES}.{sym.st_name}"))
+        self.result.blocks.append((blk.kind, sym.name, f"{self.g(S.GVL_INSTANCES)}.{sym.st_name}"))
         self.hit("db.instance" if sym.db_role == S.DB_INSTANCE else "db.typed")
 
     def instance_retain(self, sym: S.BlockSym) -> bool:
@@ -953,7 +977,7 @@ class Emitter:
             self.check(
                 "db.retain_standard",
                 "стандартный (неоптимизированный) экземплярный или типизированный DB без NON_RETAIN: в S7 он "
-                f"реманентный целиком — объявлен в VAR_GLOBAL RETAIN {S.GVL_INSTANCES}",
+                f"реманентный целиком — объявлен в VAR_GLOBAL RETAIN {self.g(S.GVL_INSTANCES)}",
             )
         if self.o.retain_mode == "persistent":
             self.check(
@@ -1530,6 +1554,17 @@ class Emitter:
             return empty
         label = _stmt_label(s)
         self.push()
+        lowered = self.lowered_notes(s.span.line)
+        todo = [n for n in lowered if n.severity == TODO]
+        if todo and not isinstance(s, RawStmt):
+            self.pop()
+            note = Note(TODO, todo[0].rule, todo[0].message, s.span.line, self._block_name())
+            lines = pre + self.note_lines([note], ind) + self.original_lines(self.src(s.span), s.span.start, ind)
+            self.trailing(lines, s.trailing)
+            self.commit(Frame(notes=[note]), Item("stmt", TODO, s.span.line, label, self._block_name()))
+            return lines
+        for n in lowered:
+            self.note(n.severity, n.rule, n.message, s.span.line)
         if isinstance(s, RawStmt):
             self.pop()
             note = Note(TODO, "parse.stmt", f"оператор не разобран: {s.reason}", s.span.line, self._block_name())
@@ -1556,6 +1591,13 @@ class Emitter:
 
     def _block_name(self) -> str:
         return self.cur.sym.name if self.cur else ""
+
+    def lowered_notes(self, line: int) -> list[LowerNote]:
+        """Пометки понижения LAD/FBD/STL для оператора строки line синтезированного SCL."""
+        lowering = self.cur.file.lowering if self.cur is not None else None
+        if lowering is None:
+            return []
+        return list(lowering.notes.get(line, ()))
 
     def _stmt(self, s: Stmt, ind: str) -> list[str]:
         if isinstance(s, Assign):
@@ -1879,7 +1921,7 @@ class Emitter:
                     self.hit("access.db_global")
                     return sym.st_name
                 self.hit("access.db_instance")
-                return f"{S.GVL_INSTANCES}.{sym.st_name}"
+                return f"{self.g(S.GVL_INSTANCES)}.{sym.st_name}"
             if sym.kind == BLOCK_FC and self.cur.fc_name.lower() == name.lower():
                 self.hit("fc.return")
                 return sym.st_name
@@ -1892,12 +1934,12 @@ class Emitter:
             if tag.address is not None:
                 var = self.p.io_var(tag.address, where)
                 self.hit("access.io_tag")
-                return f"{var.gvl}.{var.st_name}"
+                return f"{self.g(var.gvl)}.{var.st_name}"
             self.hit("access.tag")
-            return f"{tag.gvl}.{tag.st_name}"
+            return f"{self.g(tag.gvl)}.{tag.st_name}"
         implicit = self.implicit.get(name.lower())
         if implicit is not None:
-            return f"{S.GVL_INSTANCES}.{implicit[0]}"
+            return f"{self.g(S.GVL_INSTANCES)}.{implicit[0]}"
         if member:
             raise Unsupported(f'DB "{name}" не найден в корпусе — добавьте его исходник', "sym.unknown_db")
         unknown = self.p.unknown.get(name.lower())
@@ -1914,8 +1956,9 @@ class Emitter:
         if expect:
             unknown.types.append(expect)
         unknown.lines.append(where)
-        self.check("sym.unknown", f'символ "{name}" не найден в корпусе и таблице тегов — объявлен в {S.GVL_TAGS}')
-        return f"{S.GVL_TAGS}.{unknown.st_name}"
+        tags_gvl = self.g(S.GVL_TAGS)
+        self.check("sym.unknown", f'символ "{name}" не найден в корпусе и таблице тегов — объявлен в {tags_gvl}')
+        return f"{tags_gvl}.{unknown.st_name}"
 
     def address_text(self, text: str, expect: str | None) -> str:
         assert self.cur is not None
@@ -1933,7 +1976,7 @@ class Emitter:
             elif addr.size == "B" and expect in ("SINT", "USINT"):
                 var.type_name = expect
         self.hit("access.address")
-        return f"{var.gvl}.{var.st_name}"
+        return f"{self.g(var.gvl)}.{var.st_name}"
 
     def member_text(self, e: Member, expect: str | None) -> str:
         base = e.base
@@ -2018,7 +2061,7 @@ class Emitter:
             if fb is not None:
                 st = self.implicit_instance(callee.name, fb.st_name)
                 scope = self.scopes[fb.name.lower()]
-                return f"{S.GVL_INSTANCES}.{st}({self.map_args(c.args, scope, None)})"
+                return f"{self.g(S.GVL_INSTANCES)}.{st}({self.map_args(c.args, scope, None)})"
             self.check("call.unknown", f'блок "{callee.name}" не найден в корпусе — вызов перенесён как функция')
             return f"{M.sanitize(callee.name)}({self.plain_args(c.args)})"
         if isinstance(callee, LocalRef):
@@ -2050,7 +2093,7 @@ class Emitter:
             self.implicit[key] = (M.sanitize(name), type_st)
         self.check(
             "db.implicit_instance",
-            f'экземплярный DB "{name}" не найден в корпусе — создан в {S.GVL_INSTANCES} с типом {type_st}',
+            f'экземплярный DB "{name}" не найден в корпусе — создан в {self.g(S.GVL_INSTANCES)} с типом {type_st}',
         )
         return self.implicit[key][0]
 
@@ -2103,7 +2146,7 @@ class Emitter:
             if scope is None:
                 inferred = self.p.generic_types.get(sym.name.lower(), sym.db_type_name.upper())
                 rule = self.fb_types.get(inferred)
-            return f"{S.GVL_INSTANCES}.{sym.st_name}({self.map_args(c.args, scope, rule)})"
+            return f"{self.g(S.GVL_INSTANCES)}.{sym.st_name}({self.map_args(c.args, scope, rule)})"
         raise Unsupported(f"вызов «{sym.name}» ({sym.kind}) не поддерживается", "call.unsupported")
 
     def plain_args(self, args: Sequence[Arg]) -> str:
@@ -2418,7 +2461,9 @@ class Emitter:
         if retained:
             section = "VAR_GLOBAL PERSISTENT RETAIN" if self.o.retain_mode == "persistent" else "VAR_GLOBAL RETAIN"
             lines += [section, *retained, "END_VAR"]
-        self.objects.append(L.StObject(L.KIND_GVL, S.GVL_INSTANCES, "\n".join(lines), folder=list(self.o.folder)))
+        self.objects.append(
+            L.StObject(L.KIND_GVL, self.g(S.GVL_INSTANCES), "\n".join(lines), folder=list(self.o.folder))
+        )
         self.hit("gvl.instances")
 
     def io_gvls(self) -> None:
@@ -2480,10 +2525,10 @@ class Emitter:
                 lines.extend(self.note_lines(notes, IND))
                 at_text = f" AT {at}" if at else ""
                 lines.append(f"{IND}{var.st_name}{at_text} : {type_text}; // {comment}")
-                self._project_item(f"{gvl}.{var.st_name}", notes)
+                self._project_item(f"{self.g(gvl)}.{var.st_name}", notes)
                 self.hit("addr.io_var")
             lines.append("END_VAR")
-            self.objects.append(L.StObject(L.KIND_GVL, gvl, "\n".join(lines), folder=list(self.o.folder)))
+            self.objects.append(L.StObject(L.KIND_GVL, self.g(gvl), "\n".join(lines), folder=list(self.o.folder)))
 
     def _tag_for_address(self, var: S.IoVar) -> S.TagSym | None:
         for tag in self.p.tags.values():
@@ -2526,7 +2571,7 @@ class Emitter:
             entries.extend(self.note_lines(notes, IND))
             comment = f" // {tag.comment}" if tag.comment else ""
             entries.append(f"{IND}{tag.st_name} : {type_text};{comment}")
-            self._project_item(f"{S.GVL_TAGS}.{tag.st_name}", notes)
+            self._project_item(f"{self.g(S.GVL_TAGS)}.{tag.st_name}", notes)
         for key in sorted(self.p.unknown):
             unk = self.p.unknown[key]
             concrete = [t for t in unk.types if t not in ("ANY_NUM",) and not t.startswith("ARRAY")]
@@ -2559,7 +2604,7 @@ class Emitter:
                 )
             entries.extend(self.note_lines([note], IND))
             entries.append(f"{IND}{unk.st_name} : {type_text};")
-            self._project_item(f"{S.GVL_TAGS}.{unk.st_name}", [note])
+            self._project_item(f"{self.g(S.GVL_TAGS)}.{unk.st_name}", [note])
         if not entries:
             return
         lines = [
@@ -2571,7 +2616,7 @@ class Emitter:
             *entries,
             "END_VAR",
         ]
-        self.objects.append(L.StObject(L.KIND_GVL, S.GVL_TAGS, "\n".join(lines), folder=list(self.o.folder)))
+        self.objects.append(L.StObject(L.KIND_GVL, self.g(S.GVL_TAGS), "\n".join(lines), folder=list(self.o.folder)))
 
     def const_gvl(self) -> None:
         consts = [t for t in self.p.tags.values() if t.gvl == S.GVL_USER_CONST]
@@ -2592,7 +2637,7 @@ class Emitter:
             comment = f" // {tag.comment}" if tag.comment else ""
             entries.extend(self.note_lines(notes, IND))
             entries.append(f"{IND}{tag.st_name} : {type_text} := {value};{comment}")
-            self._project_item(f"{S.GVL_USER_CONST}.{tag.st_name}", notes)
+            self._project_item(f"{self.g(S.GVL_USER_CONST)}.{tag.st_name}", notes)
         lines = [
             *self._project_header("константы пользователя S7 (User constants)", "docs/MAPPING.md, раздел «Теги»"),
             "{attribute 'qualified_only'}",
@@ -2600,7 +2645,9 @@ class Emitter:
             *entries,
             "END_VAR",
         ]
-        self.objects.append(L.StObject(L.KIND_GVL, S.GVL_USER_CONST, "\n".join(lines), folder=list(self.o.folder)))
+        self.objects.append(
+            L.StObject(L.KIND_GVL, self.g(S.GVL_USER_CONST), "\n".join(lines), folder=list(self.o.folder))
+        )
 
 
 def _byte_order_overlap(a: S.S7Address, b: S.S7Address) -> bool:

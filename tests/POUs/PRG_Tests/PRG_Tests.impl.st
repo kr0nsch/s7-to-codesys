@@ -6,6 +6,7 @@ coUnit.RUN();
 // AreAllTestsFinished() вызывается после RUN(): у метода есть побочный эффект на первом цикле.
 // Наборы объединяются через AND (не AND_THEN): метод вызывается у каждого набора в каждом цикле.
 xAllFinished := fbF_NormXTest.AreAllTestsFinished()
+        AND fbF_S7EnoTest.AreAllTestsFinished()
         AND fbF_S7NowTest.AreAllTestsFinished()
         AND fbF_ScaleXTest.AreAllTestsFinished()
         AND fbS7FTrigTest.AreAllTestsFinished()

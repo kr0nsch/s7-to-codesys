@@ -420,9 +420,48 @@ class ParseIssue:
     severity: str = "error"
 
 
+@dataclass(frozen=True)
+class LowerNote:
+    """Пометка понижения (LAD/FBD/STL → SCL) для оператора строки: severity check | todo."""
+
+    severity: str
+    rule: str
+    message: str
+
+
+@dataclass(frozen=True)
+class LangUnit:
+    """Единица учёта языка для отчёта: элемент или сеть LAD/FBD, инструкция STL, шаг GRAPH."""
+
+    block: str
+    lang: str  # LAD | FBD | STL | SCL | GRAPH
+    kind: str  # element | network | instruction | step | transition | action
+    status: str  # auto | check | todo | impossible
+    rule: str
+    trace: str
+
+
+@dataclass(kw_only=True)
+class Lowering:
+    """Происхождение текста SCL, построенного понижением из SimaticML или AWL.
+
+    text SourceFile — синтезированный SCL; номера строк в нём — ключи trace и notes. Эмиттер ставит
+    пометки notes на оператор своей строки и показывает в пометках trace вместо номера строки.
+    """
+
+    source_kind: str  # simaticml | awl
+    trace: dict[int, str] = field(default_factory=dict)  # строка SCL -> «сеть 3, UId 27»
+    notes: dict[int, list[LowerNote]] = field(default_factory=dict)
+    langs: dict[str, str] = field(default_factory=dict)  # имя блока (lower) -> язык блока
+    strategies: dict[str, str] = field(default_factory=dict)  # имя блока (lower) -> стратегия (st, ld, sfc)
+    units: list[LangUnit] = field(default_factory=list)
+    origin: dict[str, str] = field(default_factory=dict)  # имя блока (lower) -> «LAD, SW.Blocks.FB "X"»
+
+
 @dataclass(kw_only=True)
 class SourceFile:
     path: str
     text: str
     blocks: list[Block | RawBlock] = field(default_factory=list)
     issues: list[ParseIssue] = field(default_factory=list)
+    lowering: Lowering | None = None

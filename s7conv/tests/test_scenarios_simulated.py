@@ -39,6 +39,7 @@ COMPAT_SUITES = [
     "FB_F_ScaleX_Test",
     "FB_StandardCounter_Test",
     "FB_StandardFlipFlop_Test",
+    "FB_F_S7Eno_Test",
 ]
 
 

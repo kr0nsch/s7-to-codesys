@@ -25,6 +25,8 @@ GVL_MARKERS = "GVL_Markers"
 GVL_TAGS = "GVL_Tags"
 GVL_USER_CONST = "GVL_UserConstants"
 GVL_INSTANCES = "GVL_InstanceDBs"
+# Глобальные объекты, которые генерирует конвертер (к ним применяется Options.global_suffix)
+GENERATED_GVLS = frozenset({GVL_IO, GVL_MARKERS, GVL_TAGS, GVL_USER_CONST, GVL_INSTANCES})
 TAG_S5 = "S5"  # тег таймера/счётчика S5 (%T5, %C3): не переносится
 
 _S5_ADDR_RE = re.compile(r"%?[TCZ]\d+\Z", re.I)
@@ -347,6 +349,7 @@ __all__ = [
     "DB_GLOBAL",
     "DB_INSTANCE",
     "DB_TYPED",
+    "GENERATED_GVLS",
     "GVL_INSTANCES",
     "GVL_IO",
     "GVL_MARKERS",

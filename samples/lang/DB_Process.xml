@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- s7-to-codesys, корпус всех языков: собрано samples/lang/build_xml.py из samples/lang/blocks.py, руками не править -->
+<Document>
+  <Engineering version="V21" />
+  <SW.Blocks.GlobalDB ID="0">
+    <AttributeList>
+      <AutoNumber>false</AutoNumber>
+      <HeaderAuthor>WTP2</HeaderAuthor>
+      <HeaderFamily>Plant</HeaderFamily>
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface>
+        <Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+          <Section Name="Static">
+            <Member Name="xPumpRun" Datatype="Bool">
+              <AttributeList><IntegerAttribute Name="Offset" Informative="true" SystemDefined="true">0</IntegerAttribute></AttributeList>
+              <Comment><MultiLanguageText Lang="ru-RU">Насос в работе</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="iLevel_cm" Datatype="Int">
+              <AttributeList><IntegerAttribute Name="Offset" Informative="true" SystemDefined="true">2</IntegerAttribute></AttributeList>
+              <Comment><MultiLanguageText Lang="ru-RU">Уровень, см</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="rFlow_m3h" Datatype="Real">
+              <AttributeList><IntegerAttribute Name="Offset" Informative="true" SystemDefined="true">4</IntegerAttribute></AttributeList>
+              <Comment><MultiLanguageText Lang="ru-RU">Расход, м3/ч</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="wStatus" Datatype="Word">
+              <AttributeList><IntegerAttribute Name="Offset" Informative="true" SystemDefined="true">8</IntegerAttribute></AttributeList>
+              <Comment><MultiLanguageText Lang="ru-RU">Слово состояния</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="stValve" Datatype='"UDT_Valve"'>
+              <AttributeList><IntegerAttribute Name="Offset" Informative="true" SystemDefined="true">10</IntegerAttribute></AttributeList>
+              <Comment><MultiLanguageText Lang="ru-RU">Задвижка напорная</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="iBatch" Datatype="Int" Remanence="Retain">
+              <AttributeList><IntegerAttribute Name="Offset" Informative="true" SystemDefined="true">14</IntegerAttribute></AttributeList>
+              <Comment><MultiLanguageText Lang="ru-RU">Номер партии</MultiLanguageText></Comment>
+              <StartValue>1</StartValue>
+            </Member>
+          </Section>
+        </Sections>
+      </Interface>
+      <MemoryLayout>Standard</MemoryLayout>
+      <Name>DB_Process</Name>
+      <Number>20</Number>
+      <ProgrammingLanguage>DB</ProgrammingLanguage>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Неоптимизированный DB: STL S7-300 адресует члены по смещению (Offset)</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <MultilingualText ID="3" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="4" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Технологические данные (стандартный доступ)</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.GlobalDB>
+</Document>

@@ -1,4 +1,4 @@
-"""Командная строка s7conv: convert, report, check, build-corpus, gen-tests.
+"""Командная строка s7conv: convert, report, check, build-corpus, gen-tests, ir, equiv.
 
 Коды выхода: 0 — успех; 1 — порог --fail-on превышен (convert, report), есть ошибки разбора
 (check) или результат в репозитории устарел (build-corpus --check, gen-tests --check); 2 — неверные
@@ -45,6 +45,18 @@ EPILOG = """\
   s7conv gen-tests scenarios --out tests [--check]
       только тесты coUnit по сценариям CSV для сконвертированного корпуса
 
+языки S7 (SimaticML — экспорт TIA Portal Openness, *.xml):
+  s7conv convert samples/lang --out build/lang --timers s7compat --emit-support
+      LAD, FBD, STL и SCL из XML → тот же ST; пометки ссылаются на сеть и UId
+  s7conv convert samples/lang/FB_StarterStl.xml --out build/stl --stl-jumps pc
+      переходы STL автоматом CASE вместо IF (по умолчанию — structured)
+  s7conv convert samples/lang --out build/lang --cpu s7-300
+      профиль STL S7-300 (2 ACCU); без --cpu — по MemoryLayout блока
+  s7conv ir samples/lang/FB_StarterStl.xml --format json
+      промежуточное представление (NetIR, StlIR) с трассой до сети, UId и строки
+  s7conv equiv samples/lang --scenarios scenarios/lang --random 500 --seed 20261019
+      эталон S7 (поток питания LAD/FBD, машина STL S7-300) против интерпретатора ST на одних входах
+
 коды выхода: 0 — успех, 1 — превышен порог --fail-on / ошибки разбора (check) / результат
 в репозитории устарел (--check), 2 — неверные аргументы, входные файлы или сценарии,
 3 — внутренняя ошибка конвертера
@@ -52,7 +64,9 @@ EPILOG = """\
 
 
 def _common(p: argparse.ArgumentParser) -> None:
-    p.add_argument("inputs", nargs="+", metavar="ВХОД", help="файлы *.scl, таблицы тегов *.csv или каталоги")
+    p.add_argument(
+        "inputs", nargs="+", metavar="ВХОД", help="файлы *.scl, *.db, *.udt, SimaticML *.xml, теги *.csv или каталоги"
+    )
     p.add_argument("--tags", action="append", default=[], metavar="CSV", help="таблица тегов (можно повторять)")
     p.add_argument(
         "--ob-config",
@@ -85,6 +99,24 @@ def _common(p: argparse.ArgumentParser) -> None:
         "на первом вызове)",
     )
     p.add_argument(
+        "--cpu",
+        choices=("s7-300", "s7-1500"),
+        default=None,
+        help="профиль STL: s7-300 (2 ACCU) или s7-1500; без ключа — по MemoryLayout блока SimaticML",
+    )
+    p.add_argument(
+        "--stl-jumps",
+        choices=("structured", "pc"),
+        default="structured",
+        help="переходы STL: structured — IF/REPEAT (по умолчанию), pc — автомат CASE в WHILE",
+    )
+    p.add_argument(
+        "--global-suffix",
+        default="",
+        metavar="СУФФИКС",
+        help="суффикс генерируемых GVL (GVL_IO, GVL_InstanceDBs ...): два корпуса в одном проекте CODESYS",
+    )
+    p.add_argument(
         "--fail-on",
         choices=("never", "todo", "check"),
         default="never",
@@ -96,8 +128,8 @@ def _common(p: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="s7conv",
-        description="Частичная автоматическая конвертация Siemens SCL (TIA Portal) в ST CODESYS V3.5 "
-        "с отчётом о ручной работе.",
+        description="Частичная автоматическая конвертация Siemens S7 (SCL, LAD, FBD, STL; TIA Portal) в ST "
+        "CODESYS V3.5 с отчётом о ручной работе.",
         epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -181,6 +213,9 @@ def _options(args: argparse.Namespace, inputs: P.Inputs) -> Options:
         ob_config=P.load_ob_config(ob_config),
         timers=args.timers,
         f_trig=args.f_trig,
+        global_suffix=args.global_suffix,
+        cpu=args.cpu,
+        stl_jumps=args.stl_jumps,
     )
 
 
@@ -224,7 +259,8 @@ def cmd_convert(args: argparse.Namespace) -> int:
     for error in result.errors:
         print(f"s7conv: предупреждение: {error}", file=sys.stderr)
     if not args.quiet:
-        print(f"s7conv: файлов SCL {len(inputs.scl)}, записано {len(written)} файлов в {args.out}")
+        xml = f", SimaticML {len(inputs.xml)}" if inputs.xml else ""
+        print(f"s7conv: файлов SCL {len(inputs.scl)}{xml}, записано {len(written)} файлов в {args.out}")
         print(f"s7conv: {_summary(result)}")
         if result.support and not args.emit_support:
             names = ", ".join(sorted(result.support))

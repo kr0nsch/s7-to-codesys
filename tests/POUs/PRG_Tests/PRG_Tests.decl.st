@@ -9,6 +9,7 @@
 PROGRAM PRG_Tests
 VAR
     fbF_NormXTest : FB_F_NormX_Test;  // рукописный набор
+    fbF_S7EnoTest : FB_F_S7Eno_Test;  // рукописный набор
     fbF_S7NowTest : FB_F_S7Now_Test;  // рукописный набор
     fbF_ScaleXTest : FB_F_ScaleX_Test;  // рукописный набор
     fbS7FTrigTest : FB_S7FTrig_Test;  // рукописный набор

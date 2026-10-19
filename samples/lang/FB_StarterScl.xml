@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- s7-to-codesys, корпус всех языков: собрано samples/lang/build_xml.py из samples/lang/blocks.py, руками не править -->
+<Document>
+  <Engineering version="V21" />
+  <SW.Blocks.FB ID="0">
+    <AttributeList>
+      <AutoNumber>false</AutoNumber>
+      <HeaderAuthor>WTP2</HeaderAuthor>
+      <HeaderFamily>Drives</HeaderFamily>
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface>
+        <Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+          <Section Name="Input">
+            <Member Name="xStart" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Пуск (кнопка)</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xStop" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Стоп (кнопка, TRUE — нажата)</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xInterlock" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Блокировки в норме, пуск разрешён</MultiLanguageText></Comment>
+              <StartValue>TRUE</StartValue>
+            </Member>
+            <Member Name="xFeedback" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Обратная связь контактора</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="tFeedbackTime" Datatype="Time">
+              <Comment><MultiLanguageText Lang="ru-RU">Допустимое время без обратной связи</MultiLanguageText></Comment>
+              <StartValue>T#2S</StartValue>
+            </Member>
+            <Member Name="xReset" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Сброс аварии</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="Output">
+            <Member Name="xRun" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Команда контактору</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xFault" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Авария: нет обратной связи</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="iStarts" Datatype="Int">
+              <Comment><MultiLanguageText Lang="ru-RU">Число пусков</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="InOut" />
+          <Section Name="Static">
+            <Member Name="xRunMem" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Бит-операнд SR пуска</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xEdgeMem" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Бит памяти фронта xRun</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="tonFeedback" Datatype="TON_TIME" Version="1.0">
+              <Comment><MultiLanguageText Lang="ru-RU">Таймер контроля обратной связи</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="Temp" />
+          <Section Name="Constant" />
+        </Sections>
+      </Interface>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>FB_StarterScl</Name>
+      <Number>104</Number>
+      <ProgrammingLanguage>SCL</ProgrammingLanguage>
+      <SetENOAutomatically>false</SetENOAutomatically>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Пускатель насоса с контролем обратной связи (один блок на LAD, FBD, STL, SCL).
+1. Пуск/стоп — SR с битом-операндом xRunMem: S = xStart AND xInterlock; R1 = xStop OR NOT xInterlock OR xFault.
+   SR S7: сначала S, затем R1 — при S = R1 = 1 (Пуск и Стоп одновременно) бит сброшен. xRun := xRunMem.
+2. Контроль обратной связи: TON tonFeedback (IN = xRun AND NOT xFeedback, PT = tFeedbackTime).
+3. Авария с самоподхватом: xFault := (tonFeedback.Q OR xFault) AND NOT xReset.
+4. Счётчик пусков: по фронту xRun (бит памяти xEdgeMem) iStarts := iStarts + 1.
+Порядок сетей 1-4; xFault в сети 1 — значение прошлого вызова.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <StructuredText xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/StructuredText/v4">
+              <LineComment><Text> 1. SR с битом xRunMem: сначала S, затем R1 (сброс главнее)</Text></LineComment>
+              <NewLine />
+              <Token Text="IF" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xStart" /></Symbol></Access>
+              <Blank />
+              <Token Text="AND" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xInterlock" /></Symbol></Access>
+              <Blank />
+              <Token Text="THEN" />
+              <NewLine />
+              <Blank Num="4" />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xRunMem" /></Symbol></Access>
+              <Blank />
+              <Token Text=":=" />
+              <Blank />
+              <Access Scope="LiteralConstant"><Constant><ConstantType>Bool</ConstantType><ConstantValue>TRUE</ConstantValue></Constant></Access>
+              <Token Text=";" />
+              <NewLine />
+              <Token Text="END_IF" />
+              <Token Text=";" />
+              <NewLine />
+              <Token Text="IF" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xStop" /></Symbol></Access>
+              <Blank />
+              <Token Text="OR" />
+              <Blank />
+              <Token Text="NOT" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xInterlock" /></Symbol></Access>
+              <Blank />
+              <Token Text="OR" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xFault" /></Symbol></Access>
+              <Blank />
+              <Token Text="THEN" />
+              <NewLine />
+              <Blank Num="4" />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xRunMem" /></Symbol></Access>
+              <Blank />
+              <Token Text=":=" />
+              <Blank />
+              <Access Scope="LiteralConstant"><Constant><ConstantType>Bool</ConstantType><ConstantValue>FALSE</ConstantValue></Constant></Access>
+              <Token Text=";" />
+              <NewLine />
+              <Token Text="END_IF" />
+              <Token Text=";" />
+              <NewLine />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xRun" /></Symbol></Access>
+              <Blank />
+              <Token Text=":=" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xRunMem" /></Symbol></Access>
+              <Token Text=";" />
+              <NewLine />
+              <LineComment><Text> 2. Контроль обратной связи</Text></LineComment>
+              <NewLine />
+              <Access Scope="Call"><Instruction Name="TON"><Instance Scope="LocalVariable"><Component Name="tonFeedback" /></Instance><Token Text="(" /><Parameter Name="IN"><Blank /><Token Text=":=" /><Blank /><Access Scope="LocalVariable"><Symbol><Component Name="xRun" /></Symbol></Access><Blank /><Token Text="AND" /><Blank /><Token Text="NOT" /><Blank /><Access Scope="LocalVariable"><Symbol><Component Name="xFeedback" /></Symbol></Access></Parameter><Token Text="," /><Blank /><Parameter Name="PT"><Blank /><Token Text=":=" /><Blank /><Access Scope="LocalVariable"><Symbol><Component Name="tFeedbackTime" /></Symbol></Access></Parameter><Token Text=")" /></Instruction></Access>
+              <Token Text=";" />
+              <NewLine />
+              <LineComment><Text> 3. Авария с самоподхватом</Text></LineComment>
+              <NewLine />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xFault" /></Symbol></Access>
+              <Blank />
+              <Token Text=":=" />
+              <Blank />
+              <Token Text="(" />
+              <Access Scope="LocalVariable"><Symbol><Component Name="tonFeedback" /><Component Name="Q" /></Symbol></Access>
+              <Blank />
+              <Token Text="OR" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xFault" /></Symbol></Access>
+              <Token Text=")" />
+              <Blank />
+              <Token Text="AND" />
+              <Blank />
+              <Token Text="NOT" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xReset" /></Symbol></Access>
+              <Token Text=";" />
+              <NewLine />
+              <LineComment><Text> 4. Счётчик пусков по фронту xRun</Text></LineComment>
+              <NewLine />
+              <Token Text="IF" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xRun" /></Symbol></Access>
+              <Blank />
+              <Token Text="AND" />
+              <Blank />
+              <Token Text="NOT" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xEdgeMem" /></Symbol></Access>
+              <Blank />
+              <Token Text="THEN" />
+              <NewLine />
+              <Blank Num="4" />
+              <Access Scope="LocalVariable"><Symbol><Component Name="iStarts" /></Symbol></Access>
+              <Blank />
+              <Token Text=":=" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="iStarts" /></Symbol></Access>
+              <Blank />
+              <Token Text="+" />
+              <Blank />
+              <Access Scope="LiteralConstant"><Constant><ConstantType>Int</ConstantType><ConstantValue>1</ConstantValue></Constant></Access>
+              <Token Text=";" />
+              <NewLine />
+              <Token Text="END_IF" />
+              <Token Text=";" />
+              <NewLine />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xEdgeMem" /></Symbol></Access>
+              <Blank />
+              <Token Text=":=" />
+              <Blank />
+              <Access Scope="LocalVariable"><Symbol><Component Name="xRun" /></Symbol></Access>
+              <Token Text=";" />
+            </StructuredText>
+          </NetworkSource>
+          <ProgrammingLanguage>SCL</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Логика пускателя целиком</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Пускатель</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="8" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="9" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Пускатель насоса (SCL)</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FB>
+</Document>

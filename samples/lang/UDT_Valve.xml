@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- s7-to-codesys, корпус всех языков: собрано samples/lang/build_xml.py из samples/lang/blocks.py, руками не править -->
+<Document>
+  <Engineering version="V21" />
+  <SW.Types.PlcStruct ID="0">
+    <AttributeList>
+      <Interface>
+        <Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+          <Section Name="None">
+            <Member Name="xOpen" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Открыта</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xClosed" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Закрыта</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="iPos_pct" Datatype="Int">
+              <Comment><MultiLanguageText Lang="ru-RU">Положение, %</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+        </Sections>
+      </Interface>
+      <Name>UDT_Valve</Name>
+      <Number>0</Number>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Состояние задвижки для HMI и STL</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <MultilingualText ID="3" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="4" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Задвижка</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Types.PlcStruct>
+</Document>

@@ -1,8 +1,12 @@
 """Конвейер: входные файлы → разбор → таблица символов → эмиттер → раскладка, tasks.json, отчёт.
 
-Входы: исходники SCL (*.scl и выгрузка TIA Portal *.db, *.udt — тот же синтаксис), таблицы тегов *.csv
-(экспорт TIA Portal) и каталоги (рекурсивно; таблицы тегов распознаются по заголовку, ob_config.json в
-каталоге — конфигурация OB). Кодировка входа — UTF-8
+Входы: исходники SCL (*.scl и выгрузка TIA Portal *.db, *.udt — тот же синтаксис), экспорт блоков TIA
+Portal Openness на любом языке S7 (SimaticML *.xml: LAD, FBD, STL, SCL), таблицы тегов *.csv (экспорт TIA
+Portal) и каталоги (рекурсивно; таблицы тегов распознаются по заголовку, ob_config.json в каталоге —
+конфигурация OB).
+
+SimaticML понижается в текст SCL (s7conv/lower) и дальше идёт тем же путём, что SCL; происхождение строк
+(сеть, UId) — в SourceFile.lowering. Кодировка входа — UTF-8
 (с BOM или без) или cp1251, переводы строк любые.
 """
 
@@ -15,13 +19,16 @@ from pathlib import Path
 from s7conv import mapping as M
 from s7conv import symbols as S
 from s7conv.emitter import ConversionResult, Options, convert
+from s7conv.frontends.simaticml import SimaticMLError, XBlock, XDocument, looks_like_simaticml, parse_document
 from s7conv.layout import SUPPORT_SRC, L
-from s7conv.nodes import SourceFile
+from s7conv.lower.block import LowerOptions, lower_document
+from s7conv.nodes import ParseIssue, RawBlock, SourceFile, Span
 from s7conv.parser import parse_source
 
 # «Generate source from blocks» TIA Portal: блоки — .scl, блоки данных — .db, типы данных PLC — .udt
 SCL_SUFFIXES = (".scl", ".db", ".udt")
 TAG_SUFFIXES = (".csv",)
+XML_SUFFIXES = (".xml",)
 
 
 class InputError(Exception):
@@ -34,6 +41,7 @@ OB_CONFIG_NAME = "ob_config.json"
 @dataclass
 class Inputs:
     scl: list[Path] = field(default_factory=list)
+    xml: list[Path] = field(default_factory=list)  # SimaticML (TIA Portal Openness)
     tags: list[Path] = field(default_factory=list)
     ob_config: Path | None = None  # ob_config.json, найденный во входном каталоге
 
@@ -76,11 +84,15 @@ def collect_inputs(paths: list[str], tag_files: list[str] | None = None) -> Inpu
                 suffix = found.suffix.lower()
                 if suffix in SCL_SUFFIXES:
                     inputs.scl.append(found)
+                elif suffix in XML_SUFFIXES and looks_like_simaticml(read_source(found)):
+                    inputs.xml.append(found)
                 elif suffix in TAG_SUFFIXES and S.looks_like_tag_table(read_source(found)):
                     inputs.tags.append(found)
         elif path.is_file():
             if path.suffix.lower() in TAG_SUFFIXES:
                 inputs.tags.append(path)
+            elif path.suffix.lower() in XML_SUFFIXES:
+                inputs.xml.append(path)
             else:
                 inputs.scl.append(path)
         else:
@@ -90,13 +102,50 @@ def collect_inputs(paths: list[str], tag_files: list[str] | None = None) -> Inpu
         if not path.is_file():
             raise InputError(f"{raw}: таблица тегов не найдена")
         inputs.tags.append(path)
-    if not inputs.scl:
-        raise InputError("нет входных файлов *.scl, *.db, *.udt")
+    if not inputs.scl and not inputs.xml:
+        raise InputError("нет входных файлов *.scl, *.db, *.udt, *.xml")
     return inputs
 
 
-def parse_inputs(inputs: Inputs) -> list[SourceFile]:
-    return [parse_source(read_source(p), str(p)) for p in inputs.scl]
+def lower_options(options: Options | None) -> LowerOptions:
+    o = options or Options()
+    return LowerOptions(cpu=o.cpu, stl_jumps=o.stl_jumps)
+
+
+def parse_xml(paths: list[Path], options: Options | None = None) -> list[SourceFile]:
+    """SimaticML → понижённый SCL; реестр блоков — по всем файлам (вызовы между документами)."""
+    docs: list[tuple[Path, XDocument | str]] = []
+    registry: dict[str, XBlock] = {}
+    for path in paths:
+        try:
+            doc = parse_document(read_source(path), str(path))
+        except SimaticMLError as exc:
+            docs.append((path, str(exc)))
+            continue
+        docs.append((path, doc))
+        for blk in doc.blocks:
+            registry.setdefault(blk.name.lower(), blk)
+    files: list[SourceFile] = []
+    for path, item in docs:
+        if isinstance(item, str):
+            sf = SourceFile(path=str(path), text="")
+            sf.issues.append(ParseIssue(1, 1, item))
+            sf.blocks.append(RawBlock(kind="", name=path.name, text="", reason=item, span=Span(1, 1, 0, 0)))
+            files.append(sf)
+            continue
+        text, lowering, _support = lower_document(item, registry, lower_options(options))
+        sf = parse_source(text, str(path))
+        sf.lowering = lowering
+        sf.issues.extend(ParseIssue(1, 1, issue, "warning") for issue in item.issues)
+        files.append(sf)
+    return files
+
+
+def parse_inputs(inputs: Inputs, options: Options | None = None) -> list[SourceFile]:
+    files = [parse_source(read_source(p), str(p)) for p in inputs.scl]
+    if inputs.xml:
+        files.extend(parse_xml(inputs.xml, options))
+    return files
 
 
 def load_project(inputs: Inputs, base: Path | None = None) -> S.Project:
@@ -124,7 +173,7 @@ def run(
     inputs: Inputs, options: Options | None = None, base: Path | None = None
 ) -> tuple[ConversionResult, list[SourceFile]]:
     """Разбор и конвертация; пути в шапках и отчёте — от base (по умолчанию — от текущего каталога)."""
-    files = parse_inputs(inputs)
+    files = parse_inputs(inputs, options)
     project = load_project(inputs, base)
     display = {sf.path: display_path(Path(sf.path), base) for sf in files}
     result = convert(files, project, options, display)
@@ -173,6 +222,7 @@ __all__ = [
     "load_ob_config",
     "load_project",
     "parse_inputs",
+    "parse_xml",
     "read_source",
     "run",
     "support_objects",
