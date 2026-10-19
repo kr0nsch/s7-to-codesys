@@ -43,8 +43,8 @@ CODESYS (`TIME()`, `a[i].b`, пустой оператор `;`, массив с 
 | 2026-10-19 | `run_iec_checker.py --tests` (iec_checker 0.4, Windows, локально) | 54 объекта `src/` и `tests/` | `ParserError` 0; необоснованных 0; обоснованных 962; артефактов сборки 163; неиспользованных обоснований нет |
 | 2026-10-19 | `run_rusty.py` (RuSTy 1.0.6, Windows, локально) | 51 файл (3 исключены) | 0 ошибок, 1 предупреждение (E067 — см. «RuSTy») |
 | 2026-10-19 | `test_repository_sources_pass_rusty_with_shims` | 53 файла из 54 (без `DB_Telegram`) | пройден |
-| — | iec_checker 0.4 (CI, Linux) | то же | _перенести из отчёта CI_ |
-| — | iec_checker `nightly` (CI, необязательно) | то же | _перенести из отчёта CI_ |
+| 2026-10-19 | iec_checker 0.4 (CI, Linux) | 54 объекта `src/` и `tests/` | ошибок разбора нет; необоснованных 0; обоснованных 962; артефактов сборки 163 ([прогон](https://github.com/kr0nsch/s7-to-codesys/actions/runs/39248631044)) |
+| 2026-10-19 | iec_checker `nightly` (CI, необязательно) | то же | необоснованных 7 — все PLCOPEN-CP17 (неиспользуемый параметр), нового правила nightly-образа; обоснованных 918. Задание необязательное, разбор CP17 — в планах ([прогон](https://github.com/kr0nsch/s7-to-codesys/actions/runs/39248631044)) |
 
 ## Компилятор CODESYS
 
