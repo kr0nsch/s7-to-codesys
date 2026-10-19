@@ -1,26 +1,78 @@
-# s7-to-codesys
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/banner-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/media/banner-light.svg">
+    <img alt="Баннер s7-to-codesys: код SCL слева и сконвертированный ST CODESYS справа" src="docs/media/banner-light.svg" width="100%">
+  </picture>
+</p>
 
-[![CI](https://github.com/<GITHUB_USER>/s7-to-codesys/actions/workflows/ci.yml/badge.svg)](https://github.com/<GITHUB_USER>/s7-to-codesys/actions/workflows/ci.yml)
+<p align="center">
+  <a href="https://github.com/<GITHUB_USER>/s7-to-codesys/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/<GITHUB_USER>/s7-to-codesys/ci.yml?branch=main&style=flat-square&label=CI&labelColor=1B2736"></a>
+  <a href="LICENSE"><img alt="Лицензия MIT" src="https://img.shields.io/badge/license-MIT-56677D?style=flat-square&labelColor=1B2736"></a>
+  <img alt="CODESYS 3.5.17" src="https://img.shields.io/badge/CODESYS-3.5.17-C2410C?style=flat-square&labelColor=1B2736">
+  <img alt="IEC 61131-3" src="https://img.shields.io/badge/IEC%2061131--3-56677D?style=flat-square">
+  <a href="docs/TEST_REPORT.md"><img alt="Тесты coUnit в CODESYS Control Win: 74" src="https://img.shields.io/badge/coUnit-74%20tests-3A4B60?style=flat-square&labelColor=1B2736"></a>
+  <img alt="Тесты pytest: 1024" src="https://img.shields.io/badge/pytest-1024%20tests-3A4B60?style=flat-square&labelColor=1B2736">
+  <img alt="Язык: Python" src="https://img.shields.io/badge/Python-3A4B60?style=flat-square&logo=python&logoColor=white">
+  <img alt="Язык: Structured Text" src="https://img.shields.io/badge/Structured%20Text-3A4B60?style=flat-square">
+</p>
 
-Инструмент и методика частичной миграции программ Siemens S7 (SCL из TIA Portal) на CODESYS V3.5.
-Конвертер `s7conv` переводит исходники SCL в ST в раскладке CODESYS и считает, что переведено
-автоматически, что требует проверки и что не поддерживается, — всё неоднозначное остаётся в коде пометкой с
-причиной. Поведение сконвертированных блоков проверяют тесты coUnit, построенные из сценариев по описанию
-логики, а не по результату конвертера: весь корпус собран в CODESYS 3.5.17.30, все 74 теста пройдены в
-CODESYS Control Win.
+<p align="center">
+  <a href="#демонстрация">Демо</a> ·
+  <a href="#архитектура">Архитектура</a> ·
+  <a href="#быстрый-старт-без-железа">Быстрый старт</a> ·
+  <a href="docs/">Документация</a> ·
+  <a href="#summary-en">Summary (EN)</a>
+</p>
+
+**Миграция с Siemens S7 на CODESYS без иллюзий.** Инструмент и методика частичной миграции программ
+S7 (SCL из TIA Portal) на CODESYS V3.5. Конвертер `s7conv` переводит исходники SCL в ST в раскладке
+CODESYS и считает, что переведено автоматически, что требует проверки и что не поддерживается, — всё
+неоднозначное остаётся в коде пометкой с причиной. Поведение сконвертированных блоков проверяют тесты
+coUnit, построенные из сценариев по описанию логики, а не по результату конвертера: весь корпус собран в
+CODESYS 3.5.17.30, все 74 теста пройдены в CODESYS Control Win.
 
 ## Демонстрация
 
-> **Плейсхолдеры — будет добавлено:**
->
-> 1. `docs/media/scl-vs-st.png` — исходник SCL и результат ST рядом (`FB_AnalogIn`: NORM_X/SCALE_X →
->    `F_NormX`/`F_ScaleX`; `FB_BatchCounter`: `CTU_INT` → `CTU` с явными преобразованиями и пометкой).
-> 2. `docs/media/conversion-report.png` — HTML-отчёт конвертации: итог 94 % / 26 / 30, доли по видам
->    конструкций и по файлам.
-> 3. `docs/media/convert-and-test.gif` — терминал: `python -m s7conv convert …` и
->    `python tools/codesys/cds.py test` (13 наборов, 74 теста в Control Win).
+Всё ниже — с реальных прогонов на машине разработки: `s7conv` на корпусе `samples/scl`, CODESYS
+3.5.17.30 и CODESYS Control Win V3. Код на картинках — файлы репозитория как есть. Макетов нет.
 
-Пока картинок нет — фрагмент корпуса текстом. SCL (`samples/scl/FB_AnalogIn.scl`):
+<p align="center">
+  <img alt="Терминал: s7conv переводит 20 файлов SCL (998 конструкций, 94 % автоматически), build-corpus --check сверяет репозиторий, cds.py test --clean — сборка без ошибок и 74 из 74 тестов coUnit" src="docs/media/demo-convert-test.gif" width="900">
+</p>
+<p align="center"><sub>Конвертация корпуса → сверка с закоммиченным результатом → тестовый проект CODESYS с нуля и прогон coUnit в Control Win. Реальная сессия 19.10.2026, снято term2gif; ожидание CODESYS (46 с) в записи сокращено</sub></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/shot-scl-vs-st-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/media/shot-scl-vs-st-light.png">
+    <img alt="FB_Motor рядом: исходник SCL и результат s7conv в ST CODESYS с настоящими номерами строк; отмечены замены TON_TIME на FB_S7Ton, REGION на комментарии и сборка вызова в одну строку" src="docs/media/shot-scl-vs-st-light.png" width="100%">
+  </picture>
+</p>
+<p align="center"><sub>Один блок корпуса: <code>samples/scl/FB_Motor.scl</code> и <code>src/POUs/Converted/FB_Motor</code> без правок (подсветка и выноски добавлены при отрисовке); его 7 сценариев пройдены в Control Win</sub></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/shot-migration-marks-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/media/shot-migration-marks-light.png">
+    <img alt="Пометки ручной работы: срезы .%W0 и .%B1 переведены с пометкой MIGRATION-CHECK, а BLKMOV и абсолютные адреса DB закомментированы с пометкой MIGRATION-TODO и причиной" src="docs/media/shot-migration-marks-light.png" width="100%">
+  </picture>
+</p>
+<p align="center"><sub>Что конвертер не решает за инженера: <code>MIGRATION-CHECK</code> — переведено, но сверить; <code>MIGRATION-TODO</code> — аналога нет, исходный текст закомментирован</sub></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/shot-conversion-report-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/media/shot-conversion-report-light.png">
+    <img alt="HTML-отчёт конвертации корпуса: 94 % конструкций переведены автоматически (942 из 998), 26 требуют проверки, 30 не поддерживаются, 20 файлов и 44 блока, доли по видам конструкций" src="docs/media/shot-conversion-report-light.png" width="100%">
+  </picture>
+</p>
+<p align="center"><sub>Верх отчёта <code>s7conv report --html</code> по корпусу, снимок страницы в браузере (тёмная и светлая тема отчёта). Разбор по файлам и причинам — в самом отчёте и в <a href="docs/CONVERSION_REPORT.md">CONVERSION_REPORT.md</a></sub></p>
+
+<details>
+<summary>Тот же принцип текстом: <code>FB_AnalogIn</code> и <code>FB_LegacyTelegram</code></summary>
+
+SCL (`samples/scl/FB_AnalogIn.scl`):
 
 ```text
 #rawClamped := LIMIT(MN := #RAW_NOMINAL_LOW, IN := #raw, MX := #RAW_NOMINAL_HIGH);
@@ -43,6 +95,8 @@ value := F_ScaleX(rMin := rangeLow, rValue := normalized, rMax := rangeHigh);
 // MIGRATION-TODO: BLKMOV: нет прямого аналога в CODESYS Standard (стр. 98)
 // #retVal := BLKMOV(SRCBLK := #source, DSTBLK => P#DB30.DBX4.0 BYTE 16);
 ```
+
+</details>
 
 ## Архитектура
 
@@ -165,6 +219,9 @@ S5TIME → TIME (7), стартовая информация OB, `Initial_Call` 
 | `test` — загрузка в Control Win, `TestTask` 10 мс | 13 наборов, 74 теста: **пройдено 74**, упало 0; все наборы завершились за 1,2 с |
 | `roundtrip` — импорт → экспорт → сравнение | 242 файла совпадают побайтно; повторный импорт — 0 изменений |
 
+Повторный прогон `cds.py test --clean` 19.10.2026 (тестовый проект с нуля: импорт 138 объектов) — тот же итог,
+74 из 74; он снят в GIF раздела [«Демонстрация»](#демонстрация).
+
 Тесты не пустые: искажённые ожидания в CSV (в том числе в строке ровно на пороге таймера) CODESYS ловит
 ровно теми тестами и сообщениями, а ошибка, внесённая в OB82 без задачи, видна в `library`, хотя `build`
 её не компилирует (контрольные эксперименты — в TEST_REPORT.md). Что значат «0 предупреждений» (смена знака —
@@ -211,7 +268,7 @@ C0195, сужение — ошибка C0032) — [docs/STATIC_ANALYSIS.md](docs
 - OB100 эмулируется флагом первого цикла, который команда Stop → Start CODESYS не сбрасывает (в S7 OB100
   выполняется при каждом STOP → RUN).
 - Дальше: прогон на ПЛК210 со стендовой проверкой retain и ввода-вывода; импорт корпуса в TIA Portal
-  (допущение S1); картинки и GIF для раздела «Демонстрация».
+  (допущение S1).
 
 ## Summary (EN)
 
@@ -228,3 +285,12 @@ Documentation is in Russian.
 ## Лицензия
 
 [MIT](LICENSE) © 2026 <ИМЯ ФАМИЛИЯ>
+
+---
+
+<p align="center"><b>Портфолио АСУ ТП</b></p>
+<table>
+<tr><td width="33%"><a href="https://github.com/<GITHUB_USER>/plc-repo-template">01 · plc-repo-template</a><br><sub>ST в git, сборка проекта скриптом, CI</sub></td><td width="33%"><a href="https://github.com/<GITHUB_USER>/plc-process-lib">02 · plc-process-lib</a><br><sub>ФБ: AI, двигатель, ПЧ, задвижка, ПИД, тревоги</sub></td><td width="33%"><a href="https://github.com/<GITHUB_USER>/kns-pump-station">03 · kns-pump-station</a><br><sub>флагман: КНС, три насоса с ПЧ, модель, HMI</sub></td></tr>
+<tr><td width="33%"><a href="https://github.com/<GITHUB_USER>/kns-port-domestic">04 · kns-port-domestic</a><br><sub>перенос на Astra.IDE / MasterSCADA 4D</sub></td><td width="33%"><a href="https://github.com/<GITHUB_USER>/plc-iiot-stack">05 · plc-iiot-stack</a><br><sub>OPC UA / MQTT → InfluxDB → Grafana</sub></td><td width="33%"><a href="https://github.com/<GITHUB_USER>/iolistgen">06 · iolistgen</a><br><sub>перечень сигналов → ST, карты Modbus, SCADA</sub></td></tr>
+<tr><td width="33%"><a href="https://github.com/<GITHUB_USER>/plc-ci-toolkit">07 · plc-ci-toolkit</a><br><sub>линтеры, сборка CODESYS, тесты, JUnit</sub></td><td width="33%"><a href="https://github.com/<GITHUB_USER>/s7-to-codesys"><b>08 · s7-to-codesys</b></a><br><sub>конвертер SCL → ST с отчётом о переносе</sub></td><td width="33%"><a href="https://github.com/<GITHUB_USER>/sis-interlock-demo">09 · sis-interlock-demo</a><br><sub>ПАЗ: MooN, матрица причин и следствий</sub></td></tr>
+</table>

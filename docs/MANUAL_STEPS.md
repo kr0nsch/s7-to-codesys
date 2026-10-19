@@ -216,3 +216,8 @@ git remote add mirror <url-зеркала>
 git push mirror --all
 git push mirror --tags
 ```
+
+## 8. Оформление репозитория на GitHub
+
+Картинки README лежат в `docs/media/`. Превью для ссылок GitHub не берёт из репозитория — его
+загружают вручную: Settings → General → Social preview → `docs/media/social-preview.png` (1280 × 640).

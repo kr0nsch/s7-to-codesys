@@ -63,6 +63,11 @@
   таймера) ловятся ровно теми тестами, `#Standard` разрешается в Standard 3.5.17.0 (`docs/TEST_REPORT.md`).
 - `docs/MANUAL_STEPS.md`, раздел 4: пошаговые действия в IDE — проект для ПЛК210, обработчик OB82,
   Persistent Variables, привязка ввода-вывода к каналам ПЛК210.
+- Оформление README: баннер для тёмной и светлой темы, бейджи, навигация, подвал портфолио; раздел
+  «Демонстрация» с реальными медиа в `docs/media/` — GIF прогона (`s7conv convert`, `build-corpus --check`,
+  `cds.py test --clean`: 74 из 74 в Control Win, 19.10.2026), FB_Motor «SCL рядом с ST», примеры пометок
+  `MIGRATION-CHECK`/`MIGRATION-TODO`, верх HTML-отчёта конвертации; `social-preview.png` (загрузка —
+  `docs/MANUAL_STEPS.md`, раздел 8).
 
 ### Changed
 
