@@ -4,7 +4,7 @@
 //             диапазон (та же формула). Ожидаемые значения — по формуле Siemens
 //             OUT = VALUE * (MAX - MIN) + MIN, а не по результату реализации.
 //             Экземпляр набора объявляется в PRG_Tests (объявление регистрирует набор).
-// Автор:      <ИМЯ ФАМИЛИЯ>
+// Автор:      kr0nsch
 // Версия:     0.1.0
 // Документ:   docs/MAPPING.md, раздел «NORM_X и SCALE_X»
 FUNCTION_BLOCK FB_F_ScaleX_Test EXTENDS coUnit.FB_TestSuite

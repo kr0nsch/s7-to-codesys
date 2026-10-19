@@ -212,7 +212,7 @@
     },
     "default_namespace": "TPL",
     "placeholder": null,
-    "author": "<ИМЯ ФАМИЛИЯ>",
+    "author": "kr0nsch",
     "description": "s7-to-codesys: объекты src/ в виде библиотеки CODESYS",
     "released": false,
     "exclude": [

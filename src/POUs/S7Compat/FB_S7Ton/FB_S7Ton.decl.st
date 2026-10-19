@@ -8,7 +8,7 @@
 //             максимуме TIME: при IN = TRUE дольше 2^32 мс (около 49,7 суток) Q не падает, как у S7 и
 //             Standard.TON (разность «сейчас − старт» после перехода TIME через ноль стала бы малой).
 //             Совпадение со Standard.TON в реальном времени — тест FB_S7Ton_Test.MatchesStandardInRealTime.
-// Автор:      <ИМЯ ФАМИЛИЯ>
+// Автор:      kr0nsch
 // Версия:     0.2.0
 // Документ:   docs/MAPPING.md, раздел «Функциональные блоки инструкций»; docs/methodology.md
 FUNCTION_BLOCK FB_S7Ton

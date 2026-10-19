@@ -4,7 +4,7 @@
 //             F_TRIG S7). В CODESYS 3.5.17.30 (Standard 3.5.17.0) F_TRIG Standard ведёт себя так же — тест
 //             StandardFTrigMatchesS7 и строка 1 сценария FB_PumpAlternation/RotateOnStop (docs/TEST_REPORT.md);
 //             блок нужен для версии Standard, где этот тест упадёт, и как эталон семантики S7 в тестах.
-// Автор:      <ИМЯ ФАМИЛИЯ>
+// Автор:      kr0nsch
 // Версия:     0.1.1
 // Документ:   docs/MAPPING.md, раздел «Функциональные блоки инструкций»
 FUNCTION_BLOCK FB_S7FTrig

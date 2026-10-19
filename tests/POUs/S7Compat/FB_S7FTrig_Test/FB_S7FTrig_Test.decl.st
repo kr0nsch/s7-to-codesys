@@ -3,7 +3,7 @@
 //             вызове, фронт не считается спадом; F_TRIG библиотеки Standard ведёт себя так же (характеризация
 //             платформы, StandardFTrigMatchesS7). Ожидаемые значения — по описанию F_TRIG S7.
 //             Экземпляр набора объявляется в PRG_Tests.
-// Автор:      <ИМЯ ФАМИЛИЯ>
+// Автор:      kr0nsch
 // Версия:     0.2.0
 // Документ:   docs/MAPPING.md, раздел «Функциональные блоки инструкций»
 FUNCTION_BLOCK FB_S7FTrig_Test EXTENDS coUnit.FB_TestSuite

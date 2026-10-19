@@ -2,7 +2,7 @@
 //             моделируемые часы при xSimulation = TRUE; при xSimulation = FALSE — время ПЛК, которое
 //             идёт так же, как ET таймера CODESYS Standard (тест на несколько циклов).
 //             Экземпляр набора объявляется в PRG_Tests.
-// Автор:      <ИМЯ ФАМИЛИЯ>
+// Автор:      kr0nsch
 // Версия:     0.1.0
 // Документ:   docs/methodology.md, раздел «Проверка поведения: время в тестах»
 FUNCTION_BLOCK FB_F_S7Now_Test EXTENDS coUnit.FB_TestSuite

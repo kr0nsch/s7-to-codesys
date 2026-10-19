@@ -5,7 +5,7 @@
 //             сбрасывается в 0 при IN = FALSE. Время — F_S7Now(): в работе TIME(), как у Standard.TP,
 //             в тестах — моделируемые часы GVL_S7Clock. Совпадение со Standard.TP в реальном времени —
 //             тест FB_S7Tp_Test.MatchesStandardInRealTime.
-// Автор:      <ИМЯ ФАМИЛИЯ>
+// Автор:      kr0nsch
 // Версия:     0.1.0
 // Документ:   docs/MAPPING.md, раздел «Функциональные блоки инструкций»; docs/methodology.md
 FUNCTION_BLOCK FB_S7Tp
