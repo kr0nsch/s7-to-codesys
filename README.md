@@ -11,8 +11,7 @@
   <a href="LICENSE"><img alt="Лицензия MIT" src="https://img.shields.io/badge/license-MIT-56677D?style=flat-square&labelColor=1B2736"></a>
   <img alt="CODESYS 3.5.17" src="https://img.shields.io/badge/CODESYS-3.5.17-C2410C?style=flat-square&labelColor=1B2736">
   <img alt="IEC 61131-3" src="https://img.shields.io/badge/IEC%2061131--3-56677D?style=flat-square">
-  <a href="docs/TEST_REPORT.md"><img alt="Тесты coUnit в CODESYS Control Win: 74" src="https://img.shields.io/badge/coUnit-74%20tests-3A4B60?style=flat-square&labelColor=1B2736"></a>
-  <img alt="Тесты pytest: 1024" src="https://img.shields.io/badge/pytest-1024%20tests-3A4B60?style=flat-square&labelColor=1B2736">
+  <a href="#тесты-и-проверки"><img alt="Тесты: coUnit 74 из 74 в CODESYS Control Win, pytest 1024" src="https://img.shields.io/badge/tests-coUnit%2074%2F74%20%C2%B7%20pytest%201024-3A4B60?style=flat-square&labelColor=1B2736"></a>
   <img alt="Язык: Python" src="https://img.shields.io/badge/Python-3A4B60?style=flat-square&logo=python&logoColor=white">
   <img alt="Язык: Structured Text" src="https://img.shields.io/badge/Structured%20Text-3A4B60?style=flat-square">
 </p>
