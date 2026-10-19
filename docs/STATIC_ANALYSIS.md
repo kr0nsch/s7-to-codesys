@@ -185,7 +185,7 @@ C0195 — их нет. Явные преобразования, которые �
 | PLCOPEN-CP17 | `FB_EventLogger`: выходы `telegramStatus`, `execTime`; `FB_LegacyTelegram`: входы `archiveDb`, `retryDelay`, выход `retVal` | 5 | Сохранённый интерфейс S7: параметры пишут или читают только операторы, которые конвертер не переводит (`RUNTIME`, `PEEK`, `BLKMOV`, `S_ODT`, запись в DB по номеру — пометки `MIGRATION-TODO`). Те же имена, кроме `retVal`, уже в списке UnusedVariable выше. Удалять до ручного переноса — менять интерфейс блока и вызовы в OB |
 | PLCOPEN-CP17 | `PRG_Diagnostic_error_interrupt`: вход `MultiError` | 1 | Стартовая информация OB82 (`MIGRATION-CHECK`): исходный OB в `samples/scl/OB_Startup.scl` её тоже не читает — перенос точный |
 | PLCOPEN-CP17 | `FB_Motor`: выход `status` | 1 | Ложное срабатывание: структура `UDT_DeviceStatus` записывается по полям (`status.running := runCmd AND feedback`), запись в поле CP17 записью не считает |
-| UnusedVariable | наборы `S7Compat`: `fbDut`, `fbStandard`, `fbCompat` | — | Образ nightly вызов экземпляра считает использованием и этих находок не выдаёт: запись помечена `checker = "v0.4"` и при прогоне образом не применяется |
+| UnusedVariable | наборы `S7Compat`: `fbDut`, `fbStandard`, `fbCompat` | — | Образ nightly этих находок не выдаёт: запись помечена `checker = "v0.4"` и при прогоне образом не применяется |
 
 ## RuSTy
 

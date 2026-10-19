@@ -103,7 +103,7 @@ id = "UnusedVariable"
 file = "tests/POUs/S7Compat/*/*.method.decl.st"
 match = "FBDUT|FBSTANDARD|FBCOMPAT"
 checker = "v0.4"
-reason = "Ложное срабатывание iec_checker 0.4: экземпляр используется вызовом (fbDut(...), fbStandard(...), fbCompat(...)) и чтением выходов — это он не считает использованием. Образ nightly вызов экземпляра считает использованием"
+reason = "Ложное срабатывание iec_checker 0.4: экземпляр используется вызовом (fbDut(...), fbStandard(...), fbCompat(...)) и чтением выходов — это он не считает использованием. Образ nightly этих находок не выдаёт"
 
 [[allow]]
 id = "UnusedVariable"
