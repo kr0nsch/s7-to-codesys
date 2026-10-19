@@ -162,3 +162,23 @@ def test_module_entry_point() -> None:
         check=False,
     )
     assert proc.returncode == 0 and __version__ in proc.stdout
+
+
+def test_db_and_udt_sources_are_read_from_directory(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Выгрузка TIA Portal: блоки данных — .db, типы данных PLC — .udt; читаются как SCL без переименования."""
+    src = tmp_path / "scl"
+    src.mkdir()
+    (src / "UDT_Pair.udt").write_text(
+        'TYPE "UDT_Pair"\nVERSION : 0.1\n   STRUCT\n      a : Int;\n      b : Int;\n   END_STRUCT;\nEND_TYPE\n',
+        encoding="utf-8",
+    )
+    (src / "DB_Pair.db").write_text(
+        'DATA_BLOCK "DB_Pair"\nVERSION : 0.1\n   VAR\n      p : "UDT_Pair";\n   END_VAR\nBEGIN\nEND_DATA_BLOCK\n',
+        encoding="utf-8",
+    )
+    assert main(["check", str(src)]) == EXIT_OK
+    assert "файлов 2, блоков 2, без ошибок" in capsys.readouterr().out
+    out = tmp_path / "out"
+    assert main(["convert", str(src), "--out", str(out), "-q"]) == EXIT_OK
+    assert (out / "src" / "DUTs" / "UDT_Pair.dut.st").is_file()
+    assert (out / "src" / "GVLs" / "DB_Pair.gvl.st").is_file()

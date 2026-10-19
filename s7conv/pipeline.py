@@ -1,7 +1,8 @@
 """Конвейер: входные файлы → разбор → таблица символов → эмиттер → раскладка, tasks.json, отчёт.
 
-Входы: файлы *.scl, таблицы тегов *.csv (экспорт TIA Portal) и каталоги (рекурсивно; таблицы тегов
-распознаются по заголовку, ob_config.json в каталоге — конфигурация OB). Кодировка входа — UTF-8
+Входы: исходники SCL (*.scl и выгрузка TIA Portal *.db, *.udt — тот же синтаксис), таблицы тегов *.csv
+(экспорт TIA Portal) и каталоги (рекурсивно; таблицы тегов распознаются по заголовку, ob_config.json в
+каталоге — конфигурация OB). Кодировка входа — UTF-8
 (с BOM или без) или cp1251, переводы строк любые.
 """
 
@@ -18,7 +19,8 @@ from s7conv.layout import SUPPORT_SRC, L
 from s7conv.nodes import SourceFile
 from s7conv.parser import parse_source
 
-SCL_SUFFIXES = (".scl",)
+# «Generate source from blocks» TIA Portal: блоки — .scl, блоки данных — .db, типы данных PLC — .udt
+SCL_SUFFIXES = (".scl", ".db", ".udt")
 TAG_SUFFIXES = (".csv",)
 
 
@@ -61,7 +63,7 @@ def read_source(path: Path) -> str:
 
 
 def collect_inputs(paths: list[str], tag_files: list[str] | None = None) -> Inputs:
-    """Файлы *.scl и таблицы тегов *.csv из путей (каталоги — рекурсивно, порядок — по имени)."""
+    """Исходники SCL (*.scl, *.db, *.udt) и таблицы тегов *.csv из путей (каталоги — рекурсивно, по имени)."""
     inputs = Inputs()
     for raw in paths:
         path = Path(raw)
@@ -89,7 +91,7 @@ def collect_inputs(paths: list[str], tag_files: list[str] | None = None) -> Inpu
             raise InputError(f"{raw}: таблица тегов не найдена")
         inputs.tags.append(path)
     if not inputs.scl:
-        raise InputError("нет входных файлов *.scl")
+        raise InputError("нет входных файлов *.scl, *.db, *.udt")
     return inputs
 
 
