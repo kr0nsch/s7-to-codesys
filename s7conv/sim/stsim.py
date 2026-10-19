@@ -7,7 +7,8 @@
 подмножество, которого достаточно блокам со сценариями, слою S7Compat и сгенерированным наборам coUnit:
 присваивания (в том числе бит `w.3`), IF/CASE/FOR/WHILE/REPEAT/EXIT/CONTINUE/RETURN, вызовы ФБ, функций и
 методов набора, массивы, структуры, литералы TIME и 16#, стандартные функции (LIMIT, MIN, MAX, ABS,
-преобразования `X_TO_Y`), R_TRIG, F_TRIG (семантика — параметр: S7 или МЭК с M = FALSE), coUnit
+преобразования `X_TO_Y`), R_TRIG, F_TRIG (семантика — параметр: S7 или МЭК с M = FALSE), SR, RS,
+CTU, CTD, CTUD библиотеки Standard (модели — `builtin_flipflop`, `builtin_counter`), coUnit
 (`TEST`, `TEST_FINISHED`, `AssertEquals_*`, `AssertTrue/False`).
 
 Типы по объявлению: целые и битовые — с переполнением по разрядности, TIME — 32 бита без знака (мс),
@@ -231,7 +232,24 @@ class Sim:
         if key in self.pous and self.pous[key].kind == L.POU_FUNCTION_BLOCK:
             return self.new_instance(type_name)
         if key in _BUILTIN_FBS:
-            bool_spec, time_spec = TypeSpec("BOOL"), TypeSpec("TIME")
+            bool_spec, time_spec, word_spec = TypeSpec("BOOL"), TypeSpec("TIME"), TypeSpec("WORD")
+            if key in _FLIPFLOPS:
+                set_in, reset_in = _FLIPFLOPS[key]
+                return Obj(
+                    type_name.upper(),
+                    "fb",
+                    vars={set_in: False, reset_in: False, "q1": False},
+                    types={set_in: bool_spec, reset_in: bool_spec, "q1": bool_spec},
+                )
+            if key in _COUNTERS:
+                names = _COUNTERS[key]
+                return Obj(
+                    type_name.upper(),
+                    "fb",
+                    vars={n: (0 if n in ("pv", "cv") else False) for n in names},
+                    types={n: (word_spec if n in ("pv", "cv") else bool_spec) for n in names},
+                    state={"cu": False, "cd": False},
+                )
             if key in ("r_trig", "f_trig"):
                 return Obj(
                     type_name.upper(),
@@ -453,6 +471,12 @@ class Sim:
         kind = inst.type_name.upper()
         if kind in ("TON", "TOF", "TP"):
             self.builtin_timer(inst, kind)
+            return
+        if kind.lower() in _FLIPFLOPS:
+            builtin_flipflop(inst, kind)
+            return
+        if kind.lower() in _COUNTERS:
+            builtin_counter(inst, kind)
             return
         clk = bool(inst.vars["clk"])
         if kind == "R_TRIG":
@@ -686,7 +710,78 @@ class Frame:
 
 
 _SCALARS = frozenset({"BOOL", "REAL", "LREAL", "TIME", "LTIME", "DATE", "TIME_OF_DAY", "DT"})
-_BUILTIN_FBS = frozenset({"r_trig", "f_trig", "ton", "tof", "tp"})
+# Бистабильные элементы Standard: вход установки, вход сброса (выход — Q1)
+_FLIPFLOPS = {"sr": ("set1", "reset"), "rs": ("set", "reset1")}
+# Счётчики Standard: входы и выходы (PV и CV — WORD)
+_COUNTERS = {
+    "ctu": ("cu", "reset", "pv", "q", "cv"),
+    "ctd": ("cd", "load", "pv", "q", "cv"),
+    "ctud": ("cu", "cd", "reset", "load", "pv", "qu", "qd", "cv"),
+}
+_WORD_MAX = 0xFFFF
+_BUILTIN_FBS = frozenset({"r_trig", "f_trig", "ton", "tof", "tp", *_FLIPFLOPS, *_COUNTERS})
+
+
+def builtin_flipflop(inst: Obj, kind: str) -> None:
+    """SR и RS CODESYS Standard 3.5.17.0 (standard.chm, «SR (FB)», «RS (FB)»).
+
+    SR — приоритет установки: Q1 := SET1 OR (NOT RESET AND Q1).
+    RS — приоритет сброса: Q1 := NOT RESET1 AND (SET OR Q1).
+    Справка называет входы «Rising edge», но формулы — по уровню (МЭК 61131-3, 2.5.2.3.1); уровень
+    подтверждает тест FB_StandardFlipFlop_Test.SrSetHeldReappliesAfterReset в Control Win.
+    Независимо от mapping.py: модель описывает CODESYS, а не перевод S7.
+    """
+    v = inst.vars
+    if kind.upper() == "SR":
+        v["q1"] = bool(v["set1"]) or (not v["reset"] and bool(v["q1"]))
+    else:
+        v["q1"] = (not v["reset1"]) and (bool(v["set"]) or bool(v["q1"]))
+
+
+def builtin_counter(inst: Obj, kind: str) -> None:
+    """CTU, CTD, CTUD CODESYS Standard 3.5.17.0 (standard.chm, «CTU (FB)», «CTD (FB)», «CTUD (FB)»).
+
+    Фронт CU/CD — внутренняя память экземпляра; RESET и LOAD — по уровню. CTU: RESET → CV := 0, иначе
+    по фронту CU CV := CV + 1, пока CV < 65535 (WORD); Q := CV >= PV. CTD: LOAD → CV := PV, иначе по
+    фронту CD CV := CV - 1, пока CV > 0; Q := CV = 0. CTUD: RESET главнее LOAD; при одновременных фронтах
+    CU и CD действуют оба (+1 и -1). Предел 65535 и одновременные фронты справка не описывает — их
+    проверяют тесты FB_StandardCounter_Test в Control Win.
+    """
+    v, st = inst.vars, inst.state
+    upper = kind.upper()
+    cu_edge = cd_edge = False
+    if "cu" in v:
+        cu_edge = bool(v["cu"]) and not st["cu"]
+        st["cu"] = bool(v["cu"])
+    if "cd" in v:
+        cd_edge = bool(v["cd"]) and not st["cd"]
+        st["cd"] = bool(v["cd"])
+    cv = int(v["cv"])
+    if upper == "CTU":
+        if v["reset"]:
+            cv = 0
+        elif cu_edge and cv < _WORD_MAX:
+            cv += 1
+        v["q"] = cv >= int(v["pv"])
+    elif upper == "CTD":
+        if v["load"]:
+            cv = int(v["pv"])
+        elif cd_edge and cv > 0:
+            cv -= 1
+        v["q"] = cv == 0
+    else:
+        if v["reset"]:
+            cv = 0
+        elif v["load"]:
+            cv = int(v["pv"])
+        else:
+            if cu_edge and cv < _WORD_MAX:
+                cv += 1
+            if cd_edge and cv > 0:
+                cv -= 1
+        v["qu"] = cv >= int(v["pv"])
+        v["qd"] = cv == 0
+    v["cv"] = cv
 
 
 def _is_namespace(e: Expr) -> bool:
@@ -771,4 +866,20 @@ def builtin(sim: Sim, name: str, args: list[Any]) -> Any:
     raise SimError(f"функция {name} не поддерживается")
 
 
-__all__ = ["F_TRIG_IEC_M_FALSE", "F_TRIG_S7", "Sim", "SimError", "SuiteOutcome", "coerce", "literal"]
+__all__ = [
+    "F_TRIG_IEC_M_FALSE",
+    "F_TRIG_S7",
+    "Arr",
+    "Frame",
+    "Obj",
+    "PouDef",
+    "Sim",
+    "SimError",
+    "SuiteOutcome",
+    "TypeSpec",
+    "builtin",
+    "builtin_counter",
+    "builtin_flipflop",
+    "coerce",
+    "literal",
+]

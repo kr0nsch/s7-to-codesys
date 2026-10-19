@@ -1,0 +1,14 @@
+coUnit.TEST('CtuCountsRisingEdges');
+fbDut(CU := TRUE, RESET := FALSE, PV := 2);
+AssertEquals_WORD(Expected := 1, Actual := fbDut.CV, Message := 'first rising edge: CV=1');
+AssertFalse(Condition := fbDut.Q, Message := 'CV=1 < PV=2: Q=FALSE');
+fbDut(CU := TRUE, RESET := FALSE, PV := 2);
+AssertEquals_WORD(Expected := 1, Actual := fbDut.CV, Message := 'CU held TRUE: no count');
+fbDut(CU := FALSE, RESET := FALSE, PV := 2);
+fbDut(CU := TRUE, RESET := FALSE, PV := 2);
+AssertEquals_WORD(Expected := 2, Actual := fbDut.CV, Message := 'second rising edge: CV=2');
+AssertTrue(Condition := fbDut.Q, Message := 'CV=PV: Q=TRUE');
+fbDut(CU := FALSE, RESET := TRUE, PV := 2);
+AssertEquals_WORD(Expected := 0, Actual := fbDut.CV, Message := 'RESET: CV=0');
+AssertFalse(Condition := fbDut.Q, Message := 'RESET: Q=FALSE');
+coUnit.TEST_FINISHED();

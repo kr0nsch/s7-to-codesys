@@ -1,0 +1,11 @@
+coUnit.TEST('CtdStopsAtZero');
+fbDut(CD := FALSE, LOAD := TRUE, PV := 1);
+AssertEquals_WORD(Expected := 1, Actual := fbDut.CV, Message := 'LOAD: CV=PV');
+AssertFalse(Condition := fbDut.Q, Message := 'CV=1: Q=FALSE');
+fbDut(CD := TRUE, LOAD := FALSE, PV := 1);
+AssertEquals_WORD(Expected := 0, Actual := fbDut.CV, Message := 'falling count: CV=0');
+AssertTrue(Condition := fbDut.Q, Message := 'CV=0: Q=TRUE');
+fbDut(CD := FALSE, LOAD := FALSE, PV := 1);
+fbDut(CD := TRUE, LOAD := FALSE, PV := 1);
+AssertEquals_WORD(Expected := 0, Actual := fbDut.CV, Message := 'edge at CV=0: stays 0');
+coUnit.TEST_FINISHED();

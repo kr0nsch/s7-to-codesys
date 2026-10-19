@@ -1,0 +1,10 @@
+coUnit.TEST('CtudBothEdgesSameCall');
+fbDut(CU := FALSE, CD := FALSE, RESET := FALSE, LOAD := TRUE, PV := 5);
+fbDut(CU := FALSE, CD := FALSE, RESET := FALSE, LOAD := FALSE, PV := 5);
+AssertEquals_WORD(Expected := 5, Actual := fbDut.CV, Message := 'after LOAD: CV=5');
+fbDut(CU := TRUE, CD := TRUE, RESET := FALSE, LOAD := FALSE, PV := 5);
+AssertEquals_WORD(Expected := 5, Actual := fbDut.CV, Message := 'CU and CD rising together: CV unchanged');
+fbDut(CU := FALSE, CD := FALSE, RESET := FALSE, LOAD := FALSE, PV := 5);
+fbDut(CU := TRUE, CD := FALSE, RESET := FALSE, LOAD := FALSE, PV := 5);
+AssertEquals_WORD(Expected := 6, Actual := fbDut.CV, Message := 'CU alone: CV=6');
+coUnit.TEST_FINISHED();

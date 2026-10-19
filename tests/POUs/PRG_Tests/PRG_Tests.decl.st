@@ -15,6 +15,7 @@ VAR
     fbS7TofTest : FB_S7Tof_Test;  // рукописный набор
     fbS7TonTest : FB_S7Ton_Test;  // рукописный набор
     fbS7TpTest : FB_S7Tp_Test;  // рукописный набор
+    fbStandardCounterTest : FB_StandardCounter_Test;  // рукописный набор
     fbAlarmDelay_ScenarioTest : FB_AlarmDelay_ScenarioTest;  // сценарии CSV (сгенерировано)
     fbAnalogIn_ScenarioTest : FB_AnalogIn_ScenarioTest;  // сценарии CSV (сгенерировано)
     fbMotor_ScenarioTest : FB_Motor_ScenarioTest;  // сценарии CSV (сгенерировано)

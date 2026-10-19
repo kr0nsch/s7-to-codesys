@@ -9,6 +9,11 @@
 
 ### Added
 
+- Модели SR, RS, CTU, CTD и CTUD библиотеки Standard в интерпретаторе `stsim` (`builtin_flipflop`,
+  `builtin_counter`; формулы и раздел справки — в docstring), независимые от таблиц `mapping.py`. Рукописный
+  набор coUnit `FB_StandardCounter_Test` проверяет на той же платформе то, чего справка Standard не описывает:
+  предел 65535, нижнюю границу CTD, приоритет RESET над LOAD и одновременные фронты CU и CD у CTUD.
+
 - `docs/USAGE.md` — перенос своей программы S7 по шагам: выгрузка из TIA Portal и форматы входных файлов
   (таблица тегов, `ob_config.json`), `check`, `report`, `convert` и его ключи, разбор пометок
   `MIGRATION-CHECK`/`MIGRATION-TODO`, свои сценарии и `gen-tests`, сборка в CODESYS через копию репозитория
