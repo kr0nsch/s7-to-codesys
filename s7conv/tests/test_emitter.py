@@ -287,8 +287,13 @@ def test_counters_rename_inputs_with_check(conv: ConvertFn) -> None:
 
 
 def test_flipflops_rename_inputs_and_outputs(conv: ConvertFn) -> None:
+    """S7 SR (сброс главнее) → CODESYS RS, S7 RS (установка главнее) → CODESYS SR — крест-накрест."""
     r = conv(fb("#ff(S := #a, R1 := #b); #a := #ff.Q;", "VAR\n ff : SR; a : Bool; b : Bool;\nEND_VAR"))
-    assert r.code("FB_T") == ["ff(SET1 := a, RESET := b);", "a := ff.Q1;"]
+    assert "ff : RS;" in r.decl("FB_T")
+    assert r.code("FB_T") == ["ff(SET := a, RESET1 := b);", "a := ff.Q1;"]
+    r = conv(fb("#ff(R := #a, S1 := #b); #a := #ff.Q;", "VAR\n ff : RS; a : Bool; b : Bool;\nEND_VAR"))
+    assert "ff : SR;" in r.decl("FB_T")
+    assert r.code("FB_T") == ["ff(RESET := a, SET1 := b);", "a := ff.Q1;"]
 
 
 def test_iec_timer_variable_takes_type_from_call(conv: ConvertFn) -> None:

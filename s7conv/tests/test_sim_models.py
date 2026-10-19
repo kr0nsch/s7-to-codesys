@@ -72,3 +72,19 @@ def test_ctud_reset_beats_load_and_simultaneous_edges_cancel() -> None:
     _call(sim, ctud, LOAD=False)
     _call(sim, ctud, CU=True, CD=True)
     assert ctud.vars["cv"] == 5
+
+
+def test_converted_s7_flipflops_keep_s7_priority_at_s_equal_r() -> None:
+    """S7 SR при S = R1 = 1 — выход сброшен, S7 RS при R = S1 = 1 — установлен: перевод + модели Standard."""
+    from s7conv.tests.conftest import convert_texts, fb
+
+    decls = "VAR_INPUT\n s : Bool; r : Bool;\nEND_VAR\nVAR_OUTPUT\n qSr : Bool; qRs : Bool;\nEND_VAR\nVAR\n ffSr : SR; ffRs : RS;\nEND_VAR"
+    body = "#ffSr(S := #xSet, R1 := #xReset); #qSr := #ffSr.Q; #ffRs(R := #xReset, S1 := #xSet); #qRs := #ffRs.Q;"
+    r = convert_texts({"ff.scl": fb(body, decls, name="FB_FlipFlops")})
+    sim = new.Sim(list(r.result.objects))
+    inst = sim.new_instance("FB_FlipFlops")
+    frame = new.Frame(sim, inst, {}, {})
+    for s, rr, q_sr, q_rs in ((True, False, True, True), (True, True, False, True), (False, True, False, False)):
+        inst.vars["xset"], inst.vars["xreset"] = s, rr
+        sim.run_body(sim.pous["fb_flipflops"].body, frame)
+        assert (inst.vars["qsr"], inst.vars["qrs"]) == (q_sr, q_rs), (s, rr)

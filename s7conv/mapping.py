@@ -141,18 +141,20 @@ FB_TYPES: dict[str, FbRule] = {
         "F_TRIG: в S7 на первом вызове с CLK = FALSE спада нет; у F_TRIG CODESYS Standard 3.5.17.0 — тоже "
         "(тест StandardFTrigMatchesS7 в Control Win); с другой версией Standard повторить этот тест",
     ),
+    # Одноимённые SR/RS у S7 и CODESYS имеют противоположный приоритет: S7 SR — сброс главнее (LAD S7-300/400,
+    # s7kop__b.pdf, §1.10), CODESYS SR — установка главнее (standard.chm, «SR (FB)»). Поэтому крест-накрест.
     "SR": FbRule(
-        "SR",
+        "RS",
         "fb.flipflop",
-        "SR: входы S/R1 → SET1/RESET, выход Q → Q1 (CODESYS Standard)",
-        {"S": "SET1", "R1": "RESET", "Q": "Q1"},
+        "S7 SR (сброс главнее) → CODESYS RS (RESET1 главнее): S/R1 → SET/RESET1, выход Q → Q1",
+        {"S": "SET", "R1": "RESET1", "Q": "Q1"},
         {"Q": "Q1"},
     ),
     "RS": FbRule(
-        "RS",
+        "SR",
         "fb.flipflop",
-        "RS: входы R/S1 → RESET1/SET, выход Q → Q1 (CODESYS Standard)",
-        {"R": "RESET1", "S1": "SET", "Q": "Q1"},
+        "S7 RS (установка главнее) → CODESYS SR (SET1 главнее): R/S1 → RESET/SET1, выход Q → Q1",
+        {"R": "RESET", "S1": "SET1", "Q": "Q1"},
         {"Q": "Q1"},
     ),
     **_counter_rules(),
