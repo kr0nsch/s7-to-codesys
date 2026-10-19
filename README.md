@@ -15,7 +15,7 @@
   <a href="https://github.com/kr0nsch/s7-to-codesys/releases"><img alt="Выпуск" src="https://img.shields.io/github/v/release/kr0nsch/s7-to-codesys?style=flat-square&label=release&color=3A4B60&labelColor=1B2736"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3A4B60?style=flat-square&logo=python&logoColor=white&labelColor=1B2736">
   <img alt="IEC 61131-3" src="https://img.shields.io/badge/IEC%2061131--3-56677D?style=flat-square">
-  <a href="#тесты-и-качество"><img alt="Тесты: coUnit 74 из 74 в CODESYS Control Win, pytest 1030" src="https://img.shields.io/badge/tests-coUnit%2074%2F74%20%C2%B7%20pytest%201030-3A4B60?style=flat-square&labelColor=1B2736"></a>
+  <a href="#тесты-и-качество"><img alt="Тесты: 74 из 74 в CODESYS Control Win (coUnit), pytest 1030" src="https://img.shields.io/badge/tests-CODESYS%2074%2F74%20%C2%B7%20pytest%201030-3A4B60?style=flat-square&labelColor=1B2736"></a>
   <img alt="Язык: Structured Text" src="https://img.shields.io/badge/Structured%20Text-3A4B60?style=flat-square">
 </p>
 
@@ -31,12 +31,10 @@
 
 ## Что это и зачем
 
-Исходник SCL из TIA Portal не компилируется в CODESYS как есть: другие обращения к переменным (`#x`,
-`"DB".тег`), экземплярные DB и OB вместо экземпляров ФБ и задач, инструкции S7 (`TON_TIME`, `NORM_X`,
-`S5TIME`), другая нумерация адресов (`%IW64` в S7 — `%IW32` в CODESYS). Ручной перенос сотен блоков долог,
-а молча потерянная семантика (`F_TRIG` на первом вызове, `RETAIN`, OB100) всплывает на пусконаладке.
-`s7conv` переводит SCL в ST CODESYS V3.5, а всё неоднозначное оставляет в коде пометкой с причиной и
-считает в отчёте.
+SCL из TIA Portal не компилируется в CODESYS как есть: другие обращения (`#x`, `"DB".тег`) и адреса (`%IW64`
+→ `%IW32`), экземплярные DB и OB вместо экземпляров ФБ и задач, инструкции S7 (`TON_TIME`, `NORM_X`). Ручной
+перенос сотен блоков долог, а молча потерянная семантика (`F_TRIG`, `RETAIN`, OB100) всплывает на
+пусконаладке. `s7conv` переводит SCL в ST CODESYS V3.5, а всё неоднозначное помечает в коде и считает в отчёте.
 
 **Для кого:** инженеры АСУ ТП и интеграторы, которые переводят S7-300/400/1500 на CODESYS V3.5 (в
 методике — ОВЕН ПЛК210), и технические руководители, которым нужна оценка ручной работы до начала проекта.
@@ -190,6 +188,17 @@ value := F_ScaleX(rMin := rangeLow, rValue := normalized, rMax := rangeHigh);
    python tools\codesys\cds.py runtime init
    ```
 
+   Увидите три строки о подготовке каталога `%USERPROFILE%\.local\plc-tools\cds-runtime`:
+
+   ```text
+   [cds] создан …\cds-runtime\boot.cfg
+   [cds] скопирован …\CODESYSControlWinV3\…\CODESYSControl.cfg -> …\cds-runtime\work\CODESYSControl.cfg
+   [cds] создан …\cds-runtime\credentials.json (пароль сгенерирован, в вывод не печатается)
+   ```
+
+   При повторном запуске — `[cds] каталог рантайма уже подготовлен`. Сам рантайм команда не запускает: его
+   запускает `test`.
+
 6. Соберите рабочий проект из `src/` и прогоните тесты в Control Win:
 
    ```bat
@@ -203,10 +212,11 @@ value := F_ScaleX(rMin := rangeLow, rValue := normalized, rMax := rangeHigh);
 
 ## Как использовать в своём проекте
 
-Путь от выгрузки TIA Portal до тестов в CODESYS. Команды выполняются из корня клона, свои файлы лежат в
-нём же, в `my_plc/`. Подробности, форматы входных файлов и частые ошибки — [docs/USAGE.md](docs/USAGE.md).
-Для пробы без своего проекта скопируйте в `my_plc/scl` четыре файла демокорпуса, а в `my_plc/scenarios` —
-`scenarios/FB_Motor.csv` ([учебный набор](docs/USAGE.md#учебный-набор)); выводы ниже — с этого набора.
+Путь от выгрузки TIA Portal до тестов в CODESYS. Команды шагов 2–6 выполняются из корня клона, свои файлы
+лежат в нём же, в `my_plc/`; шаг 7 начинается с перехода в каталог над клоном. Подробности, форматы
+входных файлов и частые ошибки — [docs/USAGE.md](docs/USAGE.md). Для пробы без своего проекта скопируйте в
+`my_plc/scl` четыре файла демокорпуса, а в `my_plc/scenarios` — `scenarios/FB_Motor.csv`
+([учебный набор](docs/USAGE.md#учебный-набор)); выводы ниже — с этого набора.
 
 1. **Выгрузите исходники.** В TIA Portal — «Generate source from blocks» для блоков SCL, DB и типов данных
    PLC, файлы — в `my_plc/scl/`; `.db` и `.udt` переименуйте в `.scl` (из каталога читаются только `*.scl`).
@@ -274,9 +284,11 @@ value := F_ScaleX(rMin := rangeLow, rValue := normalized, rMax := rangeHigh);
    Увидите: `s7conv gen-tests: наборов 1, тестов 7, проверок 364; рукописных наборов в PRG_Tests 0`.
 
 7. **Соберите и протестируйте в CODESYS.** `cds.py` собирает проект из `src/` и `tests/` корня репозитория,
-   поэтому нужна отдельная копия репозитория, в которой демокорпус заменён вашими файлами:
+   поэтому нужна отдельная копия репозитория, в которой демокорпус заменён вашими файлами. Копию кладут
+   рядом с первым клоном, а не внутри него, поэтому блок начинается с `cd ..`:
 
    ```bat
+   cd ..
    git clone https://github.com/kr0nsch/s7-to-codesys.git my-migration
    cd my-migration
    git rm -q "samples/scl/*.scl" "samples/scl/*.csv" samples/scl/ob_config.json "scenarios/*.csv"
@@ -284,13 +296,17 @@ value := F_ScaleX(rMin := rangeLow, rValue := normalized, rMax := rangeHigh);
    copy ..\s7-to-codesys\my_plc\scenarios\*.csv scenarios\
    python -m s7conv build-corpus
    python tools\codesys\cds.py build
+   python tools\codesys\cds.py check --tests
    python tools\codesys\cds.py test
    ```
 
-   `build-corpus` кладёт код в `src/*/Converted`, задачи из OB — в `tools/codesys/config.json`, тесты — в
-   `tests/POUs/Scenarios` ([USAGE.md, шаг 8](docs/USAGE.md#8-сборка-и-тесты-в-codesys)). Этот путь проверен
-   до `build-corpus` включительно; сборка и тесты в CODESYS проверены на демокорпусе. Тесты pytest,
-   привязанные к демокорпусу, в такой копии падают — их убирают вместе с ним.
+   Увидите после `build-corpus`: `s7conv build-corpus: записано файлов 4, удалено 114; файлов результата 31`
+   и `тесты сценариев — наборов 1, тестов 7, проверок 364`. Код ляжет в `src/*/Converted`, задачи из OB —
+   в `tools/codesys/config.json`, тесты — в `tests/POUs/Scenarios`
+   ([USAGE.md, шаг 8](docs/USAGE.md#8-сборка-и-тесты-в-codesys)). `build` компилирует только объекты,
+   достижимые из задач; если OB во входе нет (как в учебном наборе), задач нет, и весь код компилирует
+   `check --tests`. Этот путь проверен до `build-corpus` включительно; сборка и тесты в CODESYS проверены на
+   демокорпусе. Тесты pytest, привязанные к демокорпусу, в такой копии падают — их убирают вместе с ним.
 
 Дальше — ручные шаги в IDE (обработчик OB82, Persistent Variables, привязка ввода-вывода к ПЛК210) в
 [MANUAL_STEPS.md](docs/MANUAL_STEPS.md#4-что-делается-только-в-ide) и чек-лист миграции в
@@ -394,9 +410,11 @@ S5TIME → TIME (7), стартовая информация OB, `Initial_Call` 
 
 Что проверено в настоящем CODESYS, а что — без него. На ПЛК (ОВЕН ПЛК210) код не запускался.
 
-**CODESYS 3.5.17.30 + CODESYS Control Win V3** (локально, Windows; 2026-10-16, повторено с чистого
-`build/`; перед выпуском 1.0.0, 19.10.2026, — `check --tests` и `test --clean`) —
-[TEST_REPORT.md](docs/TEST_REPORT.md):
+**CODESYS 3.5.17.30 + CODESYS Control Win V3** (локально, Windows): все команды — 2026-10-16, повторено с
+чистого `build/` ([TEST_REPORT.md](docs/TEST_REPORT.md#сборка-и-прогон-в-codesys-2026-10-16)); перед выпуском
+1.0.0, 2026-10-19, — `check --tests` и `test --clean`
+([TEST_REPORT.md](docs/TEST_REPORT.md#повторный-прогон-перед-выпуском-2026-10-19),
+[STATIC_ANALYSIS.md](docs/STATIC_ANALYSIS.md#последний-прогон)):
 
 | Команда `python tools/codesys/cds.py …` | Итог |
 |---|---|
