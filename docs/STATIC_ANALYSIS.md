@@ -20,7 +20,7 @@
 | `python tools/codesys/cds.py check --tests` | локально (Windows, CODESYS 3.5.17.30) | все объекты `src/` и `tests/` в пуле проекта без устройства, в том числе без задачи | `build/check.log`, `build/check.json` |
 | `python tools/check/st_lint.py --strict` | локально и в CI | `src/`, `tests/` | консоль; код выхода ≠ 0 при нарушениях |
 | `python tools/check/run_iec_checker.py --tests` | локально и в CI (обязательно): iec_checker v0.4 | `build/assembled/iec-checker/` (вариант сборки `iec-checker`, `src/` и `tests/`) | `build/iec_checker.json`, `build/iec_checker.md` |
-| то же с `--docker <образ nightly>` | CI, необязательное задание | то же | артефакт `iec-checker-nightly-reports` |
+| то же с `--docker <образ nightly>` | CI, необязательное задание (образ закреплён по дайджесту в `ci.yml`); обоснования — записи без ключа `checker` и с `checker = "nightly"` | то же | артефакт `iec-checker-nightly-reports` |
 | `python tools/check/run_rusty.py` | локально и в CI (необязательное задание): RuSTy 1.0.6 `plc --check` | `build/assembled/rusty/` без файлов из `tools/check/rusty_exclude.txt` | `build/rusty.log`, `build/rusty.json` |
 | `pytest s7conv/tests/test_rusty_check.py` | локально и в CI (pytest) | весь `src/` и `tests/`, у `GVL_Markers` сняты `AT` | результат теста |
 
@@ -44,7 +44,8 @@ CODESYS (`TIME()`, `a[i].b`, пустой оператор `;`, массив с 
 | 2026-10-19 | `run_rusty.py` (RuSTy 1.0.6, Windows, локально) | 51 файл (3 исключены) | 0 ошибок, 1 предупреждение (E067 — см. «RuSTy») |
 | 2026-10-19 | `test_repository_sources_pass_rusty_with_shims` | 53 файла из 54 (без `DB_Telegram`) | пройден |
 | 2026-10-19 | iec_checker 0.4 (CI, Linux) | 54 объекта `src/` и `tests/` | ошибок разбора нет; необоснованных 0; обоснованных 962; артефактов сборки 163 ([прогон](https://github.com/kr0nsch/s7-to-codesys/actions/runs/39248631044)) |
-| 2026-10-19 | iec_checker `nightly` (CI, необязательно) | то же | необоснованных 7 — все PLCOPEN-CP17 (неиспользуемый параметр), нового правила nightly-образа; обоснованных 918. Задание необязательное, разбор CP17 — в планах ([прогон](https://github.com/kr0nsch/s7-to-codesys/actions/runs/39248631044)) |
+| 2026-10-19 | iec_checker `nightly` (CI, необязательно) | то же | в прогоне CI необоснованных 7 — все PLCOPEN-CP17 (неиспользуемый параметр), нового правила образа; обоснованных 918 ([прогон](https://github.com/kr0nsch/s7-to-codesys/actions/runs/39250376130)). Дефектов конвертации нет, все 7 обоснованы записями `checker = "nightly"` (разбор — «iec_checker nightly: PLCOPEN-CP17») |
+| 2026-10-19 | находки того же прогона nightly, пересчитанные локально с новым файлом обоснований | то же (сборка совпадает с CI побайтно) | необоснованных 0; обоснованных 925; артефактов 117; неиспользованных обоснований нет. Сам образ локально не запускался (Docker не установлен) — итог подтвердит следующий прогон CI |
 
 ## Компилятор CODESYS
 
@@ -130,7 +131,8 @@ C0195 — их нет. Явные преобразования, которые �
 ### Обоснованные находки
 
 Записи — `tools/check/iec_checker_allow.toml`; каждая используется (неиспользованную запись ловит
-`test_run_iec_checker.py::test_integration_repository_sources` шаблона).
+`test_run_iec_checker.py::test_integration_repository_sources` шаблона). Тест идёт с v0.4, поэтому записи
+`checker = "nightly"` (только для образа nightly, раздел ниже) он не проверяет.
 
 | Правило | Где | Число | Обоснование |
 |---|---|---:|---|
@@ -168,6 +170,21 @@ C0195 — их нет. Явные преобразования, которые �
 
 **Артефакты сборки** (163: CP3 — 117, UnusedVariable — 46) — находки на строках, которые создало
 понижение (копии переменных набора в функциях-методах); на код не указывают.
+
+### iec_checker nightly: PLCOPEN-CP17
+
+Образ `nightly` добавил правило PLCOPEN-CP17: вход, выход или `VAR_IN_OUT`, который в теле POU ни разу не
+прочитан (не записан); в v0.4 такого правила нет. Все 7 находок прогона CI — в сгенерированном коде; каждая
+сверена с исходником SCL в `samples/scl/`. Конвертер сохраняет интерфейс блока S7 как есть, параметры
+потеряны не им: дефектов конвертации нет. Записи — в последнем разделе `iec_checker_allow.toml`, с
+`checker = "nightly"` и списком имён.
+
+| Правило | Где | Число | Решение / обоснование |
+|---|---|---:|---|
+| PLCOPEN-CP17 | `FB_EventLogger`: выходы `telegramStatus`, `execTime`; `FB_LegacyTelegram`: входы `archiveDb`, `retryDelay`, выход `retVal` | 5 | Сохранённый интерфейс S7: параметры пишут или читают только операторы, которые конвертер не переводит (`RUNTIME`, `PEEK`, `BLKMOV`, `S_ODT`, запись в DB по номеру — пометки `MIGRATION-TODO`). Те же имена, кроме `retVal`, уже в списке UnusedVariable выше. Удалять до ручного переноса — менять интерфейс блока и вызовы в OB |
+| PLCOPEN-CP17 | `PRG_Diagnostic_error_interrupt`: вход `MultiError` | 1 | Стартовая информация OB82 (`MIGRATION-CHECK`): исходный OB в `samples/scl/OB_Startup.scl` её тоже не читает — перенос точный |
+| PLCOPEN-CP17 | `FB_Motor`: выход `status` | 1 | Ложное срабатывание: структура `UDT_DeviceStatus` записывается по полям (`status.running := runCmd AND feedback`), запись в поле CP17 записью не считает |
+| UnusedVariable | наборы `S7Compat`: `fbDut`, `fbStandard`, `fbCompat` | — | Образ nightly вызов экземпляра считает использованием и этих находок не выдаёт: запись помечена `checker = "v0.4"` и при прогоне образом не применяется |
 
 ## RuSTy
 

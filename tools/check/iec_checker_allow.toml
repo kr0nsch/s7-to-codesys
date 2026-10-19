@@ -7,11 +7,16 @@
 #   file   — шаблон fnmatch пути исходника (src/POUs/...) или имени собранного файла (FB_X.st);
 #            '*' захватывает и '/';
 #   match  — необязательно: регулярное выражение по тексту сообщения;
-#   reason — обязательно: почему находка допустима.
+#   reason — обязательно: почему находка допустима;
+#   checker — необязательно: "v0.4" (обязательная проверка, бинарник) или "nightly" (необязательное
+#            задание CI, Docker-образ, закреплённый по дайджесту в ci.yml). Запись с этим ключом
+#            применяется и проверяется на использование только при прогоне своей версией.
 # ParserError и LexingError обосновать нельзя: их исправляют в коде или в понижении iec-checker.
 #
 # Проект s7-to-codesys: python tools/check/run_iec_checker.py --tests — ParserError 0, необоснованных 0;
-# каждая запись используется (проверяет pytest: test_run_iec_checker.py::test_integration_repository_sources).
+# каждая запись, кроме checker = "nightly", используется (проверяет pytest:
+# test_run_iec_checker.py::test_integration_repository_sources). Записи для образа nightly — в последнем
+# разделе: их пересматривают вместе с дайджестом образа.
 
 # --- Все исходники -------------------------------------------------------------------------------------
 
@@ -97,10 +102,37 @@ reason = "Артефакт понижения: переменные набора
 id = "UnusedVariable"
 file = "tests/POUs/S7Compat/*/*.method.decl.st"
 match = "FBDUT|FBSTANDARD|FBCOMPAT"
-reason = "Ложное срабатывание iec_checker 0.4: экземпляр используется вызовом (fbDut(...), fbStandard(...), fbCompat(...)) и чтением выходов — это он не считает использованием"
+checker = "v0.4"
+reason = "Ложное срабатывание iec_checker 0.4: экземпляр используется вызовом (fbDut(...), fbStandard(...), fbCompat(...)) и чтением выходов — это он не считает использованием. Образ nightly вызов экземпляра считает использованием"
 
 [[allow]]
 id = "UnusedVariable"
 file = "tests/POUs/PRG_Tests/PRG_Tests.decl.st"
 match = "variable: FB[A-Z0-9_]*TEST$"
 reason = "Экземпляры наборов регистрируются в coUnit самим объявлением и используются вызовом AreAllTestsFinished()"
+
+# --- Только образ nightly (checker = "nightly"): PLCOPEN-CP17 «неиспользуемый параметр» ------------------
+# В v0.4 этого правила нет. Каждая находка проверена по исходникам SCL (docs/STATIC_ANALYSIS.md, раздел
+# «iec_checker nightly: PLCOPEN-CP17»): конвертер сохраняет интерфейс исходного блока S7, дефектов
+# конвертации нет.
+
+[[allow]]
+id = "PLCOPEN-CP17"
+file = "src/POUs/Converted/*"
+checker = "nightly"
+match = "parameter '(TELEGRAMSTATUS|EXECTIME|ARCHIVEDB|RETRYDELAY|RETVAL)'"
+reason = "Интерфейс исходного блока S7 сохранён: выходы telegramStatus, execTime, retVal пишут, а входы archiveDb, retryDelay читают только операторы, которые конвертер не переводит и помечает MIGRATION-TODO (FB_EventLogger: RUNTIME, PEEK; FB_LegacyTelegram: BLKMOV, S_ODT, запись в DB по номеру). Удалять параметры до ручного переноса этих операторов — менять интерфейс блока и вызовы в OB"
+
+[[allow]]
+id = "PLCOPEN-CP17"
+file = "src/POUs/Converted/PRG_Diagnostic_error_interrupt/*"
+checker = "nightly"
+match = "parameter 'MULTIERROR'"
+reason = "Стартовая информация OB82 сохранена как VAR_INPUT (MIGRATION-CHECK): MultiError не читал и исходный OB в samples/scl/OB_Startup.scl — перенос точный"
+
+[[allow]]
+id = "PLCOPEN-CP17"
+file = "src/POUs/Converted/FB_Motor/*"
+checker = "nightly"
+match = "parameter 'STATUS'"
+reason = "Ложное срабатывание CP17: выход-структура status (UDT_DeviceStatus) записывается по полям (status.running := runCmd AND feedback и т. д.), запись в поле CP17 записью не считает"
