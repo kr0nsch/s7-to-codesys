@@ -52,6 +52,7 @@ python tools\codesys\cds.py check --tests     :: компиляция всех �
 python tools\codesys\cds.py test             :: src/ + tests/ → тестовый проект, Control Win, coUnit
 python tools\codesys\cds.py roundtrip        :: импорт → экспорт → побайтное сравнение с src/, tests/
 python tools\codesys\cds.py report           :: итог прогона → docs/TEST_REPORT.md
+python tools_project\cds_plcopen.py test     :: вариант SFC блоков GRAPH: импорт PLCopen XML, сборка, coUnit
 ```
 
 - `build` компилирует только объекты, достижимые из задач; `PRG_Diagnostic_error_interrupt` (OB82) задачи
@@ -67,6 +68,11 @@ python tools\codesys\cds.py report           :: итог прогона → docs
   `build/test-results.json`, `build/junit.xml`.
 - Без лицензии Control Win работает 2 часа; `cds.py test` перезапускает рантайм, если он работает
   дольше 100 минут.
+- `cds_plcopen.py test` импортирует `plcopen/Lang/Converted/*.xml` скриптом (`app.import_xml`) в отдельный
+  проект `build\codesys\s7-to-codesys-plcopen.project` вместе с многоцикловыми наборами `tests/POUs/Graph`
+  и прогоняет их в Control Win; итог — `build/codesys/plcopen/test-results.json`. Ожидаемо:
+  `[cds] build: OK (ошибок 0, предупреждений 0, …)` и `[cds] test: OK (наборов 1, тестов 5, пройдено 5, …)`.
+  ST-двойник того же блока проходит те же наборы в `cds.py test` ([MAPPING_GRAPH.md](MAPPING_GRAPH.md)).
 
 ### 3.1 Компиляция под REGUL R500 и ОВЕН ПЛК210
 
@@ -76,8 +82,8 @@ python tools\codesys\cds.py report           :: итог прогона → docs
 
 | Цель | Среда (`CODESYS_EXE`, `CODESYS_PROFILE`) | Устройство (`CDS_DEVICE_TYPE` / `CDS_DEVICE_ID` / `CDS_DEVICE_VERSION`) | Итог |
 |---|---|---|---|
-| REGUL R500 | Astra.IDE 1.7.2.2: `…\AstraRegul\Astra.IDE_64_1.7.2.2\Astra.IDE\Common\Astra.IDE.exe`, профиль `Astra.IDE_V1.7.2.2` | 4096 / `109B 0008` / 11.7.2.60 | объектов 54, ошибок 0, предупреждений 0 |
-| ОВЕН ПЛК210 | CODESYS 3.5.17.30 с пакетом таргет-файлов ОВЕН, профиль `CODESYS V3.5 SP17 Patch 3` | 4096 / `1628 0083` / 3.5.17.35 (библиотека устройства OwenStorage 3.5.17.33) | объектов 54, ошибок 0, предупреждений 0 |
+| REGUL R500 | Astra.IDE 1.7.2.2: `…\AstraRegul\Astra.IDE_64_1.7.2.2\Astra.IDE\Common\Astra.IDE.exe`, профиль `Astra.IDE_V1.7.2.2` | 4096 / `109B 0008` / 11.7.2.60 | `cds.py check`: объектов 85, ошибок 0, предупреждений 0; вариант SFC (`cds_plcopen.py check`): сборка 0/0 |
+| ОВЕН ПЛК210 | CODESYS 3.5.17.30 с пакетом таргет-файлов ОВЕН, профиль `CODESYS V3.5 SP17 Patch 3` | 4096 / `1628 0083` / 3.5.17.35 (библиотека устройства OwenStorage 3.5.17.33) | `cds.py check`: объектов 85, ошибок 0, предупреждений 0; вариант SFC: ошибок 0, предупреждение устройства C0373 «задача OwenCloudTask не существует» (импорт оставляет только задачу `MainTask`) |
 
 ```bat
 set CODESYS_EXE=C:\Program Files\AstraRegul\Astra.IDE_64_1.7.2.2\Astra.IDE\Common\Astra.IDE.exe
@@ -89,8 +95,10 @@ set CDS_PROJECT_NAME=s7-to-codesys-r500
 python tools\codesys\cds.py check
 ```
 
-`CDS_PROJECT_NAME` разводит проекты в `build\codesys\`, чтобы проверка не трогала проект Control Win. Это
-компиляция, а не запуск: на R500 и ПЛК210 код не загружался, тесты coUnit под эти устройства не собирались.
+`CDS_PROJECT_NAME` разводит проекты в `build\codesys\`, чтобы проверка не трогала проект Control Win. С теми
+же переменными `python tools_project\cds_plcopen.py check` собирает вариант SFC блоков GRAPH для устройства:
+программа `PRG_SfcCheck` в `MainTask` вызывает каждый блок, coUnit не нужен. Это компиляция, а не запуск:
+на R500 и ПЛК210 код не загружался, тесты coUnit под эти устройства не собирались.
 
 ## 4. Что делается только в IDE
 
@@ -204,7 +212,7 @@ retain-памяти весь экземпляр, пометка `section.fb_reta
       исходными сетями в TIA.
 - [ ] Пометки `vocab_unverified` (элемент LAD/FBD уровня L) и `eno_error` (ENO = EN у блока, который в S7
       ловит ошибку) — сверить сеть вручную.
-- [ ] Сети GRAPH (`xml.unit_unsupported`) — перенести вручную в SFC или `CASE`.
+- [ ] Блоки GRAPH — раздел 4.6.
 - [ ] Обратный путь в TIA конвертер не даёт: переведённый ST в S7 не импортируется.
 
 ### 4.5 Прочее
@@ -219,6 +227,20 @@ retain-памяти весь экземпляр, пометка `section.fb_reta
 - [ ] Поведение после Stop → Start в CODESYS: флаг первого цикла не сбрасывается, код OB100 (`PRG_Startup`)
       и эмуляция `Initial_Call` не выполняются повторно — проверить, приемлемо ли это для объекта
       (в S7 каждый STOP → RUN — тёплый пуск с OB100).
+
+### 4.6 Блоки GRAPH: что остаётся человеку
+
+- [ ] Выбрать вариант для рабочего проекта: ST-двойник (`src/POUs/Lang/Converted/<Блок>`) или SFC
+      (импорт `plcopen/Lang/Converted/<Блок>.xml`). У обоих одно имя `<Блок>` и один интерфейс — в проекте
+      должен остаться один.
+- [ ] Открыть вариант SFC в редакторе (`cds_plcopen.py` оставляет проект
+      `build\codesys\s7-to-codesys-plcopen.project`): вид диаграммы после импорта скриптом не проверялся.
+- [ ] Пометки `graph.cycle_order`, `graph.alt_priority`, `graph.supervision`, `graph.timer_clock` — сверить с
+      настройками блока GRAPH в TIA (требование квитирования, приоритет ветвей) и, если есть, с CPU
+      ([ASSUMPTIONS.md](ASSUMPTIONS.md), L17–L22).
+- [ ] `OFF_SQ` вариант SFC не выполняет — если вход используется, оставить ST-двойник или дописать обвязку.
+- [ ] Режимы (`SW_AUTO`, `SW_MAN` …), ручной выбор шагов, предел времени шага, тексты сообщений ProDiag —
+      пометки `MIGRATION-TODO`, переносятся вручную.
 
 ## 5. После прогона тестов
 

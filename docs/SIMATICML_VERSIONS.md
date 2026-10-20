@@ -14,7 +14,7 @@ SimaticML — XML экспорта блоков TIA Portal Openness. Прост�
 
 | Версия TIA | Интерфейс | LAD/FBD (`FlgNet`) | STL (`StatementList`) | SCL (`StructuredText`) | GRAPH (`Graph`) | Чем подтверждено |
 |---|---|---|---|---|---|---|
-| V21 | `Interface/v5` — XSD + экспорт | `FlgNet/v5` — XSD + экспорт LAD | `StatementList/v5` — XSD; номер пространства [M] | `StructuredText/v4` — XSD; номер пространства [M] | не поддерживается в 1.1.0 | XSD V21 (`SW.InterfaceSections_v5`, `SW.PlcBlocks.LADFBD_v5`, `STL_v5`, `SCL_v4`; SHA-256 — `samples/lang/EXTERNAL.json`): корпус `samples/lang` и экспорт lad-cookbook (MIT) валидны; приёмка lad-cookbook без `RawBlock` и `MIGRATION-TODO` |
+| V21 | `Interface/v5` — XSD + экспорт | `FlgNet/v5` — XSD + экспорт LAD | `StatementList/v5` — XSD; номер пространства [M] | `StructuredText/v4` — XSD; номер пространства [M] | `Graph/v6` — XSD; номер пространства [M], катушки условий [L] | XSD V21 (`SW.InterfaceSections_v5`, `SW.PlcBlocks.LADFBD_v5`, `STL_v5`, `SCL_v4`, `Graph_v6`; SHA-256 — `samples/lang/EXTERNAL.json`): корпус `samples/lang` и экспорт lad-cookbook (MIT) валидны; приёмка lad-cookbook без `RawBlock` и `MIGRATION-TODO` |
 | V20 | — | — | — | — | — | ничего: разбор по пространству имён, не проверено |
 | V19 | — | — | — | — | — | ничего: разбор по пространству имён, не проверено |
 | V18 | `Interface/v5` — экспорт | — | `StatementList/v4` — экспорт | — | — | приёмка экспорта Smart_Factory (Apache-2.0, STL): без `RawBlock` и `MIGRATION-TODO`; XSD V18 не проверялся |
@@ -23,9 +23,13 @@ SimaticML — XML экспорта блоков TIA Portal Openness. Прост�
 | V15.1 | — | — | — | — | — | ничего: разбор по пространству имён, не проверено |
 | V15, V14 SP1 | — | — | — | — | — | XSD нет в открытом доступе, открытые экспорты без лицензии не используются: разбор по пространству имён, не проверено [L] |
 
-[M] — номер пространства имён `StatementList` и `StructuredText` для V21 выведен по номеру файла XSD своей
-версии (`STL_v5` → `/v5`, `SCL_v4` → `/v4`): у `Interface` и `FlgNet` V21 номера файла и пространства в
-открытом экспорте совпадают. Структура фрагментов этих языков XSD V21 проверена.
+[M] — номер пространства имён `StatementList`, `StructuredText` и `Graph` для V21 выведен по номеру файла XSD
+своей версии (`STL_v5` → `/v5`, `SCL_v4` → `/v4`, `Graph_v6` → `/v6`): у `Interface` и `FlgNet` V21 номера
+файла и пространства в открытом экспорте совпадают. Структура фрагментов этих языков XSD V21 проверена.
+
+[L] — GRAPH: XSD задаёт структуру последовательности, но не имена элементов сетей условий; катушки `TrCoil`,
+`SvCoil`, `IlCoil` взяты из образцов без лицензии (допущение L17 в [ASSUMPTIONS.md](ASSUMPTIONS.md)). Блок
+GRAPH корпуса собран по XSD, открытого экспорта GRAPH с лицензией нет.
 
 ## Что XSD не проверяет
 

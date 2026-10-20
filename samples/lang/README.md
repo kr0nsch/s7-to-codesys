@@ -1,17 +1,18 @@
 # Корпус всех языков S7 (`samples/lang/`)
 
 Блоки той же вымышленной водопроводной станции, что и корпус SCL (`samples/scl/`), но в формате
-SimaticML — XML экспорта TIA Portal Openness — и на языках LAD, FBD, STL и SCL. Это вход конвертера и
+SimaticML — XML экспорта TIA Portal Openness — и на языках LAD, FBD, STL, SCL и S7-GRAPH. Это вход конвертера и
 материал для проверки поведения: сценарии `scenarios/lang/` посчитаны моделями по описанию логики ниже,
 а не по результату конвертации.
 
 > **Честно о происхождении.** TIA Portal в окружении проекта нет, поэтому XML не экспортирован из TIA, а
 > собран скриптом `build_xml.py` из описания блоков `blocks.py`. Форма документа повторяет открытые
-> экспорты TIA (см. `EXTERNAL.json`), а фрагменты `Sections`, `FlgNet`, `StatementList` и `StructuredText`
-> валидны по XSD V21 своей версии — это проверяет `s7conv/tests/test_lang_external.py`. Имена элементов
+> экспорты TIA (см. `EXTERNAL.json`), а фрагменты `Sections`, `FlgNet`, `StatementList`, `StructuredText` и
+> `Graph` валидны по XSD V21 своей версии — это проверяет `s7conv/tests/test_lang_external.py`. Имена элементов
 > LAD/FBD и их пинов XSD не проверяет: для элементов, которых нет в открытых экспортах (SR/RS с
 > операндом, FBD-блоки A/O, вызовы, прыжки), форма взята из руководства и помечена уровнем L в
-> [MAPPING_LADFBD.md](../../docs/MAPPING_LADFBD.md). Импорт этих файлов в TIA Portal не проверялся.
+> [MAPPING_LADFBD.md](../../docs/MAPPING_LADFBD.md); то же для катушек условий GRAPH `TrCoil`, `SvCoil`,
+> `IlCoil` (допущение L17). Импорт этих файлов в TIA Portal не проверялся.
 
 ## Как собирается
 
@@ -34,6 +35,8 @@ XML — артефакт в git: руками не правится. UId эле�
 | `FB_StarterStl.xml` | FB 103 | STL (стандартный доступ, S7-300) | `FB_Starter.csv` | `A/AN/O/ON`, скобки, `S/R`, `=`, `CALL` TON, `FP`, `JCN` с меткой, `L/T`, `+I` |
 | `FB_StarterScl.xml` | FB 104 | SCL в SimaticML | `FB_Starter.csv` | сеть SCL из токенов XML; тот же ST, что из `.scl` |
 | `FB_PumpInterlockLad.xml` | FB 110 | LAD | `FB_PumpInterlockLad.csv` | S/R, сравнения, MOVE, прыжок вперёд к метке, PBox с битом, который читается в другой сети, ADD с ENO, цепочка трёх вызовов EN → ENO → EN |
+| `FB_ConveyorStl.xml` | FB 115 | STL (стандартный доступ, S7-300), таймеры и счётчик S5 | `FB_ConveyorStl.csv` | `SP`, `SE`, `SD`, `SS`, `SF` с шкалой `S5T#`, `FR`, `R` по уровню, `L T`/`LC T`, счётчик `CU`/`R`, `L C`/`LC C`; чтение таймера до пуска в том же вызове |
+| `FB_BackwashGraph.xml` | FB 120 | S7-GRAPH (оптимизированный доступ, S7-1500) | `FB_BackwashGraph.csv` | начальный шаг, альтернативная и параллельная ветви, прыжок, действия N, S, R, D, событие S1, блокировка (C), контроль с квитированием, `INIT_SQ`, `OFF_SQ`, `ERR_FLT`, постоперация |
 | `FC_ClampPctLad.xml` | FC 111 | LAD | — (через FB_PumpInterlockLad) | функция с возвратом `Ret_Val`, MOVE под условием |
 | `DB_Process.xml` | DB 20 | DB, стандартный доступ | — | члены со смещениями `Offset`, реманентный член, член типа UDT |
 | `UDT_Valve.xml` | UDT | тип данных PLC | — | структура для DB_Process |
@@ -73,6 +76,39 @@ XML — артефакт в git: руками не правится. UId эле�
 
 `FC_ClampPctLad`: результат — `iIn`, ограниченный сверху `iMax`, затем снизу `iMin` (оба сравнения — с
 исходным `iIn`); ENO блок не пишет, поэтому ENO = EN.
+
+### FB_ConveyorStl — ленточный конвейер выдачи реагента (STL S7-300, таймеры и счётчик S5)
+
+Таймеры T1–T5 и счётчик C1 — глобальные объекты CPU (в CODESYS — `GVL_S5Timers_Lang.aTimer`,
+`GVL_S5Counters_Lang.aCounter`).
+
+1. Запрос работы `xReq`: S по `xStart`, затем R по `xStop OR xJam` (сброс главнее; `xJam` — прошлого вызова).
+2. Сирена: SP T1 1 с по фронту `xReq`, `xHorn = T1`; снятие запроса обрывает сирену.
+3. Задержка пуска: SD T2 2 с, RLO = `xReq`.
+4. Выбег: SF T3 3 с, RLO = T2, `xMotor = T3` (двигатель работает, пока T2 = 1, и 3 с после).
+5. Контроль потока: SE T4 4 с по каждому фронту `xSensor`, `xFlowOk = T4`. Взвод контроля: SS T5 5 с по
+   фронту `xMotor`, сброс T5 (R) при `xMotor = 0`. Затор: `T5 AND NOT T4` → S `xJam`. Квитирование `xAck`:
+   FR T4 (при удерживаемом `xSensor` контроль запускается снова), R `xJam`.
+6. Диагностика: `iDelayLeft := L T2` (остаток задержки, единицы 10 мс), `wRunOutBcd := LC T3` (BCD со шкалой).
+7. Счётчик изделий C1: CU по `xSensor`, R по `xCountReset` (по уровню); `iCount := L C1`, `wCountBcd := LC C1`.
+
+### FB_BackwashGraph — промывка скорого фильтра (S7-GRAPH S7-1500)
+
+Одна последовательность, шаги S1–S6; входы `OFF_SQ`, `INIT_SQ`, `ACK_EF` и выход `ERR_FLT` — интерфейс
+блока GRAPH.
+
+1. S1 Idle (начальный): N `xReady`. Переход T1 Start: `xStart`.
+2. S2 Drain: N `xDrainValve`, S `xWashActive`, по событию S1 — `iWashCount := iWashCount + 1`. Контроль:
+   `xValveFault` — ошибка держит шаг до квитирования `ACK_EF`, `ERR_FLT = 1`.
+3. Альтернативная ветвь после S2. T2 LongWash (`xLevelLow AND NOT xShortWash`) — параллельно S3 Air
+   (N `xBlower`, D `xAirValve` через 2 с) и S4 Rinse (NC `xWashPump`, блокировка `xPumpOk`); синхронизация
+   T4 AirDone: `Air.T >= 10 с`. T3 ShortWash (`xLevelLow AND xShortWash`) — S5 QuickRinse (N `xWashPump`),
+   T5 QuickDone: `xLevelHigh`.
+4. S6 Refill: N `xInletValve`, R `xWashActive`. T6 Full: `xLevelHigh` — прыжок к S1.
+5. Постоперация: `xValvesBusy := xDrainValve OR xInletValve`.
+6. `INIT_SQ` — начальное состояние (S1 активен, остальные выключены), `OFF_SQ` — все шаги выключены.
+
+Перевод — ST-двойник и вариант SFC в PLCopen XML ([MAPPING_GRAPH.md](../../docs/MAPPING_GRAPH.md)).
 
 ## Внешние образцы (`EXTERNAL.json`)
 

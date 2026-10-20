@@ -21,6 +21,8 @@ python scenarios/lang/reference/generate_lang_csv.py --check  # сравнить
 | CSV | Блоки | Сценариев | Вызовов | Таймеры | Что проверяет |
 |---|---|---|---|---|---|
 | [FB_Starter.csv](FB_Starter.csv) | `FB_StarterLad`, `FB_StarterFbd`, `FB_StarterStl`, `FB_StarterScl` | 9 | 47 | TON | пуск/стоп, Пуск и Стоп одновременно (SR S7: сброс главнее), блокировки, обратная связь в срок и с опозданием (на пороге), авария с самоподхватом и сброс, счётчик пусков по фронту |
+| [FB_ConveyorStl.csv](FB_ConveyorStl.csv) | `FB_ConveyorStl` | 7 | 58 | S5 (SP, SE, SD, SS, SF), счётчик S5 | пуск с сиреной и задержкой, выбег, затор без изделий, поток изделий, сброс счётчика по уровню, обрыв сирены (остаток задержки замирает), квитирование с повторным запуском контроля |
+| [FB_BackwashGraph.csv](FB_BackwashGraph.csv) | `FB_BackwashGraph` | 6 | 46 | время шага, D | длинная промывка (параллельная ветвь, синхронизация по времени шага), короткая, контроль с квитированием, переход в цикле квитирования при ещё истинном условии контроля, блокировка насоса, `OFF_SQ` и `INIT_SQ` |
 | [FB_PumpInterlockLad.csv](FB_PumpInterlockLad.csv) | `FB_PumpInterlockLad` | 5 | 25 | нет | защёлка аварии по уровню и давлению, квитирование, прыжок мимо сетей при обслуживании (сеть 7 не выполняется — бит фронта и ENO сохраняют значения), ENO сложения, три вызова через EN/ENO |
 
 ## Алиасы
@@ -38,3 +40,7 @@ python scenarios/lang/reference/generate_lang_csv.py --check  # сравнить
   (`s7conv/tests/test_scenarios_simulated.py`).
 - `python -m s7conv equiv samples/lang --scenarios scenarios/lang` подаёт строки сценариев эталону S7 и
   переводу в stsim и сравнивает выходы и статику после каждого вызова.
+- Сценарии проверяют каждый вызов точно, поэтому для GRAPH они выполняются на ST-двойнике. Вариант SFC
+  переключает шаги на вызов позже и проходит рукописный многоцикловый набор
+  `tests/POUs/Graph/FB_BackwashGraph_SeqTest` — тот же, что и ST-двойник
+  ([MAPPING_GRAPH.md](../../docs/MAPPING_GRAPH.md)).

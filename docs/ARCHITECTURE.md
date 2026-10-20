@@ -94,32 +94,38 @@ flowchart LR
 ## Все языки (выпуск 1.1.0)
 
 С выпуска 1.1.0 вход — не только SCL, но и SimaticML (XML экспорта TIA Portal Openness) на LAD, FBD,
-STL и SCL. Новые модули понижают эти языки в текст SCL, дальше он идёт прежним путём.
+STL и SCL, с 1.2.0 — и S7-GRAPH. Новые модули понижают эти языки в текст SCL, дальше он идёт прежним путём;
+из последовательности GRAPH дополнительно строится вариант SFC в PLCopen XML.
 
 ```mermaid
 flowchart LR
     X["SimaticML *.xml"] --> FX["frontends/simaticml<br/>Document, Interface,<br/>CompileUnit"]
     FX --> N["ir/net: NetIR<br/>Part, Access, Wire"]
     FX --> T["ir/stl: StlIR<br/>токены XSD V21"]
+    FX --> G["ir/seq: SeqIR<br/>шаги, переходы, ветви"]
     FX -->|сеть SCL| SCLT["текст SCL"]
     N -->|lower/net_to_ast| SCLT
     T -->|lower/stl_lift<br/>structured / pc| SCLT
+    G -->|lower/seq_to_ast<br/>ST-двойник| SCLT
+    G -->|plcopen/sfc| PO["plcopen/Lang/Converted<br/>SFC + обёртка"]
     S["*.scl, *.db, *.udt"] --> P["parser.py 1.0.0"]
     SCLT --> P
     P --> E["emitter, mapping,<br/>symbols, report 1.0.0"]
     E --> ST["src/*/Lang/Converted"] & R["отчёт «По языкам»"] & TG["testgen → coUnit"]
-    N & T --> SEM["semantics: эталон S7<br/>net_eval, stl_machine"] --> EQ["equiv"]
+    N & T & G --> SEM["semantics: эталон S7<br/>net_eval, stl_machine, graph_seq"] --> EQ["equiv"]
     ST --> SIM["stsim"] --> EQ
 ```
 
 | Модуль `s7conv/` | Роль |
 |---|---|
 | `frontends/simaticml.py` | разбор SimaticML (`xml.etree`, без внешних сущностей): блоки, интерфейс, сети по `ProgrammingLanguage`; `Access` → текст SCL |
-| `ir/net.py`, `ir/stl.py` | NetIR (граф сети LAD/FBD) и StlIR (инструкции STL по имени токена XSD) |
+| `ir/net.py`, `ir/stl.py`, `ir/seq.py` | NetIR (граф сети LAD/FBD), StlIR (инструкции STL по имени токена XSD), SeqIR (последовательность GRAPH и топология переходов) |
 | `lower/net_to_ast.py` | LAD/FBD → SCL: поток питания, словарь элементов `PARTS`, прыжки вперёд → IF |
 | `lower/stl_lift.py`, `lower/stl_tokens.py` | STL → SCL: символьный подъём, переходы `structured`/`pc`; матрица 172 токенов |
+| `lower/seq_to_ast.py` | GRAPH → SCL ST-двойника: порядок цикла, ветви, действия, контроль, блокировка (`docs/MAPPING_GRAPH.md`) |
 | `lower/block.py` | блок → текст SCL с трассой каждой строки (`сеть 3, UId 27`) и пометками понижения |
-| `semantics/` | эталон S7, независимый от понижения: `net_eval`, `stl_machine`, таймеры и счётчики IEC |
+| `plcopen/` | вариант SFC блока GRAPH в PLCopen XML: POU SFC и ФБ-обёртка; импорт в CODESYS — `tools_project/cds_plcopen.py` |
+| `semantics/` | эталон S7, независимый от понижения: `net_eval`, `stl_machine`, `s5` (таймеры и счётчики S5), `graph_seq` (последовательность GRAPH), таймеры и счётчики IEC |
 | `sim/stsim.py` | интерпретатор ST (переехал из `s7conv/tests/stsim.py`, старый путь — реэкспорт) |
 | `equiv.py`, `irdump.py`, `docs_gen.py` | команды `equiv` и `ir`; генерация `MAPPING_LADFBD.md`, `MAPPING_STL.md` |
 

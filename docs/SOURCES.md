@@ -11,8 +11,8 @@
 | Ladder Logic (LAD) for S7-300 and S7-400, A5E02790079-01 — https://cache.industry.siemens.com/dl/files/822/45523822/att_82001/v1/s7kop__b.pdf | SR — сброс главнее (§1.10), RS — установка главнее (§1.11), фронты P/N с битом памяти, ENO = EN AND NOT ошибка (прил. C.1) — `semantics/net_eval.py`, `lower/net_to_ast.py` |
 | FAQ 67655405 «Migration of STL Programs to S7-1500» — https://support.industry.siemens.com/cs/ww/en/view/67655405 | профиль S7-1500: 2 ACCU, после CALL слово состояния и ACCU не определены, регистр DB, нет MCR/ENT/LEAVE |
 | TIA Portal Openness V19, System Manual 11/2023 — https://support.industry.siemens.com/cs/attachments/109826886/TIAPortalOpenness_enUS_en-US.pdf | экспорт блоков FB/FC/OB/DB на STL/FBD/LAD/GRAPH/SCL в SimaticML (с. 1350–1351), `GenerateSource` только для `.awl/.scl/.db/.udt` (с. 510–511) |
-| S7-GRAPH V5.3 for S7-300/400, A5E00290656-01 — https://cache.industry.siemens.com/dl/files/630/1137630/att_28560/v1/Graph7_e.pdf | модель GRAPH (следующий выпуск) |
-| XSD SimaticML V15.1–V21 — копии в https://github.com/dotnetprojects/DotNetSiemensPLCToolBoxLibrary/tree/bbe5beccbadcf7497408e92883e260cc5024a874/externalDlls/siemens | структура `Sections`, `FlgNet`, `StatementList`, `StructuredText`; 172 значения `StlToken` (`SW.PlcBlocks.STL_v5.xsd`); SHA-256 файлов — `samples/lang/EXTERNAL.json`; © Siemens AG, в git не кладутся |
+| S7-GRAPH V5.3 for S7-300/400, A5E00290656-01 — https://cache.industry.siemens.com/dl/files/630/1137630/att_28560/v1/Graph7_e.pdf | модель GRAPH для ST-двойника и эталона `graph_seq`: действия N/S/R/D/L, события S1/S0, блокировка и контроль, `INIT_SQ`/`ACK_EF` (гл. 7, 13); спорное — допущения L17–L22 |
+| XSD SimaticML V15.1–V21 — копии в https://github.com/dotnetprojects/DotNetSiemensPLCToolBoxLibrary/tree/bbe5beccbadcf7497408e92883e260cc5024a874/externalDlls/siemens | структура `Sections`, `FlgNet`, `StatementList`, `StructuredText`, `Graph` (`SW.PlcBlocks.Graph_v6.xsd`); 172 значения `StlToken` (`SW.PlcBlocks.STL_v5.xsd`); SHA-256 файлов — `samples/lang/EXTERNAL.json`; © Siemens AG, в git не кладутся |
 
 ## CODESYS
 
@@ -20,6 +20,7 @@
 |---|---|
 | Офлайн-справка CODESYS 3.5.17.30, библиотека Standard (`standard.chm`: SR, RS, CTU, CTD, CTUD) | модели `stsim` (`builtin_flipflop`, `builtin_counter`); SR — set-dominant (`SET1`), RS — reset-dominant (`RESET1`). Справка пишет о входах «Rising edge» — поведение по уровню подтверждено тестом `RsSetHeldReappliesAfterReset` в Control Win |
 | Офлайн-справка CODESYS 3.5.17.30 (`codesys.chm`): `JMP` в ST, ENO у блоков FBD/LD | ENO = EN; `JMP` есть, но в `src/` не используется (RuSTy и iec_checker его не разбирают) |
+| Офлайн-справка CODESYS 3.5.17.30: SFC — квалификаторы IEC-действий, неявные переменные шага, флаги (`SFCInit`), порядок обработки | вариант SFC: IEC-действия над BOOL-флагами, побочные эффекты — в обёртке (IEC-действие выполняется ещё раз после выключения шага), `SFCInit` для `INIT_SQ`; форма PLCopen XML (`tc6_0200`, условие — `inVariable`, тип экземпляра — `<derived>`) подобрана импортом в CODESYS 3.5.17.30 |
 
 ## Открытые экспорты TIA (приёмка разборщика)
 
@@ -37,3 +38,4 @@
 |---|---|
 | CBMC, STL-фронтенд — https://github.com/diffblue/cbmc/tree/develop/src/statement-list (лицензия BSD-подобная) | символьный подъём STL: /FC и OR-бит как значения времени трансляции, RLO как выражение, стек скобок; код не копировался |
 | Czarnak/simaticml-decoder — https://github.com/Czarnak/simaticml-decoder (MIT) | что открытого перекомпилируемого перевода LAD/FBD/STL/GRAPH из SimaticML нет; код не копировался |
+| awlsim 0.77.1 — https://pypi.org/project/awlsim/ (GPL-2.0) | независимая сверка эталона таймеров и счётчиков S5 (`s7conv/tests/test_s5_awlsim.py`): ставится отдельно (в CI — `pip install awlsim==0.77.1`), без него тест пропускается; код не копировался |

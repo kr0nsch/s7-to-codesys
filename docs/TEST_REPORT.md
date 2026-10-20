@@ -6,12 +6,12 @@
 <!-- cds:test-report:begin (раздел обновляет `python tools/codesys/cds.py report`) -->
 ## Последний прогон в CODESYS
 
-Проверено в CODESYS 3.5.17.30 / CODESYS Control Win V3 (пользовательский процесс) — 2026-10-20 04:04:26. Итог: **все тесты пройдены**.
+Проверено в CODESYS 3.5.17.30 / CODESYS Control Win V3 (пользовательский процесс) — 2026-10-20 06:04:27. Итог: **все тесты пройдены**.
 
 | Параметр | Значение |
 |---|---|
-| Дата прогона | 2026-10-20 04:04:26 |
-| Коммит | 1a2db65 |
+| Дата прогона | 2026-10-20 06:04:27 |
+| Коммит | e17dc41 |
 | CODESYS | 3.5.17.30 (профиль `CODESYS V3.5 SP17 Patch 3`) |
 | Устройство в проекте | CODESYS Control Win V3 (4096 / 0000 0001 / 3.5.17.30) |
 | Рантайм | CODESYS Control Win V3 (пользовательский процесс) |
@@ -21,16 +21,21 @@
 
 | Набор | Тестов | Пройдено | Упало | Пропущено | Итог |
 |---|---|---|---|---|---|
+| `PRG_Tests.fbBackwashGraph_SeqTest` | 5 | 5 | 0 | 0 | пройдено |
 | `PRG_Tests.fbF_NormXTest` | 8 | 8 | 0 | 0 | пройдено |
 | `PRG_Tests.fbF_S7EnoTest` | 4 | 4 | 0 | 0 | пройдено |
 | `PRG_Tests.fbF_S7NowTest` | 2 | 2 | 0 | 0 | пройдено |
 | `PRG_Tests.fbF_ScaleXTest` | 8 | 8 | 0 | 0 | пройдено |
+| `PRG_Tests.fbS5CounterTest` | 5 | 5 | 0 | 0 | пройдено |
+| `PRG_Tests.fbS5TimerTest` | 10 | 10 | 0 | 0 | пройдено |
 | `PRG_Tests.fbS7FTrigTest` | 3 | 3 | 0 | 0 | пройдено |
 | `PRG_Tests.fbS7TofTest` | 4 | 4 | 0 | 0 | пройдено |
 | `PRG_Tests.fbS7TonTest` | 7 | 7 | 0 | 0 | пройдено |
 | `PRG_Tests.fbS7TpTest` | 3 | 3 | 0 | 0 | пройдено |
 | `PRG_Tests.fbStandardCounterTest` | 4 | 4 | 0 | 0 | пройдено |
 | `PRG_Tests.fbStandardFlipFlopTest` | 5 | 5 | 0 | 0 | пройдено |
+| `PRG_Tests.fbBackwashGraph_ScenarioTest` | 6 | 6 | 0 | 0 | пройдено |
+| `PRG_Tests.fbConveyorStl_ScenarioTest` | 7 | 7 | 0 | 0 | пройдено |
 | `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | 5 | 5 | 0 | 0 | пройдено |
 | `PRG_Tests.fbStarterFbd_ScenarioTest` | 9 | 9 | 0 | 0 | пройдено |
 | `PRG_Tests.fbStarterLad_ScenarioTest` | 9 | 9 | 0 | 0 | пройдено |
@@ -42,12 +47,17 @@
 | `PRG_Tests.fbPumpAlternation_ScenarioTest` | 6 | 6 | 0 | 0 | пройдено |
 | `PRG_Tests.fbSequencer_ScenarioTest` | 6 | 6 | 0 | 0 | пройдено |
 | `PRG_Tests.fbTotalizer_ScenarioTest` | 6 | 6 | 0 | 0 | пройдено |
-| **Всего** | 128 | 128 | 0 | 0 | **пройдено** |
+| **Всего** | 161 | 161 | 0 | 0 | **пройдено** |
 
 ### Результаты тестов
 
 | Набор | Тест | Итог |
 |---|---|---|
+| `PRG_Tests.fbBackwashGraph_SeqTest` | `ShortWashCycle` | пройден |
+| `PRG_Tests.fbBackwashGraph_SeqTest` | `LongWashParallel` | пройден |
+| `PRG_Tests.fbBackwashGraph_SeqTest` | `InterlockStopsPump` | пройден |
+| `PRG_Tests.fbBackwashGraph_SeqTest` | `SupervisionHoldsUntilAck` | пройден |
+| `PRG_Tests.fbBackwashGraph_SeqTest` | `InitResets` | пройден |
 | `PRG_Tests.fbF_NormXTest` | `MidRangeGivesHalf` | пройден |
 | `PRG_Tests.fbF_NormXTest` | `AtMinGivesZero` | пройден |
 | `PRG_Tests.fbF_NormXTest` | `AtMaxGivesOne` | пройден |
@@ -70,6 +80,21 @@
 | `PRG_Tests.fbF_ScaleXTest` | `NegativeLowBound` | пройден |
 | `PRG_Tests.fbF_ScaleXTest` | `EqualBoundsGivesMin` | пройден |
 | `PRG_Tests.fbF_ScaleXTest` | `ReversedBoundsKeepsFormula` | пройден |
+| `PRG_Tests.fbS5CounterTest` | `CountUpOnEdgeUpTo999` | пройден |
+| `PRG_Tests.fbS5CounterTest` | `CountDownStopsAtZero` | пройден |
+| `PRG_Tests.fbS5CounterTest` | `SetLoadsBcdOnEdge` | пройден |
+| `PRG_Tests.fbS5CounterTest` | `ResetIsLevel` | пройден |
+| `PRG_Tests.fbS5CounterTest` | `EnableRetriggersEdges` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `PulseStopsWhenRloFalls` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `ExtPulseRunsOutAndRetriggers` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `OnDelayNeedsRloHeld` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `RetOnDelayHoldsQUntilReset` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `OffDelayHoldsAfterFall` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `EnableRestartsRunningTimer` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `ResetIsLevelAndNeedsNewEdge` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `BcdCarriesTimeBase` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `TimeWordPicksSmallestBase` | пройден |
+| `PRG_Tests.fbS5TimerTest` | `QReadBeforeStartSeesPreviousState` | пройден |
 | `PRG_Tests.fbS7FTrigTest` | `NoEdgeOnFirstCallWithClkFalse` | пройден |
 | `PRG_Tests.fbS7FTrigTest` | `FallingEdgeOnce` | пройден |
 | `PRG_Tests.fbS7FTrigTest` | `StandardFTrigMatchesS7` | пройден |
@@ -96,6 +121,19 @@
 | `PRG_Tests.fbStandardFlipFlopTest` | `RsSetHeldReappliesAfterReset` | пройден |
 | `PRG_Tests.fbStandardFlipFlopTest` | `S7SrResetDominantViaRs` | пройден |
 | `PRG_Tests.fbStandardFlipFlopTest` | `S7RsSetDominantViaSr` | пройден |
+| `PRG_Tests.fbBackwashGraph_ScenarioTest` | `LongWash` | пройден |
+| `PRG_Tests.fbBackwashGraph_ScenarioTest` | `ShortWash` | пройден |
+| `PRG_Tests.fbBackwashGraph_ScenarioTest` | `Supervision` | пройден |
+| `PRG_Tests.fbBackwashGraph_ScenarioTest` | `AckSwitches` | пройден |
+| `PRG_Tests.fbBackwashGraph_ScenarioTest` | `InterlockPump` | пройден |
+| `PRG_Tests.fbBackwashGraph_ScenarioTest` | `OffAndInit` | пройден |
+| `PRG_Tests.fbConveyorStl_ScenarioTest` | `StartSequence` | пройден |
+| `PRG_Tests.fbConveyorStl_ScenarioTest` | `StopRunOut` | пройден |
+| `PRG_Tests.fbConveyorStl_ScenarioTest` | `JamWithoutProducts` | пройден |
+| `PRG_Tests.fbConveyorStl_ScenarioTest` | `ProductsKeepFlow` | пройден |
+| `PRG_Tests.fbConveyorStl_ScenarioTest` | `CountResetIsLevel` | пройден |
+| `PRG_Tests.fbConveyorStl_ScenarioTest` | `HornCutShort` | пройден |
+| `PRG_Tests.fbConveyorStl_ScenarioTest` | `AckRestartsFlowWatch` | пройден |
 | `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | `AutoRunAndCount` | пройден |
 | `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | `LowLevelTripAndAck` | пройден |
 | `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | `HighPressure` | пройден |
@@ -183,6 +221,44 @@ _Нет._
 
 Машиночитаемые результаты: `build/test-results.json`, `build/junit.xml` (не в git).
 <!-- cds:test-report:end -->
+
+## Прогон выпуска 1.2.0 (2026-10-20)
+
+Все команды — в чистом клоне ветки выпуска (каталог `s7-to-codesys`, `build/` с нуля): `cds.py` — на коммите
+`e17dc41`, `cds_plcopen.py` — на `671b9c7` (после него менялись только оформление обёртки SFC, путь раскладки
+импорта и `s7conv ir`; `src/` и `tests/` те же). CODESYS 3.5.17.30, CODESYS Control Win V3 в пользовательском
+процессе, coUnit 1.2.0.0; Astra.IDE 1.7.2.2. Итоги взяты из файлов прогона в `build/` (в git не хранятся).
+
+| Команда | Среда и устройство | Итог |
+|---|---|---|
+| `cds.py build` | CODESYS 3.5.17.30, Control Win V3 (4096 / `0000 0001` / 3.5.17.30) | импорт: создано 94 объекта; ошибок 0, предупреждений 0 |
+| `cds.py check --tests` | CODESYS 3.5.17.30, пул без устройства | объектов 112 (`src/` и `tests/`, оба корпуса), ошибок 0, предупреждений 0 |
+| `cds.py test --clean` | CODESYS 3.5.17.30, Control Win V3 | импорт: создано 287 объектов; сборка 0/0; 26 наборов, 161 тест: пройдено 161, упало 0 (раздел «Последний прогон в CODESYS» выше) |
+| `cds_plcopen.py test` | CODESYS 3.5.17.30, Control Win V3 | импорт `plcopen/Lang/Converted/FB_BackwashGraph.xml`: добавлены `FB_BackwashGraph_Sfc`, `FB_BackwashGraph`, ошибок и предупреждений импорта нет; сборка 0/0; набор `FB_BackwashGraph_SeqTest`: 5 тестов (`ShortWashCycle`, `LongWashParallel`, `InterlockStopsPump`, `SupervisionHoldsUntilAck`, `InitResets`) — пройдено 5 |
+| `cds.py check` с `CODESYS_EXE` = Astra.IDE, `CDS_DEVICE_*` = 4096 / `109B 0008` / 11.7.2.60 | Astra.IDE 1.7.2.2 (профиль `Astra.IDE_V1.7.2.2`), REGUL R500 | объектов 85 (`src/`), ошибок 0, предупреждений 0 |
+| `cds_plcopen.py check`, те же переменные | Astra.IDE 1.7.2.2, REGUL R500 | вариант SFC: импорт без ошибок, сборка — ошибок 0, предупреждений 0 |
+| `cds.py check` с `CDS_DEVICE_*` = 4096 / `1628 0083` / 3.5.17.35 | CODESYS 3.5.17.30 с таргет-файлами ОВЕН, ПЛК210 | объектов 85 (`src/`), ошибок 0, предупреждений 0 |
+| `cds_plcopen.py check`, те же переменные | CODESYS 3.5.17.30, ПЛК210 | вариант SFC: ошибок 0, предупреждение C0373 «Необходимая задача 'OwenCloudTask' не существует» — устройство ждёт свою задачу, а импорт оставляет только `MainTask` с `PRG_SfcCheck` |
+
+Что нового по сравнению с 1.1.0:
+
+- Таймеры и счётчики S5: наборы `FB_S5Timer_Test` (10 тестов) и `FB_S5Counter_Test` (5), сценарии конвейера
+  на STL `FB_ConveyorStl_ScenarioTest` (7).
+- GRAPH: сценарии `FB_BackwashGraph_ScenarioTest` (6) на ST-двойнике и многоцикловый набор
+  `FB_BackwashGraph_SeqTest` (5) — его же прошёл вариант SFC в отдельном проекте (`cds_plcopen.py test`).
+- Под R500 и ПЛК210 — компиляция `src/` и сборка варианта SFC; загрузка на ПЛК и прогон тестов coUnit на этих
+  устройствах не выполнялись.
+
+Проверена и копия репозитория для своего проекта (README, «Как использовать в своём проекте», шаг 7):
+учебный набор SCL с двумя CSV вместо обоих демокорпусов (`git rm -r`, в том числе `tests/POUs/Graph`) —
+`build-corpus` (записано 8, удалено 257 файлов), `check --tests` 64 объекта 0/0, `test` 14 наборов и 71 тест
+пройдены, `build` — ошибка «Не задано ни одной задачи» (в учебном наборе нет OB, ожидаемо); с блоком
+`FB_StarterStl.xml` вместо корпуса всех языков — `check --tests` 65 объектов 0/0.
+
+Без CODESYS на том же коммите: pytest — 1190 пройдено, 1 пропущен (сверка S5 с awlsim: awlsim в локальном
+окружении не установлен; в CI устанавливается), `s7conv equiv samples/lang --scenarios scenarios/lang
+--random 500` (и с `--stl-jumps pc`) — 7 блоков без расхождений, `st_lint --strict` — 526 файлов 0/0,
+iec_checker 0.4 — 112 файлов, необоснованных находок 0, RuSTy 1.0.6 — 109 файлов, 0 ошибок.
 
 ## Прогон выпуска 1.1.0 (2026-10-20)
 

@@ -2,12 +2,13 @@
 
 Кит лежит вне репозитория (каталог `_scripts/media` портфолио); путь к нему — переменная окружения
 `MEDIA_KIT` или ключ `--kit`. Снимки строятся из файлов репозитория и прогонов, поэтому перед `shots`
-нужны `python -m s7conv build-corpus` (отчёты `build/report.html`, `build/report-lang.html`) и
-`python tools/codesys/cds.py test` (`build/test-results.json`).
+нужны `python -m s7conv build-corpus` (отчёты `build/report.html`, `build/report-lang.html`),
+`python tools/codesys/cds.py test` (`build/test-results.json`) и `python tools_project/cds_plcopen.py test`
+(`build/codesys/plcopen/test-results.json` — для снимка варианта SFC).
 
     set MEDIA_KIT=C:\\path\\to\\_scripts\\media
     python tools_project/make_media.py banner          # docs/media/banner-*.svg|png, social-preview.png
-    python tools_project/make_media.py shots           # shot-*.png и chart-lang-coverage-*.png
+    python tools_project/make_media.py shots           # shot-*.png (и shot-graph-sfc) и chart-lang-coverage-*.png
     python tools_project/make_media.py gif             # demo-all-languages.gif из снятой сессии
     python tools_project/make_media.py gif --capture   # снять сессию заново (нужен CODESYS)
 
@@ -28,9 +29,10 @@ MEDIA = REPO / "docs" / "media"
 SESSION = REPO / "tools_project" / "media" / "demo-all-languages.json"
 DEMO_COMMANDS = (
     "python -m s7conv check samples/lang",
-    "python -m s7conv convert samples/lang --out build/lang --timers s7compat --emit-support --clean",
+    "python -m s7conv convert samples/lang --out build/lang --timers s7compat --emit-support --plcopen build/plc",
     "python -m s7conv equiv samples/lang --scenarios scenarios/lang --random 500",
     "python tools/codesys/cds.py test --clean",
+    "python tools_project/cds_plcopen.py test",
 )
 PROMPT = "\x1b[90mPS \x1b[94ms7-to-codesys\x1b[0m> "
 
