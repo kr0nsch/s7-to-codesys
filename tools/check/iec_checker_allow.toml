@@ -161,3 +161,10 @@ file = "src/POUs/Converted/FB_Motor/*"
 checker = "nightly"
 match = "parameter 'STATUS'"
 reason = "Ложное срабатывание CP17: выход-структура status (UDT_DeviceStatus) записывается по полям (status.running := runCmd AND feedback и т. д.), запись в поле CP17 записью не считает"
+
+[[allow]]
+id = "PLCOPEN-CP17"
+file = "src/POUs/S7Compat/F_S5*/F_S5*.decl.st"
+checker = "nightly"
+match = "parameter '(STTIMER|STCOUNTER)'"
+reason = "Ложное срабатывание образа nightly: слово таймера или счётчика S5 (VAR_IN_OUT или VAR_INPUT stTimer, stCounter) читается и пишется по полям (stTimer.xQ, stCounter.iValue) и передаётся во вложенный вызов — это CP17 не считает чтением и записью (то же, что UnusedVariable у v0.4 выше)"
