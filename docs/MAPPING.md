@@ -4,6 +4,12 @@
 `s7conv/mapping.py` (таблицы) и `s7conv/emitter.py` (решения, зависящие от контекста); подмножество
 SCL — [GRAMMAR.md](GRAMMAR.md); итог по корпусу — [CONVERSION_REPORT.md](CONVERSION_REPORT.md).
 
+Блоки LAD, FBD и STL из SimaticML сначала понижаются в тот же SCL и дальше идут по этим правилам; их
+собственные правила — в сгенерированных справочниках [MAPPING_LADFBD.md](MAPPING_LADFBD.md) (словарь
+элементов LAD/FBD с уровнем подтверждения) и [MAPPING_STL.md](MAPPING_STL.md) (172 токена STL), выбор
+стратегии — [STRATEGIES.md](STRATEGIES.md), итог по корпусу `samples/lang` —
+[CONVERSION_REPORT_LANG.md](CONVERSION_REPORT_LANG.md).
+
 Обозначения в столбце «Статус»: **авто** — перевод без пометки; **проверка** — перевод с пометкой
 `// MIGRATION-CHECK: причина (стр. N)` над конструкцией; **TODO** — не переводится: в коде
 `// MIGRATION-TODO: причина (стр. N)` и закомментированный исходный текст. В скобках — идентификатор

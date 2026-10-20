@@ -7,6 +7,16 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-20
+
+Все языки S7, кроме GRAPH: блоки LAD, FBD и STL из экспорта SimaticML переводятся в тот же ST CODESYS,
+что и SCL, с трассой до сети и UId и сверкой с эталоном S7 (`s7conv equiv`). Цель — ОВЕН ПЛК210/СПК
+(CODESYS V3.5 SP17 Patch 3) и REGUL (Astra.IDE 1.7.2.2). Проверено в CODESYS 3.5.17.30 с Control Win V3:
+21 набор coUnit, 128 тестов, все пройдены; `src/` компилируется под REGUL R500 и ПЛК210 без ошибок и
+предупреждений (компиляция, не запуск на ПЛК). Корпус SCL 1.0.0 (`src/*/Converted`, отчёт, снапшоты)
+побайтно не изменился. Версия конвертера остаётся 0.1.0: она стоит в заголовке каждого сгенерированного
+файла, и её подъём изменил бы корпус 1.0.0.
+
 ### Added
 
 - Модели SR, RS, CTU, CTD и CTUD библиотеки Standard в интерпретаторе `stsim` (`builtin_flipflop`,
@@ -71,6 +81,17 @@
   эталон против понижения; мутации «старое SR→SR», «ENO = EN» и «знаковое расширение вместо дополнения
   нулями» ловятся.
 
+- GRAPH в 1.1.0 не переводится: сеть GRAPH закомментирована с `MIGRATION-TODO` (`xml.unit_unsupported`) и
+  ссылкой на файл и сеть (тест `test_graph_network_is_todo_with_network_reference`).
+- Документация всех языков: `docs/STRATEGIES.md` (почему ST, а не LD/FBD/IL; режимы переходов STL),
+  `docs/EQUIVALENCE.md` (оракулы, мутации, чего проверка не доказывает), `docs/SIMATICML_VERSIONS.md`
+  (матрица «версия TIA × язык» и чем подтверждено), `docs/SOURCES.md`, допущения L1–L12 в
+  `docs/ASSUMPTIONS.md`, раздел «Все языки» в `docs/ARCHITECTURE.md`; `docs/USAGE.md` — экспорт SimaticML,
+  ключи `--stl-jumps`, `--cpu`, `--global-suffix`, сценарии и `equiv` для своих блоков, копия репозитория со
+  своими XML; `docs/MANUAL_STEPS.md` — компиляция под REGUL R500 и ПЛК210 и ручные шаги по LAD/FBD/STL.
+- Медиа README: баннер всех языков, GIF реальной сессии `check` → `convert` → `equiv` → `cds.py test`, снимки
+  трассы STL → ST и раздела «По языкам», график покрытия языков; обёртка `tools_project/make_media.py` над
+  медиа-китом портфолио (`MEDIA_KIT`), снятая сессия терминала — `tools_project/media/`.
 - `docs/USAGE.md` — перенос своей программы S7 по шагам: выгрузка из TIA Portal и форматы входных файлов
   (таблица тегов, `ob_config.json`), `check`, `report`, `convert` и его ключи, разбор пометок
   `MIGRATION-CHECK`/`MIGRATION-TODO`, свои сценарии и `gen-tests`, сборка в CODESYS через копию репозитория
@@ -79,6 +100,11 @@
 
 ### Changed
 
+- `build-corpus`: корпус всех языков собирается, только если в `samples/lang` есть `*.xml`, а наборы
+  сценариев — только если в `scenarios/lang` есть `*.csv`. Копия репозитория со своими блоками SimaticML и без
+  сценариев собирается (проверено: `build-corpus` и `cds.py check --tests` — 64 объекта, 0 ошибок).
+- README: конвертер всех языков S7 — первый экран, демо, быстрый старт с корпусом `samples/lang`, путь своих
+  XML, границы автоматизации по языкам, тесты 1.1.0 (Control Win, R500, ПЛК210), Summary (EN).
 - Интерпретатор ST `stsim` переехал из `s7conv/tests/stsim.py` в пакет `s7conv/sim/stsim.py`: им пользуются
   `equiv` и тесты нового корпуса. Старый путь остаётся реэкспортом — соседние проекты, закреплённые на 1.0.0,
   импортируют его без изменений.

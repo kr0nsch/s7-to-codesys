@@ -6,8 +6,10 @@
 
 Команды CODESYS выполняет `tools/codesys/cds.py` (подробно — [tools/README.md](../tools/README.md),
 раздел «codesys/cds.py»). Проект s7-to-codesys собран и протестирован в CODESYS 3.5.17.30 с
-CODESYS Control Win V3 (2026-10-16): сборка — 0 ошибок и 0 предупреждений, тесты — 74 из 74, roundtrip без
-диффа ([TEST_REPORT.md](TEST_REPORT.md)); ошибки сборки из IDE записываются в [BUILD_ERRORS.md](BUILD_ERRORS.md).
+CODESYS Control Win V3: выпуск 1.0.0 (2026-10-16) — сборка 0 ошибок и 0 предупреждений, тесты 74 из 74,
+roundtrip без диффа; выпуск 1.1.0 (2026-10-20) — с корпусом всех языков 21 набор, 128 тестов, все пройдены;
+компиляция `src/` под REGUL R500 (Astra.IDE) и ОВЕН ПЛК210 — 0 ошибок, 0 предупреждений
+([TEST_REPORT.md](TEST_REPORT.md)). Ошибки сборки из IDE записываются в [BUILD_ERRORS.md](BUILD_ERRORS.md).
 
 ## 1. Установка
 
@@ -32,11 +34,13 @@ CODESYS Control Win V3 (2026-10-16): сборка — 0 ошибок и 0 пре
 ## 2. Пересборка корпуса (если менялись конвертер, корпус или сценарии)
 
 ```bash
-python -m s7conv build-corpus          # src/*/Converted, отчёт, задачи в config.json, тесты сценариев
+python -m s7conv build-corpus          # src/*/Converted и src/*/Lang/Converted, отчёты, задачи, тесты сценариев
 python -m s7conv build-corpus --check  # то же без записи: код 1, если репозиторий устарел (так в CI)
+python samples/lang/build_xml.py       # XML корпуса всех языков из samples/lang/blocks.py (после правки блоков)
 ```
 
-Сгенерированное (`src/*/Converted`, `tests/POUs/Scenarios`, `tests/POUs/PRG_Tests`) руками не правится —
+Сгенерированное (`src/*/Converted`, `src/*/Lang/Converted`, `tests/POUs/Scenarios`, `tests/POUs/ScenariosLang`,
+`tests/POUs/PRG_Tests`, `docs/MAPPING_LADFBD.md`, `docs/MAPPING_STL.md`) руками не правится —
 правка в IDE будет потеряна при следующей пересборке. Настройки сборки корпуса (таймеры, `F_TRIG`) — в
 `s7conv/corpus.py` (`corpus_options`).
 
@@ -63,6 +67,30 @@ python tools\codesys\cds.py report           :: итог прогона → docs
   `build/test-results.json`, `build/junit.xml`.
 - Без лицензии Control Win работает 2 часа; `cds.py test` перезапускает рантайм, если он работает
   дольше 100 минут.
+
+### 3.1 Компиляция под REGUL R500 и ОВЕН ПЛК210
+
+Тесты идут в Control Win, но код должен компилироваться и под устройства, на которые переносят проект.
+`cds.py check` компилирует все объекты `src/` в проекте с заданным устройством; устройство и среда
+задаются переменными окружения (значения — с машины разработки, где выполнены проверки 2026-10-20):
+
+| Цель | Среда (`CODESYS_EXE`, `CODESYS_PROFILE`) | Устройство (`CDS_DEVICE_TYPE` / `CDS_DEVICE_ID` / `CDS_DEVICE_VERSION`) | Итог |
+|---|---|---|---|
+| REGUL R500 | Astra.IDE 1.7.2.2: `…\AstraRegul\Astra.IDE_64_1.7.2.2\Astra.IDE\Common\Astra.IDE.exe`, профиль `Astra.IDE_V1.7.2.2` | 4096 / `109B 0008` / 11.7.2.60 | объектов 54, ошибок 0, предупреждений 0 |
+| ОВЕН ПЛК210 | CODESYS 3.5.17.30 с пакетом таргет-файлов ОВЕН, профиль `CODESYS V3.5 SP17 Patch 3` | 4096 / `1628 0083` / 3.5.17.35 (библиотека устройства OwenStorage 3.5.17.33) | объектов 54, ошибок 0, предупреждений 0 |
+
+```bat
+set CODESYS_EXE=C:\Program Files\AstraRegul\Astra.IDE_64_1.7.2.2\Astra.IDE\Common\Astra.IDE.exe
+set CODESYS_PROFILE=Astra.IDE_V1.7.2.2
+set CDS_DEVICE_TYPE=4096
+set CDS_DEVICE_ID=109B 0008
+set CDS_DEVICE_VERSION=11.7.2.60
+set CDS_PROJECT_NAME=s7-to-codesys-r500
+python tools\codesys\cds.py check
+```
+
+`CDS_PROJECT_NAME` разводит проекты в `build\codesys\`, чтобы проверка не трогала проект Control Win. Это
+компиляция, а не запуск: на R500 и ПЛК210 код не загружался, тесты coUnit под эти устройства не собирались.
 
 ## 4. Что делается только в IDE
 
@@ -168,7 +196,18 @@ retain-памяти весь экземпляр, пометка `section.fb_reta
 5. Проверить на стенде каждый канал: дискретные — переключением, аналоговые — калибратором в точках
    4, 12, 20 мА и вне диапазона (обрыв, КЗ).
 
-### 4.4 Прочее
+### 4.4 Блоки LAD, FBD, STL: что остаётся человеку
+
+- [ ] Экспорт SimaticML из TIA Portal Openness (скрипт или надстройка) — у разработчика TIA нет, путь
+      выгрузки проверен только на открытых экспортах ([SIMATICML_VERSIONS.md](SIMATICML_VERSIONS.md)).
+- [ ] Если версия TIA в матрице не подтверждена: сравнить отчёт «По языкам» и ST нескольких сетей с
+      исходными сетями в TIA.
+- [ ] Пометки `vocab_unverified` (элемент LAD/FBD уровня L) и `eno_error` (ENO = EN у блока, который в S7
+      ловит ошибку) — сверить сеть вручную.
+- [ ] Сети GRAPH (`xml.unit_unsupported`) — перенести вручную в SFC или `CASE`.
+- [ ] Обратный путь в TIA конвертер не даёт: переведённый ST в S7 не импортируется.
+
+### 4.5 Прочее
 
 - [ ] Свободный цикл для `MainTask`, если он нужен вместо 10 мс (`tools/codesys` создаёт только
       циклические задачи).

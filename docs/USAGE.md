@@ -1,9 +1,14 @@
 # Перенос своей программы S7 на CODESYS
 
-Пошаговая инструкция для инженера, у которого есть проект TIA Portal с блоками на SCL: как выгрузить
-исходники, сконвертировать их в ST CODESYS, прочитать отчёт, разобрать пометки `MIGRATION-CHECK` и
-`MIGRATION-TODO`, проверить поведение тестами по сценариям и собрать результат в CODESYS. У каждого шага —
-команда и вывод, который вы увидите на учебном наборе из четырёх файлов демокорпуса.
+Пошаговая инструкция для инженера, у которого есть проект TIA Portal: как выгрузить исходники, сконвертировать
+их в ST CODESYS, прочитать отчёт, разобрать пометки `MIGRATION-CHECK` и `MIGRATION-TODO`, проверить поведение
+тестами по сценариям и собрать результат в CODESYS. У каждого шага — команда и вывод, который вы увидите на
+учебном наборе из четырёх файлов демокорпуса SCL. Блоки LAD, FBD и STL идут тем же путём через экспорт
+SimaticML — [раздел 1](#блоки-lad-fbd-и-stl-экспорт-simaticml) и корпус `samples/lang`.
+
+Цель — платформы, на которые в России переносят проекты Siemens: ОВЕН ПЛК210/СПК (CODESYS V3.5 SP17 Patch 3)
+и REGUL (Astra.IDE — OEM-сборка CODESYS 3.5.17). Тесты идут в CODESYS Control Win; компиляция корпуса
+проверена и под устройства REGUL R500 и ПЛК210 ([шаг 8](#8-сборка-и-тесты-в-codesys)).
 
 Здесь только работа с инструментом. Этапы миграции, риски (время цикла, приоритеты OB, retain, HMI, SCADA),
 чек-лист и оценка трудоёмкости — в [methodology.md](methodology.md); действия в IDE (ПЛК210, OB82,
@@ -29,7 +34,7 @@ Persistent Variables, привязка ввода-вывода) — в [MANUAL_S
 |---|---|
 | Python 3.11+ | конвертер `s7conv` использует только стандартную библиотеку; `requirements-dev.txt` нужен для проверок самого репозитория (pytest, ruff, mypy) |
 | клон репозитория | `s7conv` работает из него: раскладку ST пишет общий модуль `tools/codesys/stlayout.py`, а объекты слоя совместимости S7Compat копируются из `src/` репозитория. `python -m pip install -e .` добавляет команду `s7conv`, но файлы по-прежнему берутся из клона |
-| исходники на SCL | блоки LAD/FBD/STL `s7conv` не разбирает: их сначала переводят в SCL в TIA Portal или переписывают вручную |
+| исходники SCL (`*.scl`, `*.db`, `*.udt`) или экспорт блоков в SimaticML (`*.xml`) | SimaticML несёт LAD, FBD, STL и SCL; сеть GRAPH в выпуске 1.1.0 не переводится (`MIGRATION-TODO`) |
 | для шага 8: Windows, CODESYS 3.5.17.30 с CODESYS Control Win V3, библиотека coUnit 1.2.0.0 | сборка проекта и прогон тестов; установка — [MANUAL_STEPS.md](MANUAL_STEPS.md), раздел 1 |
 
 ```bat
@@ -85,6 +90,46 @@ cp scenarios/FB_Motor.csv my_plc/scenarios/
 - **Сверка с форматом.** Демокорпус написан по формату внешних источников TIA Portal V15–V18, но в TIA не
   компилировался ([samples/scl/README.md](../samples/scl/README.md)). Если ваша выгрузка не разбирается,
   шаг 2 покажет файл и строку.
+
+### Блоки LAD, FBD и STL: экспорт SimaticML
+
+«Generate source from blocks» даёт текст только для SCL и STL; блоки LAD и FBD текстом не выгружаются.
+Для них (и для STL) нужен XML-экспорт TIA Portal Openness — SimaticML: метод `Export` блока
+(TIA Portal Openness V19, System Manual, с. 1350–1351), вызванный своим скриптом или надстройкой.
+Исходник STL `.awl` выпуск 1.1.0 не читает — выгружайте STL в XML. Файлы `*.xml` кладите рядом с SCL:
+конвертер читает оба формата из одного каталога, и вызовы между блоками разных языков разрешаются.
+
+Пробный запуск на корпусе репозитория (`samples/lang`: пускатель на LAD, FBD, STL и SCL, блок блокировок
+насоса на LAD, FC, UDT и глобальный DB):
+
+```bat
+python -m s7conv check samples/lang
+python -m s7conv convert samples/lang --out build/lang --timers s7compat --emit-support --clean
+```
+
+Увидите:
+
+```text
+s7conv check: файлов 8, блоков 8, без ошибок
+s7conv: файлов SCL 0, SimaticML 8, записано 22 файлов в build/lang
+s7conv: конструкций 173: автоматически 164 (95 %), требуют проверки 9, не поддерживаются 0
+```
+
+- **Что переводится.** Сети LAD и FBD — в булевы выражения и вызовы (поток питания, ветви, SR/RS с
+  операндом в порядке S7, фронты с явным битом памяти, ENO арифметики через S7Compat); STL — символьным
+  подъёмом в выражения, переходы — в `IF/ELSE` или автомат `CASE` (ключ `--stl-jumps pc`), `JMP` в ST не
+  попадает; сеть SCL — тем же разборщиком, что и `.scl`. Что во что — [MAPPING_LADFBD.md](MAPPING_LADFBD.md),
+  [MAPPING_STL.md](MAPPING_STL.md); почему ST, а не LD/FBD/IL — [STRATEGIES.md](STRATEGIES.md).
+- **Трасса.** Пометка в ST ссылается на файл, сеть и UId элемента: `(FB_PumpInterlockLad.xml, сеть 7, UId 25)`;
+  в отчёте — раздел «По языкам» и столбец «Место».
+- **Версии TIA.** Разборщик сравнивает локальные имена элементов и принимает любую версию SimaticML;
+  подтверждены V21 (XSD и открытый экспорт LAD) и V18 (открытый экспорт STL), остальные — «разбор по
+  пространству имён, не проверено» ([SIMATICML_VERSIONS.md](SIMATICML_VERSIONS.md)).
+- **Профиль STL.** S7-300/400 (2 аккумулятора) или S7-1500 берётся из `MemoryLayout` блока; ключ
+  `--cpu s7-300|s7-1500` задаёт его явно.
+- **Ошибки.** Битый XML `check` показывает с файлом (`bad.xml:1:1: error: … XML не разбирается`), код
+  выхода 1; `convert` его пропускает и считает как «не поддерживается». `DOCTYPE` и сущности XML
+  отвергаются.
 
 ### Таблица тегов
 
@@ -219,6 +264,9 @@ build/my_plc/
 | `--clean` | удаляет из `<out>/src` файлы `*.st`, которых нет в новом результате | повторная конвертация в тот же каталог |
 | `--report-md`, `--report-html` | отчёт рядом с результатом | по желанию |
 | `--fail-on todo` / `--fail-on check` | код выхода 1, если есть `MIGRATION-TODO` (или `TODO` и `CHECK`) | CI: новые неподдержанные конструкции не проходят незамеченными |
+| `--stl-jumps structured` / `pc` | переходы STL: `IF/ELSE` (по умолчанию) или автомат `CASE iStlPc` в `WHILE`; несводимый поток (обратный переход, `LOOP`) уходит в автомат сам | STL с переходами; оба режима сверяются с эталоном `s7conv equiv` |
+| `--cpu s7-300` / `s7-1500` | профиль STL; без ключа — по `MemoryLayout` блока | если профиль в XML не совпадает с реальным CPU |
+| `--global-suffix _Lang` | суффикс генерируемых GVL (`GVL_IO_Lang`, `GVL_InstanceDBs_Lang` …) | два корпуса в одном проекте CODESYS, как `samples/scl` и `samples/lang` в репозитории |
 
 Почему таймерам S7Compat можно доверять: их юнит-тесты (`tests/POUs/S7Compat`) проверяют пороги, фронты,
 сброс и переход TIME через 2³² мс, а тесты `MatchesStandardInRealTime` сравнивают каждый таймер со Standard
@@ -334,6 +382,37 @@ python -m s7conv gen-tests my_plc/scenarios --out build/my_plc/tests --corpus my
   таймеров и фронтов и запись CSV — в `scenarios/reference/scenario_lib.py`, примеры моделей —
   `scenarios/reference/model_fb_*.py`.
 
+### Блоки SimaticML: тесты по сценариям и эталон S7
+
+Сценарии для блоков LAD, FBD и STL пишутся в том же формате; `--corpus` принимает каталог с `*.xml`.
+Если один CSV проверяет несколько переводов одной логики (как `FB_Starter.csv` — пускатель на четырёх языках),
+соответствие лежит в `aliases.json` рядом с CSV ([scenarios/lang/README.md](../scenarios/lang/README.md)):
+
+```bat
+python -m s7conv gen-tests scenarios/lang --out build/lang-tests --corpus samples/lang
+```
+
+Увидите: `s7conv gen-tests: наборов 5, тестов 41, проверок 789; рукописных наборов в PRG_Tests 0`.
+
+Вторая проверка, без CODESYS, — `s7conv equiv`: эталон S7 (поток питания LAD/FBD, машина STL S7-300)
+и интерпретатор ST на переведённом коде получают одни входы — строки сценариев и случайные вызовы — и
+сравнивают выходы и статику после каждого вызова:
+
+```bat
+python -m s7conv equiv samples/lang --scenarios scenarios/lang --random 500
+```
+
+Увидите по строке на блок и итог:
+
+```text
+s7conv equiv: FB_StarterStl (STL, эталон STL): вызовов по сценариям 47, случайных 500 — расхождений нет
+s7conv equiv: блоков 5, без расхождений
+```
+
+Расхождение выводится строкой `РАСХОЖДЕНИЕ`: блок, сценарий и номер вызова, переменная, значения эталона и ST;
+код выхода — 1. Эталон — модель по
+руководствам Siemens, а не CPU; чего эта проверка не доказывает — [EQUIVALENCE.md](EQUIVALENCE.md).
+
 ## 7. Проверка без CODESYS
 
 ```bat
@@ -351,7 +430,8 @@ iec_checker и проверка компилятором RuSTy настроен�
 
 `tools/codesys/cds.py` собирает проект CODESYS из `src/` и `tests/` корня репозитория через CODESYS
 Scripting, задачи берёт из `tools/codesys/config.json`. Команда `build-corpus` пишет туда всё сразу, но
-читает только `samples/scl` и `scenarios`. Поэтому проверенный путь — отдельная копия репозитория, в
+читает только корпуса репозитория: `samples/scl` со `scenarios` (SCL) и `samples/lang` со `scenarios/lang`
+(SimaticML). Поэтому проверенный путь — отдельная копия репозитория, в
 которой демокорпус заменён своими файлами. Копию кладут рядом с первым клоном, а не внутри него: блок
 начинается с `cd ..` из корня клона, и пути `..\s7-to-codesys\my_plc\…` указывают на первый клон (если вы
 клонировали его под другим именем, поправьте их).
@@ -360,19 +440,32 @@ Scripting, задачи берёт из `tools/codesys/config.json`. Коман�
 cd ..
 git clone https://github.com/kr0nsch/s7-to-codesys.git my-migration
 cd my-migration
-git rm -q "samples/scl/*.scl" "samples/scl/*.csv" samples/scl/ob_config.json "scenarios/*.csv"
+git rm -q "samples/scl/*.scl" "samples/scl/*.csv" samples/scl/ob_config.json "scenarios/*.csv" "samples/lang/*.xml" scenarios/lang/aliases.json
 copy ..\s7-to-codesys\my_plc\scl\* samples\scl\
 copy ..\s7-to-codesys\my_plc\scenarios\*.csv scenarios\
 python -m s7conv build-corpus
 ```
 
-Увидите на учебном наборе (с обоими CSV):
+`git rm` убирает оба демокорпуса: SCL и всех языков (образец `scenarios/*.csv` в git совпадает и с
+`scenarios/lang/*.csv`). Увидите на учебном наборе (с обоими CSV):
 
 ```text
-s7conv build-corpus: записано файлов 8, удалено 114; файлов результата 35
+s7conv build-corpus: записано файлов 8, удалено 220; файлов результата 35
 s7conv build-corpus: конструкций 176: автоматически 164 (93 %), требуют проверки 6, не поддерживаются 6
-s7conv build-corpus: тесты сценариев — наборов 2, тестов 8, проверок 384; рукописных наборов в PRG_Tests 7
+s7conv build-corpus: тесты сценариев — наборов 2, тестов 8, проверок 384; рукописных наборов в PRG_Tests 10
 ```
+
+Блоки SimaticML кладут в `samples/lang` (сценарии — в `scenarios/lang`, их может пока не быть):
+
+```bat
+copy ..\s7-to-codesys\my_plc\xml\*.xml samples\lang\
+python -m s7conv build-corpus
+```
+
+Код ляжет в `src/*/Lang/Converted` с суффиксом `_Lang` у генерируемых GVL, отчёт — в
+`docs/CONVERSION_REPORT_LANG.md`, наборы сценариев (если есть CSV) — в `tests/POUs/ScenariosLang`. Проверено
+на копии с одним блоком `FB_StarterStl.xml` вместо корпуса и без сценариев: `build-corpus` и
+`cds.py check --tests` проходят.
 
 `build-corpus` записывает:
 
@@ -380,7 +473,7 @@ s7conv build-corpus: тесты сценариев — наборов 2, тес�
 - `docs/CONVERSION_REPORT.md` — отчёт конвертации, `build/report.html` — его HTML-версия;
 - задачи из OB — в `tools/codesys/config.json`, ключ `modes.normal.tasks` (остальной текст файла не
   меняется; `tools/codesys` создаёт только циклические задачи);
-- `tests/POUs/Scenarios/` и `tests/POUs/PRG_Tests/` — тесты сценариев и программу запуска вместе с 7
+- `tests/POUs/Scenarios/` и `tests/POUs/PRG_Tests/` — тесты сценариев и программу запуска вместе с 10
   рукописными наборами слоя S7Compat из `tests/POUs/S7Compat`.
 
 Настройки конвертации для `build-corpus` — функция `corpus_options` в `s7conv/corpus.py` (папка
@@ -400,22 +493,25 @@ python tools\codesys\cds.py test
 
 - `runtime init` — один раз: пользовательский процесс CODESYS Control Win V3 без прав администратора.
 - `build` — рабочий проект `build\my-migration.project` с задачами из OB; компилируются только объекты,
-  достижимые из задач. Если OB во входе нет, задач нет — тогда весь код проверяет `check --tests`.
+  достижимые из задач. Если OB во входе нет (как в учебном наборе), задач нет, и `build` останавливается с
+  ошибкой `TaskConfiguration: Не задано ни одной задачи` — это ожидаемо, весь код проверяет `check --tests`.
 - `check --tests` — компиляция всех объектов `src/` и `tests/`, в том числе без вызовов.
-- `test` — тестовый проект с coUnit, загрузка в Control Win и прогон: ваши наборы сценариев и 7 наборов
+- `test` — тестовый проект с coUnit, загрузка в Control Win и прогон: ваши наборы сценариев и 10 наборов
   S7Compat; среди тестов S7Compat — `StandardFTrigMatchesS7`, сверка F_TRIG вашей версии Standard с S7.
 
-На демокорпусе вывод такой (последние строки `cds.py test`): `[cds] build: OK (ошибок 0, предупреждений 0,
-…)` и `[cds] test: OK (наборов 13, тестов 74, пройдено 74, упало 0, пропущено 0, …)`. Справочник команд и
+На демокорпусах вывод такой (последние строки `cds.py test`): `[cds] build: OK (ошибок 0, предупреждений 0,
+…)` и `[cds] test: OK (наборов 21, тестов 128, пройдено 128, упало 0, пропущено 0, …)`. Справочник команд и
 переменных окружения — [tools/README.md](../tools/README.md), раздел «codesys/cds.py».
 
-Честно о проверке этого шага: копия репозитория проверена до `build-corpus` включительно (файлы
-записываются, задачи и тесты появляются). Сборка и тесты в CODESYS проверены на демокорпусе, а на чужих
-исходниках этим путём не прогонялись.
+Проверка этого шага (2026-10-20, выпуск 1.1.0): копия с учебным набором и обоими демокорпусами, убранными
+командой выше, — `build-corpus` (вывод выше), `check --tests` — 34 объекта, 0 ошибок и 0 предупреждений,
+`test` — 11 наборов, 55 тестов, все пройдены; `build` — ошибка «нет задач», как описано выше. Копия со
+своим блоком SimaticML вместо корпуса всех языков — `build-corpus` и `check --tests` (64 объекта, 0 ошибок).
+На чужих исходниках этот путь не прогонялся.
 
 Что ещё изменится в копии:
 
-- Тесты pytest, привязанные к демокорпусу, упадут: в проверочной копии с учебным набором — 82 из 1030
+- Тесты pytest, привязанные к демокорпусу, упадут: в проверочной копии выпуска 1.0.0 с учебным набором — 82 из 1030
   (`scenarios/reference/test_scenario_models.py` — эталонные модели демокорпуса, `samples/test_coverage_matrix.py`,
   моделирование сценариев и снапшоты корпуса в `s7conv/tests`, по одному тесту в `tools_project/` и
   `tools/tests/test_run_iec_checker.py`). Это проверки демонстрационных данных, а не конвертера: их удаляют
@@ -435,7 +531,9 @@ python tools\codesys\cds.py test
 
 | Что видно | Причина | Что делать |
 |---|---|---|
-| `s7conv: ошибка: нет входных файлов *.scl, *.db, *.udt` | в указанном каталоге нет исходников | проверить путь и расширения |
+| `s7conv: ошибка: нет входных файлов *.scl, *.db, *.udt, *.xml` | в указанном каталоге нет исходников | проверить путь и расширения |
+| пометка `xml.unit_unsupported` у сети GRAPH | GRAPH в выпуске 1.1.0 не переводится | перенести вручную (SFC или `CASE`) по описанию последовательности |
+| пометка `vocab_unverified` у элемента LAD/FBD | имя и пины элемента не подтверждены открытым экспортом TIA (уровень L в [MAPPING_LADFBD.md](MAPPING_LADFBD.md)) | сверить сеть в TIA с ST; подтверждённый экспорт элемента присылать в issue |
 | пометки `type.unknown`, `call.instance_unknown` | во входе нет исходника ФБ или UDT, на который ссылается блок | выгрузить и добавить его исходник |
 | `s7conv gen-tests: ошибка: …: строка длиннее 120 символов — укоротите имена` | путь к CSV вписывается в шапку набора, а каталог сценариев лежит вне текущего каталога или путь длинный | запускать из корня клона, сценарии держать внутри него, путь писать относительный (`my_plc/scenarios`) |
 | тесты сценариев с таймерами не сходятся | код сконвертирован с таймерами Standard | конвертировать с `--timers s7compat --emit-support` (шаг 4) |
