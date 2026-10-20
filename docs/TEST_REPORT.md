@@ -6,12 +6,12 @@
 <!-- cds:test-report:begin (раздел обновляет `python tools/codesys/cds.py report`) -->
 ## Последний прогон в CODESYS
 
-Проверено в CODESYS 3.5.17.30 / CODESYS Control Win V3 (пользовательский процесс) — 2026-10-19 14:43:13. Итог: **все тесты пройдены**.
+Проверено в CODESYS 3.5.17.30 / CODESYS Control Win V3 (пользовательский процесс) — 2026-10-20 04:04:26. Итог: **все тесты пройдены**.
 
 | Параметр | Значение |
 |---|---|
-| Дата прогона | 2026-10-19 14:43:13 |
-| Коммит | 6c5e025-dirty |
+| Дата прогона | 2026-10-20 04:04:26 |
+| Коммит | 1a2db65 |
 | CODESYS | 3.5.17.30 (профиль `CODESYS V3.5 SP17 Patch 3`) |
 | Устройство в проекте | CODESYS Control Win V3 (4096 / 0000 0001 / 3.5.17.30) |
 | Рантайм | CODESYS Control Win V3 (пользовательский процесс) |
@@ -22,19 +22,27 @@
 | Набор | Тестов | Пройдено | Упало | Пропущено | Итог |
 |---|---|---|---|---|---|
 | `PRG_Tests.fbF_NormXTest` | 8 | 8 | 0 | 0 | пройдено |
+| `PRG_Tests.fbF_S7EnoTest` | 4 | 4 | 0 | 0 | пройдено |
 | `PRG_Tests.fbF_S7NowTest` | 2 | 2 | 0 | 0 | пройдено |
 | `PRG_Tests.fbF_ScaleXTest` | 8 | 8 | 0 | 0 | пройдено |
 | `PRG_Tests.fbS7FTrigTest` | 3 | 3 | 0 | 0 | пройдено |
 | `PRG_Tests.fbS7TofTest` | 4 | 4 | 0 | 0 | пройдено |
 | `PRG_Tests.fbS7TonTest` | 7 | 7 | 0 | 0 | пройдено |
 | `PRG_Tests.fbS7TpTest` | 3 | 3 | 0 | 0 | пройдено |
+| `PRG_Tests.fbStandardCounterTest` | 4 | 4 | 0 | 0 | пройдено |
+| `PRG_Tests.fbStandardFlipFlopTest` | 5 | 5 | 0 | 0 | пройдено |
+| `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | 5 | 5 | 0 | 0 | пройдено |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | 9 | 9 | 0 | 0 | пройдено |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | 9 | 9 | 0 | 0 | пройдено |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | 9 | 9 | 0 | 0 | пройдено |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | 9 | 9 | 0 | 0 | пройдено |
 | `PRG_Tests.fbAlarmDelay_ScenarioTest` | 8 | 8 | 0 | 0 | пройдено |
 | `PRG_Tests.fbAnalogIn_ScenarioTest` | 6 | 6 | 0 | 0 | пройдено |
 | `PRG_Tests.fbMotor_ScenarioTest` | 7 | 7 | 0 | 0 | пройдено |
 | `PRG_Tests.fbPumpAlternation_ScenarioTest` | 6 | 6 | 0 | 0 | пройдено |
 | `PRG_Tests.fbSequencer_ScenarioTest` | 6 | 6 | 0 | 0 | пройдено |
 | `PRG_Tests.fbTotalizer_ScenarioTest` | 6 | 6 | 0 | 0 | пройдено |
-| **Всего** | 74 | 74 | 0 | 0 | **пройдено** |
+| **Всего** | 128 | 128 | 0 | 0 | **пройдено** |
 
 ### Результаты тестов
 
@@ -48,6 +56,10 @@
 | `PRG_Tests.fbF_NormXTest` | `OffsetRange` | пройден |
 | `PRG_Tests.fbF_NormXTest` | `EqualBoundsGivesZero` | пройден |
 | `PRG_Tests.fbF_NormXTest` | `ReversedBoundsKeepsFormula` | пройден |
+| `PRG_Tests.fbF_S7EnoTest` | `AddIntOverflow` | пройден |
+| `PRG_Tests.fbF_S7EnoTest` | `SubIntUnderflow` | пройден |
+| `PRG_Tests.fbF_S7EnoTest` | `MulIntOverflow` | пройден |
+| `PRG_Tests.fbF_S7EnoTest` | `DintLimits` | пройден |
 | `PRG_Tests.fbF_S7NowTest` | `SimulationReturnsSimClock` | пройден |
 | `PRG_Tests.fbF_S7NowTest` | `AdvancesLikeStandardTimer` | пройден |
 | `PRG_Tests.fbF_ScaleXTest` | `HalfGivesMidRange` | пройден |
@@ -75,6 +87,56 @@
 | `PRG_Tests.fbS7TpTest` | `PulseOnRisingEdge` | пройден |
 | `PRG_Tests.fbS7TpTest` | `RetriggerIgnored` | пройден |
 | `PRG_Tests.fbS7TpTest` | `MatchesStandardInRealTime` | пройден |
+| `PRG_Tests.fbStandardCounterTest` | `CtuCountsRisingEdges` | пройден |
+| `PRG_Tests.fbStandardCounterTest` | `CtdStopsAtZero` | пройден |
+| `PRG_Tests.fbStandardCounterTest` | `CtudResetBeatsLoad` | пройден |
+| `PRG_Tests.fbStandardCounterTest` | `CtudBothEdgesSameCall` | пройден |
+| `PRG_Tests.fbStandardFlipFlopTest` | `SrSetDominant` | пройден |
+| `PRG_Tests.fbStandardFlipFlopTest` | `RsResetDominant` | пройден |
+| `PRG_Tests.fbStandardFlipFlopTest` | `RsSetHeldReappliesAfterReset` | пройден |
+| `PRG_Tests.fbStandardFlipFlopTest` | `S7SrResetDominantViaRs` | пройден |
+| `PRG_Tests.fbStandardFlipFlopTest` | `S7RsSetDominantViaSr` | пройден |
+| `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | `AutoRunAndCount` | пройден |
+| `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | `LowLevelTripAndAck` | пройден |
+| `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | `HighPressure` | пройден |
+| `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | `MaintenanceJump` | пройден |
+| `PRG_Tests.fbPumpInterlockLad_ScenarioTest` | `SetpointClamp` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `StartStop` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `StartAndStopTogether` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `InterlockBlocksStart` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `InterlockDropStops` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `FeedbackOk` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `FeedbackTimeout` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `FaultResetAndBlock` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `StartCounter` | пройден |
+| `PRG_Tests.fbStarterFbd_ScenarioTest` | `ResetWhileRunning` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `StartStop` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `StartAndStopTogether` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `InterlockBlocksStart` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `InterlockDropStops` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `FeedbackOk` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `FeedbackTimeout` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `FaultResetAndBlock` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `StartCounter` | пройден |
+| `PRG_Tests.fbStarterLad_ScenarioTest` | `ResetWhileRunning` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `StartStop` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `StartAndStopTogether` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `InterlockBlocksStart` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `InterlockDropStops` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `FeedbackOk` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `FeedbackTimeout` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `FaultResetAndBlock` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `StartCounter` | пройден |
+| `PRG_Tests.fbStarterScl_ScenarioTest` | `ResetWhileRunning` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `StartStop` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `StartAndStopTogether` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `InterlockBlocksStart` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `InterlockDropStops` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `FeedbackOk` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `FeedbackTimeout` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `FaultResetAndBlock` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `StartCounter` | пройден |
+| `PRG_Tests.fbStarterStl_ScenarioTest` | `ResetWhileRunning` | пройден |
 | `PRG_Tests.fbAlarmDelay_ScenarioTest` | `ActivateAckClear` | пройден |
 | `PRG_Tests.fbAlarmDelay_ScenarioTest` | `ClearedBeforeAck` | пройден |
 | `PRG_Tests.fbAlarmDelay_ScenarioTest` | `ChatterSuppressed` | пройден |
@@ -121,6 +183,35 @@ _Нет._
 
 Машиночитаемые результаты: `build/test-results.json`, `build/junit.xml` (не в git).
 <!-- cds:test-report:end -->
+
+## Прогон выпуска 1.1.0 (2026-10-20)
+
+Все команды — на коммите `1a2db65` в чистом клоне репозитория (каталог `s7-to-codesys`, `build/` с нуля).
+CODESYS 3.5.17.30, CODESYS Control Win V3 в пользовательском процессе, coUnit 1.2.0.0; Astra.IDE 1.7.2.2.
+Итоги взяты из файлов прогона в `build/` (в git не хранятся).
+
+| Команда `python tools/codesys/cds.py …` | Среда и устройство | Итог |
+|---|---|---|
+| `build` | CODESYS 3.5.17.30, Control Win V3 (4096 / `0000 0001` / 3.5.17.30) | импорт: создано 63 объекта; ошибок 0, предупреждений 0 |
+| `check --tests` | CODESYS 3.5.17.30, пул без устройства | объектов 76 (`src/` и `tests/`, оба корпуса), ошибок 0, предупреждений 0 |
+| `test --clean` | CODESYS 3.5.17.30, Control Win V3 | импорт: создано 217 объектов; сборка 0/0; 21 набор, 128 тестов: пройдено 128, упало 0 (раздел «Последний прогон в CODESYS» выше) |
+| `check` с `CODESYS_EXE` = Astra.IDE, `CDS_DEVICE_*` = 4096 / `109B 0008` / 11.7.2.60 | Astra.IDE 1.7.2.2 (профиль `Astra.IDE_V1.7.2.2`), REGUL R500 | объектов 54 (`src/`), ошибок 0, предупреждений 0 |
+| `check` с `CDS_DEVICE_*` = 4096 / `1628 0083` / 3.5.17.35 | CODESYS 3.5.17.30 с таргет-файлами ОВЕН, ПЛК210; библиотека устройства OwenStorage 3.5.17.33 | объектов 54 (`src/`), ошибок 0, предупреждений 0 |
+
+Что нового по сравнению с 1.0.0:
+
+- Наборы корпуса всех языков `FB_StarterLad/Fbd/Stl/Scl_ScenarioTest` (по 9 сценариев — один и тот же
+  `FB_Starter.csv`) и `FB_PumpInterlockLad_ScenarioTest` (5) — 41 тест; все пройдены.
+- Рукописные наборы S7Compat: `FB_StandardFlipFlop_Test` (5: SR/RS Standard по уровню, перевод S7 SR → RS и
+  S7 RS → SR при `S = R = 1`), `FB_StandardCounter_Test` (4: CTU/CTD/CTUD, одновременные фронты CU и CD),
+  `FB_F_S7Eno_Test` (4: ENO сложения, вычитания и умножения INT/DINT на границах).
+- Под R500 и ПЛК210 — компиляция всех объектов `src/`; загрузка на ПЛК и прогон тестов coUnit на этих
+  устройствах не выполнялись.
+
+Отдельно проверена копия репозитория для своего проекта (README, «Как использовать в своём проекте», шаг 7):
+учебный набор SCL вместо обоих демокорпусов — `check --tests` 34 объекта 0/0, `test` 11 наборов и 55 тестов
+пройдены, `build` — ошибка «Не задано ни одной задачи» (в учебном наборе нет OB, ожидаемо); один блок
+SimaticML вместо корпуса всех языков — `check --tests` 64 объекта 0/0.
 
 ## Повторный прогон перед выпуском (2026-10-19)
 
