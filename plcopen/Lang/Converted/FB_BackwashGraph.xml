@@ -396,12 +396,14 @@
           </localVars>
         </interface>
         <body>
-          <ST><xhtml xmlns="http://www.w3.org/1999/xhtml">// Сгенерировано s7conv из samples/lang/FB_BackwashGraph.xml (S7-GRAPH, стратегия sfc): SFC FB_BackwashGraph_Sfc и обёртка FB_BackwashGraph.
+          <ST><xhtml xmlns="http://www.w3.org/1999/xhtml">// Сгенерировано s7conv из samples/lang/FB_BackwashGraph.xml (S7-GRAPH, стратегия sfc):
+// SFC FB_BackwashGraph_Sfc и обёртка FB_BackwashGraph с интерфейсом блока GRAPH.
 // Квитирование ошибок контроля (ACK_EF) и INIT_SQ — до вызова SFC: в этом цикле переход возможен
 IF ACK_EF OR INIT_SQ THEN
     Drain_SvErr := FALSE;
 END_IF
-fbSfc(SFCInit := INIT_SQ, xStart := xStart, xLevelLow := xLevelLow, xLevelHigh := xLevelHigh, xShortWash := xShortWash, xPumpOk := xPumpOk, xValveFault := xValveFault, Drain_SvErr := Drain_SvErr);
+fbSfc(SFCInit := INIT_SQ, xStart := xStart, xLevelLow := xLevelLow, xLevelHigh := xLevelHigh,
+      xShortWash := xShortWash, xPumpOk := xPumpOk, xValveFault := xValveFault, Drain_SvErr := Drain_SvErr);
 // Действия GRAPH по флагам IEC-действий SFC
 xReady := (fbSfc.xIdle_N1 OR INIT_SQ);
 xDrainValve := (fbSfc.xDrain_N1 AND NOT INIT_SQ);

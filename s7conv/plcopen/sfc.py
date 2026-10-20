@@ -363,7 +363,7 @@ def build_sfc(blk: XBlock) -> tuple[str, str, list[Var], list[Var], list[Var], l
     args = ["SFCInit := INIT_SQ"] if "INIT_SQ" in members else ["SFCInit := FALSE"]
     args += [f"{m.name} := {m.name}" for m in user_inputs]
     args += [f"{var} := {var}" for var in sv_err.values()]
-    body.append("fbSfc(" + ", ".join(args) + ");")
+    body += _wrap_call("fbSfc", args)
     body.append("// Действия GRAPH по флагам IEC-действий SFC")
     order = []
     for st in seq.steps:
@@ -392,6 +392,25 @@ def build_sfc(blk: XBlock) -> tuple[str, str, list[Var], list[Var], list[Var], l
     wrapper_vars = [Var("fbSfc", f"{blk.name}_Sfc", comment="последовательность SFC")]
     wrapper_vars += [Var(var, "BOOL", comment=f"шаг S{n}: ошибка контроля") for n, var in sv_err.items()]
     return "\n".join(elements), "\n".join(body), sfc_in, sfc_out, wrapper_vars, notes
+
+
+def _wrap_call(name: str, args: list[str], width: int = 110) -> list[str]:
+    """Вызов `name(a := a, b := b, …);` по строкам не длиннее width, продолжение — под первым аргументом."""
+    lines: list[str] = []
+    cur = f"{name}("
+    for i, arg in enumerate(args):
+        piece = arg + ("," if i < len(args) - 1 else ");")
+        if cur.endswith("("):
+            cur += piece
+        elif len(cur) + 1 + len(piece) > width:
+            lines.append(cur)
+            cur = " " * (len(name) + 1) + piece
+        else:
+            cur += " " + piece
+    if not args:
+        cur += ");"
+    lines.append(cur)
+    return lines
 
 
 def _plain_st(blk: XBlock, flgnet: object, lang: str) -> list[str]:
@@ -429,7 +448,11 @@ def sfc_project(blk: XBlock, source: str) -> SfcResult:
         for m in sec.members:
             wrapper_sections[tag].append(Var(m.name, iec_type(m.datatype), m.start_value or "", m.comment))
     sfc_name = f"{blk.name}_Sfc"
-    head = f"// Сгенерировано s7conv из {source} (S7-GRAPH, стратегия sfc): SFC {sfc_name} и обёртка {blk.name}."
+    head = (
+        f"// Сгенерировано s7conv из {source} (S7-GRAPH, стратегия sfc):"
+        + chr(10)
+        + f"// SFC {sfc_name} и обёртка {blk.name} с интерфейсом блока GRAPH."
+    )
     out = [
         '<?xml version="1.0" encoding="utf-8"?>',
         f'<project xmlns="{NS}">',

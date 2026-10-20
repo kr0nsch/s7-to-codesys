@@ -10,8 +10,8 @@
 ОВЕН ПЛК210 — программа `PRG_SfcCheck` в задаче `MainTask` вызывает каждый блок, coUnit не нужен.
 `test` для каждого блока берёт рукописный многоцикловый набор `tests/POUs/Graph/<Блок>_SeqTest` — тот же, что
 `cds.py test` прогоняет на ST-двойнике `src/POUs/Lang/Converted/<Блок>`: оба варианта проходят одни проверки.
-Проект — `build/codesys/<имя>-plcopen.project` (отдельный от проектов `cds.py`), раскладка для импорта —
-`build/codesys/plcopen/layout` (наборы и программа запуска `PRG_Tests` или программа `PRG_SfcCheck`).
+Проект — `build/codesys/<имя>-plcopen.project` (отдельный от проектов `cds.py`), раскладка для импорта (наборы
+и программа запуска `PRG_Tests` или программа `PRG_SfcCheck`) — во временном каталоге, после прогона удаляется.
 
 Шаги выполняются в одном процессе CODESYS (`tools_project/codesys/cds_plcopen_entry.py`): import (модуль
 шаблона `tools/codesys/import_sources.py`, раскладка ST), plcopen (`app.import_xml`, PLCopen XML — после ST),
@@ -28,6 +28,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -215,21 +216,24 @@ def main(argv: list[str] | None = None) -> int:
         xml_files = find_inputs(args.xml)
         work = REPO / cli.WORK_DIR / "plcopen"
         work.mkdir(parents=True, exist_ok=True)
-        layout = work / "layout"
-        if args.command == "test":
-            make_layout(layout, suite_dirs(xml_files))
-        else:
-            make_check_layout(layout, [f.stem for f in xml_files])
-        steps = steps_for(settings, args.command, layout, work, xml_files, args.export)
-        timeout = settings.number("codesys.timeout_s")
-        with cli.repo_lock(settings, f"plcopen {args.command}"):
+        # раскладка — во временном каталоге с коротким путём: пути методов наборов в глубоком build/ клона
+        # упираются в предел 260 символов Windows (shutil.copytree: WinError 3)
+        with tempfile.TemporaryDirectory(prefix="s7plc-") as tmp:
+            layout = Path(tmp) / "layout"
             if args.command == "test":
-                timeout += settings.number("tests.timeout_s")
-                with cli.runtime_lock(settings, f"plcopen test {REPO.name}"):
-                    cli.ensure_runtime(settings, restart=args.restart_runtime)
-                    result = run_entry(settings, work, {"steps": steps}, timeout)
+                make_layout(layout, suite_dirs(xml_files))
             else:
-                result = run_entry(settings, work, {"steps": steps}, timeout)
+                make_check_layout(layout, [f.stem for f in xml_files])
+            steps = steps_for(settings, args.command, layout, work, xml_files, args.export)
+            timeout = settings.number("codesys.timeout_s")
+            with cli.repo_lock(settings, f"plcopen {args.command}"):
+                if args.command == "test":
+                    timeout += settings.number("tests.timeout_s")
+                    with cli.runtime_lock(settings, f"plcopen test {REPO.name}"):
+                        cli.ensure_runtime(settings, restart=args.restart_runtime)
+                        result = run_entry(settings, work, {"steps": steps}, timeout)
+                else:
+                    result = run_entry(settings, work, {"steps": steps}, timeout)
     except PlcopenError as exc:
         print(f"[plcopen] {exc}", file=sys.stderr)
         return cli.EXIT_USAGE
