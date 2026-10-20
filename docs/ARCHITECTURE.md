@@ -74,7 +74,7 @@ flowchart LR
 
 | Контур | Где | Что ловит |
 |---|---|---|
-| Python | CI и локально: ruff, mypy, pytest | разбор, эмиттер, генератор тестов, снапшот корпуса (`build-corpus` воспроизводит закоммиченное побайтно), RuSTy по всему `src/` и `tests/`; наборы coUnit, исполненные интерпретатором ST (`s7conv/tests/stsim.py`) против закоммиченного кода, и мутации логики |
+| Python | CI и локально: ruff, mypy, pytest | разбор, эмиттер, генератор тестов, снапшот корпуса (`build-corpus` воспроизводит закоммиченное побайтно), RuSTy по всему `src/` и `tests/`; наборы coUnit, исполненные интерпретатором ST (`s7conv/sim/stsim.py`) против закоммиченного кода, и мутации логики |
 | ST без CODESYS | CI и локально: `st_lint`, `assemble.py`, iec_checker (`run_iec_checker.py --tests`), RuSTy | раскладка, оформление, синтаксис и типы, статанализ ([STATIC_ANALYSIS.md](STATIC_ANALYSIS.md)) |
 | CODESYS | Windows, CODESYS 3.5.17.30 и Control Win V3 | компиляция CODESYS, тесты coUnit ([TEST_REPORT.md](TEST_REPORT.md)) |
 
@@ -90,3 +90,60 @@ flowchart LR
 | `tools_project/` | проверки настроек репозитория проекта (`st_lint.toml`, `config.json`) |
 | `docs/` | документация и отчёты |
 | `build/` | артефакты сборки и проверок, в git не хранится |
+
+## Все языки (выпуск 1.1.0)
+
+С выпуска 1.1.0 вход — не только SCL, но и SimaticML (XML экспорта TIA Portal Openness) на LAD, FBD,
+STL и SCL. Новые модули понижают эти языки в текст SCL, дальше он идёт прежним путём.
+
+```mermaid
+flowchart LR
+    X["SimaticML *.xml"] --> FX["frontends/simaticml<br/>Document, Interface,<br/>CompileUnit"]
+    FX --> N["ir/net: NetIR<br/>Part, Access, Wire"]
+    FX --> T["ir/stl: StlIR<br/>токены XSD V21"]
+    FX -->|сеть SCL| SCLT["текст SCL"]
+    N -->|lower/net_to_ast| SCLT
+    T -->|lower/stl_lift<br/>structured / pc| SCLT
+    S["*.scl, *.db, *.udt"] --> P["parser.py 1.0.0"]
+    SCLT --> P
+    P --> E["emitter, mapping,<br/>symbols, report 1.0.0"]
+    E --> ST["src/*/Lang/Converted"] & R["отчёт «По языкам»"] & TG["testgen → coUnit"]
+    N & T --> SEM["semantics: эталон S7<br/>net_eval, stl_machine"] --> EQ["equiv"]
+    ST --> SIM["stsim"] --> EQ
+```
+
+| Модуль `s7conv/` | Роль |
+|---|---|
+| `frontends/simaticml.py` | разбор SimaticML (`xml.etree`, без внешних сущностей): блоки, интерфейс, сети по `ProgrammingLanguage`; `Access` → текст SCL |
+| `ir/net.py`, `ir/stl.py` | NetIR (граф сети LAD/FBD) и StlIR (инструкции STL по имени токена XSD) |
+| `lower/net_to_ast.py` | LAD/FBD → SCL: поток питания, словарь элементов `PARTS`, прыжки вперёд → IF |
+| `lower/stl_lift.py`, `lower/stl_tokens.py` | STL → SCL: символьный подъём, переходы `structured`/`pc`; матрица 172 токенов |
+| `lower/block.py` | блок → текст SCL с трассой каждой строки (`сеть 3, UId 27`) и пометками понижения |
+| `semantics/` | эталон S7, независимый от понижения: `net_eval`, `stl_machine`, таймеры и счётчики IEC |
+| `sim/stsim.py` | интерпретатор ST (переехал из `s7conv/tests/stsim.py`, старый путь — реэкспорт) |
+| `equiv.py`, `irdump.py`, `docs_gen.py` | команды `equiv` и `ir`; генерация `MAPPING_LADFBD.md`, `MAPPING_STL.md` |
+
+### Почему так
+
+- **AST SCL вместо нового промежуточного представления уровня ST.** Все языки понижаются в текст SCL,
+  который разбирает `parser.py` 1.0.0: эмиттер (около 2600 строк), отчёт, таблицы соответствий и генератор
+  тестов переиспользуются без копий. Происхождение строк (`Lowering.trace`) и пометки понижения
+  (`Lowering.notes`) едут рядом с текстом и попадают в пометки ST и отчёт.
+- **XML из стандартной библиотеки.** `xml.etree` без зависимостей: тот же код можно запустить в браузере
+  (Pyodide) и в любом окружении CI; DOCTYPE и сущности отклоняются до разбора.
+- **Структурные переходы вместо JMP.** RuSTy и iec_checker не разбирают `JMP` и метки — их нельзя было бы
+  проверять статанализом; IF/ELSE и автомат CASE читаются и проверяются как обычный ST.
+- **Один проект CODESYS на два корпуса.** Корпус всех языков лежит в `src/*/Lang/Converted`, генерируемые
+  GVL — с суффиксом `_Lang` (`--global-suffix`); сборка проверяет, что имена объектов и членов GVL двух
+  корпусов не совпадают. Папка `Lang/Converted` подпадает под шаблоны `src/*/Converted/*` настроек
+  статанализа (`tools/check`), а `src/*/Converted` корпуса SCL 1.0.0 не меняется.
+- **Эталон независим от понижения.** `semantics/` не импортирует `lower`, `emitter`, `mapping`: эталон и
+  транслятор делят только разбор XML ([EQUIVALENCE.md](EQUIVALENCE.md)).
+
+### Проект CODESYS: новые папки
+
+| Папка проекта | Каталог | Что |
+|---|---|---|
+| `Lang/Converted` | `src/{DUTs,GVLs,POUs}/Lang/Converted` | корпус всех языков: 4 перевода `FB_Starter`, `FB_PumpInterlockLad`, `FC_ClampPctLad`, `DB_Process`, `UDT_Valve` |
+| `S7Compat` | `src/POUs/S7Compat/F_S7Eno*` | функции ENO арифметики S7 |
+| `Tests/ScenariosLang` | `tests/POUs/ScenariosLang` | наборы сценариев `scenarios/lang` (объявлены в `PRG_Tests`) |
