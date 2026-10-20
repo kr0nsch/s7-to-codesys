@@ -100,6 +100,7 @@ class CorpusBuild:
     lang_html: str = ""
     lang_files: dict[str, str] = field(default_factory=dict)  # корпус всех языков: путь -> текст
     lang_tests: TG.TestsBuild | None = None
+    lang_dirs_managed: bool = False  # каталог samples/lang есть: Lang/Converted и ScenariosLang — под сборкой
 
     @property
     def all_files(self) -> dict[str, str]:
@@ -107,7 +108,8 @@ class CorpusBuild:
 
     @property
     def managed(self) -> tuple[str, ...]:
-        return MANAGED_DIRS + (LANG_MANAGED_DIRS if self.lang_result is not None else ())
+        lang = self.lang_result is not None or self.lang_dirs_managed
+        return MANAGED_DIRS + (LANG_MANAGED_DIRS if lang else ())
 
 
 def _object_files(objects: list[L.StObject], subdir: str) -> dict[str, str]:
@@ -260,7 +262,9 @@ def build(root: Path = REPO_ROOT) -> CorpusBuild:
         warnings.append(f"{CONFIG_REL} нет — задачи только в отчёте ({REPORT_REL})")
     html = R.render_html(result, [CORPUS_REL])
     built = CorpusBuild(files=files, result=result, tests=TG.TestsBuild([], [], []), html=html, warnings=warnings)
-    if (root / LANG_CORPUS_REL).is_dir():
+    # samples/lang без *.xml (демокорпус убран, своих блоков нет): старый результат Lang/Converted удаляется
+    built.lang_dirs_managed = (root / LANG_CORPUS_REL).is_dir()
+    if any((root / LANG_CORPUS_REL).rglob("*.xml")):
         _build_lang(root, built)
     lang_suites = [s.obj.name for s in built.lang_tests.suites] if built.lang_tests is not None else []
     built.tests = TG.generate(root / SCENARIOS_REL, result, root, "tests", root, lang_suites)
@@ -287,7 +291,7 @@ def _build_lang(root: Path, built: CorpusBuild) -> None:
     )
     built.warnings.extend(lang_result.errors)
     lang_scenarios = root / LANG_SCENARIOS_REL
-    if lang_scenarios.is_dir():
+    if any(lang_scenarios.glob("*.csv")):  # свои блоки XML без сценариев: код и отчёт без наборов
         source = TG.ScenarioSource(lang_scenarios, lang_result, TG.load_aliases(lang_scenarios))
         built.lang_tests = TG.generate_lang(source, "tests", root)
         lang_files.update(_object_files(built.lang_tests.objects, "tests"))

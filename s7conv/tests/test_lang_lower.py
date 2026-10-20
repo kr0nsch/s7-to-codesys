@@ -280,6 +280,25 @@ def test_unknown_part_is_todo_with_uid() -> None:
     assert '"FancyBox"(in := #a);' in text
 
 
+def test_graph_network_is_todo_with_network_reference() -> None:
+    """GRAPH в 1.1.0 не переводится: сеть закомментирована с MIGRATION-TODO и ссылкой на файл и сеть."""
+    ns = "http://www.siemens.com/automation/Openness/SW/NetworkSource/Graph/v4"
+    graph = B.Unit("GRAPH", "Шаги", "", "Graph", [f'<Graph xmlns="{ns}"><Sequence /></Graph>'])
+    blk = fb("FB_Seq", [graph], BOOLS, lang="GRAPH")
+    assert "xml.unit_unsupported" in lower_rules(blk)
+    path = Path("FB_Seq.xml")
+    doc = parse_document(B.render(blk), str(path))
+    text, lowering, _ = lower_document(doc, {b.name.lower(): b for b in doc.blocks}, LowerOptions())
+    from s7conv.parser import parse_source
+
+    sf = parse_source(text, str(path))
+    sf.lowering = lowering
+    obj = next(o for o in convert([sf], Project(), Options()).objects if o.name == "FB_Seq")
+    assert obj.impl is not None
+    assert "// MIGRATION-TODO: сеть 1: язык GRAPH (Graph) не поддерживается (FB_Seq.xml, сеть 1)" in obj.impl
+    assert all(ln.startswith("//") for ln in obj.impl.splitlines() if ln.strip())
+
+
 def test_unverified_vocabulary_is_at_most_check() -> None:
     """Элемент уровня L (форма XML не подтверждена экспортом) не может быть «автоматически»."""
     n = B.Net("x", lang="FBD")

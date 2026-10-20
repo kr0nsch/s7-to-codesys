@@ -96,3 +96,40 @@ def test_corpus_without_language_samples_ignores_lang_dirs(tmp_path: Path) -> No
     assert first.lang_result is None and not first.lang_files
     C.write(first, root, html=False)
     assert C.compare(C.build(root), root).clean
+
+
+def test_own_xml_without_scenarios_builds_code_and_report(tmp_path: Path) -> None:
+    """Копия со своим блоком SimaticML и без сценариев CSV: код и отчёт есть, наборов ScenariosLang нет."""
+    from s7conv.tests.test_corpus_build import _mini_repo
+
+    root = _mini_repo(tmp_path)
+    for path in (root / "samples" / "lang").glob("*.xml"):
+        if path.name != "FB_StarterStl.xml":
+            path.unlink()
+    shutil.rmtree(root / "scenarios" / "lang")
+    first = C.build(root)
+    assert first.lang_result is not None
+    assert {o.name for o in first.lang_result.objects} == {"FB_StarterStl"}
+    assert C.LANG_REPORT_REL in first.lang_files
+    assert not any(f"/{TG.LANG_SCENARIO_FOLDER}/" in rel for rel in first.all_files)
+    C.write(first, root, html=False)
+    assert C.compare(C.build(root), root).clean
+
+
+def test_removed_language_corpus_cleans_generated_lang_dirs(tmp_path: Path) -> None:
+    """samples/lang без *.xml (демокорпус убран): сгенерированные Lang/Converted и ScenariosLang удаляются."""
+    from s7conv.tests.test_corpus_build import _mini_repo
+
+    root = _mini_repo(tmp_path)
+    C.write(C.build(root), root, html=False)
+    assert (root / "src" / "POUs" / "Lang" / "Converted" / "FB_StarterStl").is_dir()
+    for path in (root / "samples" / "lang").glob("*.xml"):
+        path.unlink()
+    shutil.rmtree(root / "scenarios" / "lang")
+    second = C.build(root)
+    assert second.lang_result is None
+    diff = C.write(second, root, html=False)
+    assert any(rel.startswith("src/POUs/Lang/Converted/") for rel in diff.stale)
+    assert any(rel.startswith(f"tests/POUs/{TG.LANG_SCENARIO_FOLDER}/") for rel in diff.stale)
+    assert not any((root / "src").rglob("Lang/Converted/**/*.st"))
+    assert C.compare(C.build(root), root).clean
