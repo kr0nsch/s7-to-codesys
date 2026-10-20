@@ -27,7 +27,10 @@ line-length = 120
 target-version = "py311"
 extend-exclude = ["build"]
 # Каталоги модулей проекта (для сортировки импортов: first-party)
-src = [".", "tools", "tools/codesys", "tools/check", "tools/tests", "scenarios/reference", "samples", "tools_project"]
+src = [
+    ".", "tools", "tools/codesys", "tools/check", "tools/tests", "scenarios/reference", "scenarios/lang/reference",
+    "samples", "samples/lang", "tools_project",
+]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "C4", "RUF"]
@@ -51,8 +54,8 @@ exclude = ["tools/codesys/*.py"]
 
 [tool.mypy]
 python_version = "3.11"
-files = ["tools", "scenarios/reference", "samples", "s7conv", "tools_project"]
-mypy_path = ["tools", "tools/codesys", "tools/check", "scenarios/reference", "samples"]
+files = ["tools", "scenarios/reference", "scenarios/lang/reference", "samples", "s7conv", "tools_project"]
+mypy_path = ["tools", "tools/codesys", "tools/check", "scenarios/reference", "scenarios/lang/reference", "samples", "samples/lang"]
 strict = true
 warn_unreachable = true
 # cdshost управляет CODESYS и рантаймом только в Windows: mypy и в Linux-CI проверяет код как для
@@ -66,10 +69,10 @@ exclude = [
 ]
 
 [tool.pytest.ini_options]
-# scenarios/reference — эталонные модели сценариев; samples — проверка матрицы покрытия корпуса SCL;
+# scenarios/reference, scenarios/lang/reference — эталонные модели сценариев; samples — матрицы покрытия корпусов;
 # tools_project — проверки настроек репозитория проекта (st_lint.toml, config.json)
-testpaths = ["tools/tests", "scenarios/reference", "samples", "s7conv/tests", "tools_project"]
-pythonpath = [".", "tools", "tools/codesys", "tools/check", "scenarios/reference", "samples"]
+testpaths = ["tools/tests", "scenarios/reference", "scenarios/lang/reference", "samples", "s7conv/tests", "tools_project"]
+pythonpath = [".", "tools", "tools/codesys", "tools/check", "scenarios/reference", "scenarios/lang/reference", "samples", "samples/lang"]
 addopts = "-ra --strict-markers"
 markers = [
     "integration: проверки с настоящими plc (RuSTy) и iec_checker; пропускаются, если инструмента нет",

@@ -1,6 +1,6 @@
-"""Сборка корпуса samples/scl/ в раскладку репозитория — команда `s7conv build-corpus`.
+"""Сборка корпусов samples/scl/ и samples/lang/ в раскладку репозитория — команда `s7conv build-corpus`.
 
-Один источник всего, что в репозитории получено из корпуса и сценариев:
+Один источник всего, что в репозитории получено из корпусов и сценариев:
 
 - `src/{DUTs,GVLs,POUs}/Converted/` — результат конвертера с настройками CORPUS_OPTIONS (папка проекта
   CODESYS `Converted`; таймеры S7Compat с подменяемым временем; периоды и номера OB — `ob_config.json`
@@ -8,7 +8,11 @@
   генерируются — сборка только проверяет, что нужные на месте;
 - `docs/CONVERSION_REPORT.md` — отчёт конвертации (и `build/report.html` при записи);
 - `tools/codesys/config.json` — задачи из OB (`modes.normal.tasks`); остальной текст файла не меняется;
-- `tests/POUs/Scenarios/` и `tests/POUs/PRG_Tests/` — тесты сценариев и программа запуска (testgen).
+- `tests/POUs/Scenarios/` и `tests/POUs/PRG_Tests/` — тесты сценариев и программа запуска (testgen);
+- корпус всех языков (SimaticML LAD/FBD/STL/SCL, samples/lang): `src/{DUTs,GVLs,POUs}/Lang/Converted/` с
+  суффиксом `_Lang` у генерируемых GVL (один проект CODESYS с корпусом SCL, плоское пространство имён),
+  `docs/CONVERSION_REPORT_LANG.md` и тесты сценариев `scenarios/lang/` в тех же `tests/POUs/Scenarios`.
+  Корпус SCL 1.0.0 собирается так же, как раньше: его файлы не меняются.
 
 `--check` ничего не пишет и возвращает код 1, если файлы репозитория отличаются от результата:
 так CI и pytest проверяют, что закоммиченный результат воспроизводится из корпуса.
@@ -36,12 +40,28 @@ REPORT_REL = "docs/CONVERSION_REPORT.md"
 REPORT_HTML_REL = "build/report.html"
 CONFIG_REL = "tools/codesys/config.json"
 COMMAND = "s7conv build-corpus"
+# Корпус всех языков S7 (SimaticML)
+LANG_CORPUS_REL = "samples/lang"
+LANG_SCENARIOS_REL = "scenarios/lang"
+# Папка проекта CODESYS Lang/Converted: шаблоны src/*/Converted/* настроек статанализа (tools/check) и правила
+# для сгенерированного кода действуют на оба корпуса; src/<вид>/Converted/ корпуса SCL 1.0.0 не меняется
+LANG_FOLDER = "Lang/Converted"
+LANG_FOLDERS = ("Lang", "Converted")
+LANG_SUFFIX = "_Lang"
+LANG_REPORT_REL = "docs/CONVERSION_REPORT_LANG.md"
+LANG_REPORT_HTML_REL = "build/report-lang.html"
 
 # Каталоги, которыми сборка владеет целиком: лишние файлы в них удаляются (--check сообщает о них)
 MANAGED_DIRS = (
     *(f"src/{cat}/{FOLDER}" for cat in L.CATEGORIES),
     f"tests/POUs/{TG.SCENARIO_FOLDER}",
     f"tests/POUs/{TG.PRG_TESTS}",
+)
+# Каталоги корпуса всех языков — управляемые, только если корпус samples/lang есть в корне
+LANG_MANAGED_DIRS = (
+    *(f"src/{cat}/{LANG_FOLDER}" for cat in L.CATEGORIES),
+    f"tests/POUs/{TG.LANG_SCENARIO_FOLDER}",
+    f"tests/GVLs/{TG.LANG_SCENARIO_FOLDER}",
 )
 
 
@@ -60,6 +80,16 @@ def corpus_options(corpus: Path = REPO_ROOT / CORPUS_REL) -> Options:
     )
 
 
+def lang_options() -> Options:
+    """Настройки корпуса всех языков: папка Lang/Converted, суффикс GVL, таймеры S7Compat, профиль по XML."""
+    return Options(
+        folder=LANG_FOLDERS,
+        timers=M.S7COMPAT,
+        f_trig=M.STANDARD,
+        global_suffix=LANG_SUFFIX,
+    )
+
+
 @dataclass
 class CorpusBuild:
     files: dict[str, str]  # путь от корня -> текст
@@ -67,6 +97,18 @@ class CorpusBuild:
     tests: TG.TestsBuild
     html: str
     warnings: list[str] = field(default_factory=list)
+    lang_result: ConversionResult | None = None
+    lang_html: str = ""
+    lang_files: dict[str, str] = field(default_factory=dict)  # корпус всех языков: путь -> текст
+    lang_tests: TG.TestsBuild | None = None
+
+    @property
+    def all_files(self) -> dict[str, str]:
+        return {**self.files, **self.lang_files}
+
+    @property
+    def managed(self) -> tuple[str, ...]:
+        return MANAGED_DIRS + (LANG_MANAGED_DIRS if self.lang_result is not None else ())
 
 
 def _object_files(objects: list[L.StObject], subdir: str) -> dict[str, str]:
@@ -78,7 +120,7 @@ def _object_files(objects: list[L.StObject], subdir: str) -> dict[str, str]:
 
 
 def _managed(rel: str) -> bool:
-    return any(rel == d or rel.startswith(d + "/") for d in MANAGED_DIRS)
+    return any(rel == d or rel.startswith(d + "/") for d in (*MANAGED_DIRS, *LANG_MANAGED_DIRS))
 
 
 def _hand_written(root: Path) -> list[L.StObject]:
@@ -220,7 +262,77 @@ def build(root: Path = REPO_ROOT) -> CorpusBuild:
     tests = TG.generate(root / SCENARIOS_REL, result, root, "tests", root)
     files.update(_object_files(tests.objects, "tests"))
     html = R.render_html(result, [CORPUS_REL])
-    return CorpusBuild(files=files, result=result, tests=tests, html=html, warnings=warnings)
+    built = CorpusBuild(files=files, result=result, tests=tests, html=html, warnings=warnings)
+    lang = root / LANG_CORPUS_REL
+    if lang.is_dir():
+        _build_lang(root, built)
+    check_names_unique(root, built)
+    return built
+
+
+def _build_lang(root: Path, built: CorpusBuild) -> None:
+    """Корпус всех языков: Lang/Converted, отчёт CONVERSION_REPORT_LANG.md, наборы ScenariosLang."""
+    lang_inputs = P.collect_inputs([str(root / LANG_CORPUS_REL)])
+    lang_result, _lang_files = P.run(lang_inputs, lang_options(), base=root)
+    _check_hand_written(root, lang_result)
+    clash = {o.name.lower() for o in built.result.objects} & {o.name.lower() for o in lang_result.objects}
+    if clash:
+        raise CorpusError(f"имена объектов корпусов SCL и всех языков совпадают: {', '.join(sorted(clash))}")
+    lang_files = _object_files(lang_result.objects, "src")
+    lang_files[LANG_REPORT_REL] = R.render_markdown(
+        lang_result,
+        [LANG_CORPUS_REL],
+        command=COMMAND,
+        tasks_target="— (OB в корпусе всех языков нет)",
+        title="Отчёт конвертации S7 (LAD, FBD, STL, SCL) → ST CODESYS",
+    )
+    built.warnings.extend(lang_result.errors)
+    lang_scenarios = root / LANG_SCENARIOS_REL
+    if lang_scenarios.is_dir():
+        source = TG.ScenarioSource(lang_scenarios, lang_result, TG.load_aliases(lang_scenarios))
+        built.lang_tests = TG.generate_lang(source, "tests", root)
+        lang_files.update(_object_files(built.lang_tests.objects, "tests"))
+    built.lang_result = lang_result
+    built.lang_html = R.render_html(lang_result, [LANG_CORPUS_REL])
+    built.lang_files = lang_files
+
+
+def check_names_unique(root: Path, built: CorpusBuild) -> None:
+    """Объекты уникальны по всему src/ (CODESYS — плоское пространство имён); члены GVL корпуса всех языков
+    не совпадают с членами остальных GVL (RuSTy снимает имена GVL — E004). Повторы внутри корпуса SCL 1.0.0
+    (heartbeat в DB_Plant и DB_Telegram) уже были и проверяются RuSTy с исключениями (tools/check)."""
+    lang = list(built.lang_result.objects) if built.lang_result else []
+    generated = list(built.result.objects) + lang
+    names = {x.name.lower() for x in generated}
+    hand = [o for o in _hand_written(root) if o.name.lower() not in names]
+    seen: set[str] = set()
+    errors: list[str] = []
+    for obj in [*generated, *hand]:
+        if obj.name.lower() in seen:
+            errors.append(f"объект {obj.name}")
+        seen.add(obj.name.lower())
+
+    def members(objs: list[L.StObject]) -> dict[str, tuple[str, str]]:
+        found: dict[str, tuple[str, str]] = {}  # имя (lower) -> (GVL, имя как в объявлении)
+        for obj in objs:
+            if obj.kind != L.KIND_GVL:
+                continue
+            for block in L.parse_var_blocks(obj.decl):
+                for d in block.decls:
+                    for name in d.name_list:
+                        prev = found.get(name.lower())
+                        if prev is not None and prev[0] != obj.name and obj in lang:
+                            errors.append(f"член GVL {name} ({prev[0]} и {obj.name})")
+                        found.setdefault(name.lower(), (obj.name, name))
+        return found
+
+    lang_members = members(lang)
+    other_members = members([o for o in [*built.result.objects, *hand] if o not in lang])
+    for key, (gvl, name) in lang_members.items():
+        if key in other_members:
+            errors.append(f"член GVL {name} ({gvl} и {other_members[key][0]})")
+    if errors:
+        raise CorpusError("имена в src/ повторяются: " + "; ".join(sorted(set(errors))))
 
 
 def _existing(root: Path, managed: Sequence[str]) -> set[str]:
@@ -275,17 +387,19 @@ def apply_diff(diff: Diff, files: dict[str, str], root: Path, managed: Sequence[
 
 
 def compare(build_result: CorpusBuild, root: Path = REPO_ROOT) -> Diff:
-    return diff_files(build_result.files, root, MANAGED_DIRS)
+    return diff_files(build_result.all_files, root, build_result.managed)
 
 
 def write(build_result: CorpusBuild, root: Path = REPO_ROOT, html: bool = True) -> Diff:
     """Записать результат; удалить лишние файлы управляемых каталогов. Возвращает, что изменилось."""
     diff = compare(build_result, root)
-    apply_diff(diff, build_result.files, root, MANAGED_DIRS)
+    apply_diff(diff, build_result.all_files, root, build_result.managed)
     if html:
         target = root / REPORT_HTML_REL
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(build_result.html.encode("utf-8"))
+        if build_result.lang_html:
+            (root / LANG_REPORT_HTML_REL).write_bytes(build_result.lang_html.encode("utf-8"))
     return diff
 
 
@@ -294,6 +408,12 @@ __all__ = [
     "CONFIG_REL",
     "CORPUS_REL",
     "FOLDER",
+    "LANG_CORPUS_REL",
+    "LANG_FOLDER",
+    "LANG_FOLDERS",
+    "LANG_REPORT_REL",
+    "LANG_SCENARIOS_REL",
+    "LANG_SUFFIX",
     "MANAGED_DIRS",
     "REPORT_REL",
     "CorpusBuild",
@@ -301,10 +421,12 @@ __all__ = [
     "Diff",
     "apply_diff",
     "build",
+    "check_names_unique",
     "compare",
     "config_tasks",
     "corpus_options",
     "diff_files",
+    "lang_options",
     "update_config_tasks",
     "write",
 ]

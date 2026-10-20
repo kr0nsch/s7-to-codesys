@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from s7conv import __version__
 from s7conv.emitter import AUTO, CHECK, TODO, ConversionResult, FileResult, Item, Note
+from s7conv.nodes import LangUnit
 
 STATUS_LABEL = {AUTO: "автоматически", CHECK: "требует проверки", TODO: "не поддерживается"}
 STATUS_ICON = {AUTO: "✓", CHECK: "!", TODO: "✕"}
@@ -179,6 +180,204 @@ def _sorted_notes(notes: Sequence[Note]) -> list[Note]:
 
 
 # ---------------------------------------------------------------------------
+# Языки S7 (LAD, FBD, STL, GRAPH): раздел появляется, только если во входе есть SimaticML
+# ---------------------------------------------------------------------------
+
+LANG_ORDER = ("LAD", "FBD", "STL", "SCL", "GRAPH", "DB", "UDT")
+UNIT_KINDS = {"element": "элемент", "network": "сеть", "instruction": "инструкция", "step": "шаг"}
+UNIT_STATUSES = (AUTO, CHECK, TODO, "impossible")
+UNIT_STATUS_LABEL = {AUTO: "авто", CHECK: "проверка", TODO: "нет", "impossible": "невозможно"}
+LANG_RULE_TITLES = {
+    "lad.contact": "LAD: контакты, ветви, NOT",
+    "lad.coil": "LAD: катушка",
+    "lad.set_reset": "LAD: катушки S/R",
+    "lad.sr_operand": "LAD: SR/RS с битом-операндом",
+    "lad.edge": "LAD: фронт с явным битом памяти",
+    "lad.edge_memory": "LAD: бит памяти фронта во временной области",
+    "lad.compare": "LAD: сравнение",
+    "lad.move": "LAD: MOVE",
+    "lad.math": "LAD: арифметика",
+    "lad.eno_error": "LAD: ENO = EN AND NOT ошибка",
+    "lad.div_zero": "LAD: деление на 0",
+    "lad.convert": "LAD: преобразование",
+    "lad.instruction": "LAD: инструкция-блок",
+    "lad.calculate": "LAD: CALCULATE",
+    "lad.timer": "LAD: таймер с экземпляром",
+    "lad.counter": "LAD: счётчик с экземпляром",
+    "lad.call": "LAD: вызов FB/FC",
+    "lad.call_eno": "LAD: ENO вызова",
+    "lad.jump": "LAD: прыжок вперёд → IF",
+    "lad.jump_irreducible": "LAD: несводимый прыжок",
+    "lad.return": "LAD: RET",
+    "lad.wire": "LAD: висячий провод или операнд",
+    "lad.instance": "LAD: блок без экземпляра",
+    "lad.unknown_part": "LAD: неизвестный элемент",
+    "lad.vocab_unverified": "LAD: форма XML элемента не подтверждена экспортом",
+    "scl.network": "сеть SCL",
+    "stl.logic": "STL: логика битов",
+    "stl.edge": "STL: FP/FN с явным битом памяти",
+    "stl.edge_memory": "STL: бит памяти фронта во временной области",
+    "stl.accu": "STL: L/T",
+    "stl.math": "STL: арифметика",
+    "stl.compare": "STL: сравнение",
+    "stl.call": "STL: CALL/UC/CC",
+    "stl.call_registers_1500": "STL S7-1500: состояние после CALL",
+    "stl.block_end": "STL: BE/BEU/BEC",
+    "stl.nop": "STL: NOP, комментарии",
+    "stl.jump_structured": "STL: переход → IF/ELSE",
+    "stl.jump_pc": "STL: автомат переходов CASE",
+    "stl.jump_dead": "STL: недостижимый участок после JU",
+    "stl.zero_extend": "STL: L WORD/INT в DINT — дополнение нулями",
+    "stl.accu_high": "STL: старшая часть ACCU1",
+    "stl.bitcopy": "STL: копия битов через ACCU",
+    "stl.type": "STL: тип ACCU1 и операнда",
+    "stl.mode_b": "STL: слово состояния, TAK/PUSH/POP (режим B)",
+    "stl.addr_register": "STL: адресные регистры",
+    "stl.db_register": "STL: регистры DB",
+    "stl.db_offset": "STL: доступ к DB по смещению",
+    "stl.mcr": "STL: MCR",
+    "stl.loop": "STL: LOOP",
+    "stl.jump_list": "STL: JL",
+    "stl.round": "STL: RND",
+    "stl.convert": "STL: преобразования",
+    "stl.word_logic": "STL: логика слов",
+    "stl.shift": "STL: сдвиги",
+    "stl.rlo_unknown": "STL: RLO не определён",
+    "stl.accu_unknown": "STL: ACCU не определён",
+    "stl.operand": "STL: инструкция без операнда",
+    "stl.bracket": "STL: скобки",
+    "stl.bracket_depth": "STL: глубина скобок",
+    "stl.unknown": "STL: неизвестный токен",
+    "s5.timer": "S5: таймер",
+    "s5.counter": "S5: счётчик",
+    "xml.profile_mismatch": "XML: профиль CPU не совпадает с MemoryLayout",
+    "xml.unit_unsupported": "XML: сеть на неподдерживаемом языке",
+    "func.s7compat_eno": "ENO арифметики S7 (S7Compat)",
+}
+RULE_TITLES.update(LANG_RULE_TITLES)
+RULE_TITLES.update({k.replace("lad.", "fbd.", 1): v.replace("LAD:", "FBD:", 1) for k, v in LANG_RULE_TITLES.items()})
+
+
+def has_languages(result: ConversionResult) -> bool:
+    """Во входе есть SimaticML/AWL (понижённые языки S7)."""
+    return any(f.lowering is not None for f in result.files)
+
+
+def _lang_units(result: ConversionResult) -> list[LangUnit]:
+    return [u for f in result.files if f.lowering is not None for u in f.lowering.units]
+
+
+def _block_langs(result: ConversionResult) -> dict[str, str]:
+    langs: dict[str, str] = {}
+    for f in result.files:
+        if f.lowering is None:
+            for _kind, name, _st in f.blocks:
+                langs.setdefault(name.lower(), "SCL")
+            continue
+        langs.update(f.lowering.langs)
+    return langs
+
+
+def language_rows(result: ConversionResult) -> list[tuple[str, str, int, dict[str, int]]]:
+    """(язык, вид единицы, блоков, {статус: число}) — единица учёта по M8: элемент и сеть, инструкция, шаг."""
+    units = _lang_units(result)
+    blocks: dict[str, set[str]] = {}
+    for u in units:
+        blocks.setdefault(u.lang, set()).add(u.block)
+    rows: list[tuple[str, str, int, dict[str, int]]] = []
+    for lang in sorted({u.lang for u in units}, key=lambda x: (LANG_ORDER.index(x) if x in LANG_ORDER else 99, x)):
+        for kind in UNIT_KINDS:
+            subset = [u for u in units if u.lang == lang and u.kind == kind]
+            if subset:
+                counts = {s: sum(1 for u in subset if u.status == s) for s in UNIT_STATUSES}
+                rows.append((lang, kind, len(blocks[lang]), counts))
+    return rows
+
+
+def language_section(result: ConversionResult) -> list[str]:
+    if not has_languages(result):
+        return []
+    out = [
+        "",
+        "## По языкам",
+        "",
+        "Единица учёта языка: LAD/FBD — элемент и сеть, STL — инструкция, GRAPH — шаг (ниже — независимо от",
+        "конструкций ST выше). Статус единицы — тяжелейший из её правил: **авто**, **проверка**",
+        "(`MIGRATION-CHECK`), **нет** (`MIGRATION-TODO`), **невозможно** (аналога в CODESYS нет).",
+        "",
+        "| Язык | Единица | Блоков | Всего | Авто | Проверка | Нет | Невозможно |",
+        "|---|---|---:|---:|---:|---:|---:|---:|",
+    ]
+    for lang, kind, nblocks, counts in language_rows(result):
+        total = sum(counts.values())
+        out.append(
+            f"| {lang} | {UNIT_KINDS[kind]} | {nblocks} | {total} | {counts[AUTO]} | {counts[CHECK]} | "
+            f"{counts[TODO]} | {counts['impossible']} |"
+        )
+    out += ["", "### Блоки: язык, стратегия, переходы STL", ""]
+    out += ["| Блок | Язык | Стратегия | Профиль и переходы STL | Источник |", "|---|---|---|---|---|"]
+    opts = result.options
+    for f in result.files:
+        if f.lowering is None:
+            continue
+        for _kind, name, _st in f.blocks:
+            key = name.lower()
+            lang = f.lowering.langs.get(key, "SCL")
+            strategy = f.lowering.strategies.get(key, "st")
+            stl = "—"
+            if lang == "STL":
+                pc = any(u.rule == "stl.jump_pc" for u in f.lowering.units if u.block.lower() == key)
+                cpu = opts.cpu or "по MemoryLayout"
+                stl = f"{cpu}; переходы: {'pc' if pc or opts.stl_jumps == 'pc' else 'structured'}"
+            out.append(f"| `{_md(name)}` | {lang} | `{strategy}` | {stl} | `{_md(f.path)}` |")
+    counter: Counter[str] = Counter()
+    statuses: dict[str, str] = {}
+    for u in _lang_units(result):
+        if u.status != AUTO:
+            counter[u.rule] += 1
+            statuses[u.rule] = u.status
+    out += ["", "### Правила языков: проверка и ручная работа", ""]
+    if not counter:
+        out += ["Нет: все единицы переведены автоматически.", ""]
+        return out
+    out += ["| Правило | Что | Статус | Единиц |", "|---|---|---|---:|"]
+    for rule, count in sorted(counter.items(), key=lambda x: (-x[1], x[0])):
+        title = RULE_TITLES.get(rule, rule)
+        out.append(f"| `{rule}` | {_md(title)} | {UNIT_STATUS_LABEL.get(statuses[rule], statuses[rule])} | {count} |")
+    out.append("")
+    return out
+
+
+def language_html(result: ConversionResult) -> str:
+    """Карточка «По языкам» для HTML-отчёта."""
+    if not has_languages(result):
+        return ""
+    parts = ['<section class="card">', "<h2>По языкам S7</h2>"]
+    parts.append(
+        '<p class="hint">Единица учёта: LAD/FBD — элемент и сеть, STL — инструкция. Статус — тяжелейший из '
+        "правил единицы.</p>"
+    )
+    parts.append('<div class="scroll"><table><thead><tr><th>Язык</th><th>Единица</th><th class="num">Блоков</th>')
+    parts.append('<th class="num">Всего</th><th class="barcell">Статус</th>')
+    parts.append(
+        f'<th class="num">{STATUS_ICON[AUTO]}</th><th class="num">{STATUS_ICON[CHECK]}</th>'
+        f'<th class="num">{STATUS_ICON[TODO]}</th></tr></thead><tbody>'
+    )
+    for lang, kind, nblocks, counts in language_rows(result):
+        t = Totals(counts[AUTO], counts[CHECK], counts[TODO] + counts["impossible"])
+        parts.append(
+            f"<tr><td><strong>{_e(lang)}</strong></td><td>{_e(UNIT_KINDS[kind])}</td>"
+            f'<td class="num">{nblocks}</td><td class="num">{t.total}</td>'
+            f'<td class="barcell">{_bar(t, f"{lang} {kind}")}</td><td class="num">{t.auto}</td>'
+            f'<td class="num">{t.check}</td><td class="num">{t.todo}</td></tr>'
+        )
+    parts.append("</tbody></table></div>")
+    parts.append(_legend())
+    parts.append("</section>")
+    return "".join(parts)
+
+
+# ---------------------------------------------------------------------------
 # Markdown
 # ---------------------------------------------------------------------------
 
@@ -217,6 +416,7 @@ def render_markdown(
     inputs: Sequence[str],
     command: str = "s7conv report",
     tasks_target: str = "`tasks.json` рядом с раскладкой",
+    title: str = "Отчёт конвертации SCL → ST CODESYS",
 ) -> str:
     """Отчёт Markdown; command — команда пересоздания, tasks_target — куда записаны задачи."""
     items = all_items(result)
@@ -224,7 +424,7 @@ def render_markdown(
     files = [f for f in result.files if f.items]
     blocks = sum(1 for i in items if i.category == "block")
     out: list[str] = [
-        "# Отчёт конвертации SCL → ST CODESYS",
+        f"# {title}",
         "",
         f"Сгенерирован `s7conv {__version__}` — не редактировать вручную, пересоздаётся командой",
         f"`{command}` (см. README). Вход: " + ", ".join(f"`{_md(p)}`" for p in inputs) + ".",
@@ -240,7 +440,8 @@ def render_markdown(
         "",
         "| Показатель | Значение |",
         "|---|---:|",
-        f"| Файлов SCL | {sum(1 for f in result.files if not f.path.startswith('('))} |",
+        f"| {'Файлов' if has_languages(result) else 'Файлов SCL'} | "
+        f"{sum(1 for f in result.files if not f.path.startswith('('))} |",
         f"| Блоков S7 | {blocks} |",
         f"| Конструкций | {tot.total} |",
         f"| Автоматически | {tot.auto} ({_pct(tot.pct(tot.auto))}) |",
@@ -271,6 +472,7 @@ def render_markdown(
     out.append(
         f"| **Итого** | {blocks} | {tot.total} | {tot.auto} | {tot.check} | {tot.todo} | {_pct(tot.pct(tot.auto))} |"
     )
+    out += language_section(result)
     out += ["", "## Задачи CODESYS (из OB)", ""]
     if result.tasks:
         out += [
@@ -321,9 +523,10 @@ def render_markdown(
         if not notes:
             out += ["Пометок нет.", ""]
             continue
-        out += ["| Строка | Статус | Блок | Правило | Причина |", "|---:|---|---|---|---|"]
+        where = "Место" if f.lowering is not None else "Строка"
+        out += [f"| {where} | Статус | Блок | Правило | Причина |", "|---:|---|---|---|---|"]
         for n in notes:
-            line = str(n.line) if n.line else "—"
+            line = f.where(n.line)
             out.append(
                 f"| {line} | {STATUS_ICON[n.severity]} {STATUS_LABEL[n.severity]} | {_md(n.block) or '—'} | "
                 f"`{n.rule}` | {_md(n.message)} |"
@@ -581,14 +784,15 @@ def render_html(result: ConversionResult, inputs: Sequence[str]) -> str:
     a("<head>")
     a('<meta charset="utf-8">')
     a('<meta name="viewport" content="width=device-width, initial-scale=1">')
-    a("<title>Отчёт конвертации SCL</title>")
+    lang_title = "S7" if has_languages(result) else "SCL"
+    a(f"<title>Отчёт конвертации {lang_title}</title>")
     a(f"<style>{_CSS}</style>")
     a("</head>")
     a("<body>")
     a('<div class="wrap">')
     a('<header class="top"><div>')
     a('<p class="eyebrow">Миграция Siemens S7 → CODESYS V3.5</p>')
-    a("<h1>Отчёт конвертации SCL → ST</h1>")
+    a(f"<h1>Отчёт конвертации {lang_title} → ST</h1>")
     a(
         '<p class="sub">Сколько конструкций переведено автоматически, сколько требует проверки '
         "и что не поддерживается — по каждому файлу.</p>"
@@ -628,6 +832,7 @@ def render_html(result: ConversionResult, inputs: Sequence[str]) -> str:
     )
     a("</section>")
 
+    a(language_html(result))
     # общая полоса и разрез по видам
     a('<section class="card">')
     a("<h2>Все конструкции</h2>")

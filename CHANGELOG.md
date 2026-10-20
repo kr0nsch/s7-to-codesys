@@ -36,6 +36,16 @@
   `FC_ClampPctLad`, `DB_Process` (стандартный доступ, смещения), `UDT_Valve`.
 - S7Compat: `F_S7EnoAddInt` … `F_S7EnoMulDint` — ENO арифметики S7 (EN AND NOT переполнение) и набор
   `FB_F_S7Eno_Test`.
+- `build-corpus` собирает и корпус всех языков: ST — в `src/{DUTs,GVLs,POUs}/Lang/Converted/` (папка
+  проекта `Lang/Converted`, генерируемые GVL с суффиксом `_Lang`; корпус SCL 1.0.0 в `src/*/Converted/` не
+  меняется), отчёт `docs/CONVERSION_REPORT_LANG.md` с разделом «По языкам» (элементы и сети LAD/FBD,
+  инструкции STL), тесты сценариев — `tests/POUs/ScenariosLang/`, экземпляры наборов — в
+  `tests/GVLs/ScenariosLang/GVL_ScenarioTestsLang` (`PRG_Tests` корпуса SCL не меняется). Сборка проверяет,
+  что имена объектов и членов GVL двух корпусов не совпадают (CODESYS — плоское пространство имён, RuSTy — E004).
+- Сценарии `scenarios/lang/`: `FB_Starter.csv` (9 сценариев, 47 вызовов) проверяет все четыре перевода
+  пускателя через `aliases.json`, `FB_PumpInterlockLad.csv` (5 сценариев, 25 вызовов); модели —
+  `scenarios/lang/reference/`, контрольные точки посчитаны вручную. Мутация «S7 SR → одноимённый SR CODESYS»
+  роняет сценарий `StartAndStopTogether`.
 
 - `docs/USAGE.md` — перенос своей программы S7 по шагам: выгрузка из TIA Portal и форматы входных файлов
   (таблица тегов, `ob_config.json`), `check`, `report`, `convert` и его ключи, разбор пометок

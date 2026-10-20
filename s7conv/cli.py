@@ -333,12 +333,20 @@ def cmd_build_corpus(args: argparse.Namespace) -> int:
             state = "репозиторий совпадает с результатом"
         else:
             state = f"записано файлов {len(diff.changed) + len(diff.missing)}, удалено {len(diff.stale)}"
-        print(f"s7conv build-corpus: {state}; файлов результата {len(built.files)}")
+        print(f"s7conv build-corpus: {state}; файлов результата {len(built.all_files)}")
         print(f"s7conv build-corpus: {_summary(built.result)}")
         print(
             f"s7conv build-corpus: тесты сценариев — наборов {len(built.tests.suites)}, тестов {tests}, "
             f"проверок {asserts}; рукописных наборов в PRG_Tests {len(built.tests.hand_written)}"
         )
+        if built.lang_result is not None:
+            print(f"s7conv build-corpus: корпус всех языков (samples/lang): {_summary(built.lang_result)}")
+        if built.lang_tests is not None:
+            lt = built.lang_tests
+            print(
+                f"s7conv build-corpus: тесты сценариев всех языков — наборов {len(lt.suites)}, "
+                f"тестов {sum(s.tests for s in lt.suites)}, проверок {sum(s.asserts for s in lt.suites)}"
+            )
     return EXIT_OK
 
 

@@ -43,6 +43,16 @@ COMPAT_SUITES = [
 ]
 
 
+# Наборы корпуса всех языков (tests/POUs/ScenariosLang): один CSV FB_Starter — четыре перевода
+LANG_SUITES = [
+    "FB_StarterLad_ScenarioTest",
+    "FB_StarterFbd_ScenarioTest",
+    "FB_StarterStl_ScenarioTest",
+    "FB_StarterScl_ScenarioTest",
+    "FB_PumpInterlockLad_ScenarioTest",
+]
+
+
 @pytest.fixture(scope="module")
 def objects() -> list[L.StObject]:
     return list(L.scan(str(REPO_ROOT), "src").objects) + list(L.scan(str(REPO_ROOT), "tests").objects)
@@ -138,3 +148,27 @@ def test_mutated_logic_is_caught(objects: list[L.StObject], block: str, old: str
     """Мутация логики (в том числе порога таймера: >= → >) роняет тесты сценариев."""
     out = Sim(_replace(objects, block, None, old, new)).run_suite(suite)
     assert out.failures
+
+
+@pytest.mark.parametrize("suite", LANG_SUITES)
+def test_language_corpus_suites_pass_in_simulation(objects: list[L.StObject], suite: str) -> None:
+    """Сконвертированные LAD, FBD, STL и SCL из SimaticML проходят сценарии scenarios/lang."""
+    out = Sim(objects, f_trig=F_TRIG_S7).run_suite(suite, cycles=3)
+    assert out.failures == {}, out.failures
+    assert out.finished == set(out.registered) == set(_methods(objects, suite))
+
+
+def test_old_flipflop_mapping_breaks_starter_scenario(objects: list[L.StObject]) -> None:
+    """Мутация «S7 SR → одноимённый SR CODESYS» в LAD (бит-операнд, порядок R раньше S) роняет сценарий
+    StartAndStopTogether: тесты сценариев ловят ошибку приоритета."""
+    mutated = copy.deepcopy(objects)
+    lad = next(o for o in mutated if o.name == "FB_StarterLad")
+    assert lad.impl is not None
+    head, sep, tail = lad.impl.partition("IF xStop OR NOT xInterlock OR xFault THEN")
+    assert sep, "в FB_StarterLad нет ожидаемого оператора R1"
+    reset_block = sep + tail.split("END_IF", 1)[0] + "END_IF"
+    rest = tail.split("END_IF", 1)[1]
+    set_start = head.rindex("IF xStart AND xInterlock THEN")
+    lad.impl = head[:set_start] + reset_block + "\n" + head[set_start:] + rest
+    out = Sim(mutated, f_trig=F_TRIG_S7).run_suite("FB_StarterLad_ScenarioTest", cycles=1)
+    assert "StartAndStopTogether" in out.failures

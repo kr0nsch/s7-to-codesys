@@ -1,0 +1,48 @@
+scenario,cycle,t_ms,in.xStart:BOOL,in.xStop:BOOL,in.xInterlock:BOOL,in.xFeedback:BOOL,in.tFeedbackTime:TIME,in.xReset:BOOL,out.xRun:BOOL,out.xFault:BOOL,out.iStarts:INT,boundary,comment
+StartStop,1,0,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,покой
+StartStop,2,100,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"Пуск: SR установлен, пуск №1"
+StartStop,3,200,FALSE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"кнопка отпущена, обратная связь: работает"
+StartStop,4,1000,FALSE,TRUE,TRUE,TRUE,T#2000MS,FALSE,FALSE,FALSE,1,FALSE,Стоп: SR сброшен
+StartStop,5,1100,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,1,FALSE,стоп отпущен: остаётся выключенным
+StartAndStopTogether,1,0,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,покой
+StartAndStopTogether,2,100,TRUE,TRUE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,S = R1 = 1: не включается
+StartAndStopTogether,3,200,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"Стоп отпущен, Пуск держится: включается, пуск №1"
+StartAndStopTogether,4,300,FALSE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,работает
+StartAndStopTogether,5,400,TRUE,TRUE,TRUE,TRUE,T#2000MS,FALSE,FALSE,FALSE,1,FALSE,в работе снова S = R1 = 1: выключается
+StartAndStopTogether,6,500,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,1,FALSE,выключен
+InterlockBlocksStart,1,0,FALSE,FALSE,FALSE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,блокировка
+InterlockBlocksStart,2,100,TRUE,FALSE,FALSE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,Пуск при блокировке: не включается
+InterlockBlocksStart,3,200,FALSE,FALSE,FALSE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,кнопка отпущена
+InterlockBlocksStart,4,300,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,блокировка снята: пуск не запомнен
+InterlockBlocksStart,5,400,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"новый Пуск: включается, пуск №1"
+InterlockDropStops,1,0,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"Пуск, пуск №1"
+InterlockDropStops,2,100,FALSE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,работает
+InterlockDropStops,3,500,FALSE,FALSE,FALSE,TRUE,T#2000MS,FALSE,FALSE,FALSE,1,FALSE,блокировка пропала: выключается
+InterlockDropStops,4,600,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,1,FALSE,блокировка вернулась: остаётся выключенным
+FeedbackOk,1,0,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,покой
+FeedbackOk,2,100,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"Пуск, таймер обратной связи с 0.1 с"
+FeedbackOk,3,1000,FALSE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,обратная связь через 0.9 с
+FeedbackOk,4,5000,FALSE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"работает, аварии нет"
+FeedbackTimeout,1,0,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,FALSE,0,FALSE,покой
+FeedbackTimeout,2,100,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"Пуск без обратной связи, таймер с 0.1 с"
+FeedbackTimeout,3,1900,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,1.8 с < 2 с: аварии нет
+FeedbackTimeout,4,2100,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,TRUE,1,TRUE,2.0 с = tFeedbackTime: авария; xRun ещё TRUE (сеть 1 раньше сети 3)
+FeedbackTimeout,5,2300,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,TRUE,1,FALSE,"R1 = xFault: насос выключен, авария держится"
+FeedbackTimeout,6,3000,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,TRUE,1,FALSE,авария держится (самоподхват)
+FaultResetAndBlock,1,0,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"Пуск без обратной связи, пуск №1"
+FaultResetAndBlock,2,100,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,ждём
+FaultResetAndBlock,3,2400,FALSE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,TRUE,1,FALSE,2.4 с: авария
+FaultResetAndBlock,4,2600,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,FALSE,TRUE,1,FALSE,Пуск при аварии: R1 = 1 главнее — не включается
+FaultResetAndBlock,5,2700,FALSE,FALSE,TRUE,FALSE,T#2000MS,TRUE,FALSE,FALSE,1,FALSE,сброс: авария снята
+FaultResetAndBlock,6,2800,TRUE,FALSE,TRUE,FALSE,T#2000MS,FALSE,TRUE,FALSE,2,FALSE,"Пуск: включается, пуск №2"
+FaultResetAndBlock,7,2900,FALSE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,2,FALSE,обратная связь: работает без аварии
+StartCounter,1,0,TRUE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,пуск №1
+StartCounter,2,100,TRUE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,Пуск держится: без нового счёта
+StartCounter,3,200,FALSE,TRUE,TRUE,TRUE,T#2000MS,FALSE,FALSE,FALSE,1,FALSE,стоп
+StartCounter,4,300,TRUE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,2,FALSE,пуск №2
+StartCounter,5,400,FALSE,TRUE,TRUE,TRUE,T#2000MS,FALSE,FALSE,FALSE,2,FALSE,стоп
+StartCounter,6,500,FALSE,FALSE,TRUE,TRUE,T#2000MS,FALSE,FALSE,FALSE,2,FALSE,покой: 2 пуска
+ResetWhileRunning,1,0,TRUE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,пуск №1
+ResetWhileRunning,2,100,FALSE,FALSE,TRUE,TRUE,T#2000MS,TRUE,TRUE,FALSE,1,FALSE,сброс в работе: без изменений
+ResetWhileRunning,3,200,TRUE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,"Пуск в работе: SR уже установлен, счёта нет"
+ResetWhileRunning,4,300,FALSE,FALSE,TRUE,TRUE,T#2000MS,FALSE,TRUE,FALSE,1,FALSE,работает
