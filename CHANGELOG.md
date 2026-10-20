@@ -39,9 +39,10 @@
 - `build-corpus` собирает и корпус всех языков: ST — в `src/{DUTs,GVLs,POUs}/Lang/Converted/` (папка
   проекта `Lang/Converted`, генерируемые GVL с суффиксом `_Lang`; корпус SCL 1.0.0 в `src/*/Converted/` не
   меняется), отчёт `docs/CONVERSION_REPORT_LANG.md` с разделом «По языкам» (элементы и сети LAD/FBD,
-  инструкции STL), тесты сценариев — `tests/POUs/ScenariosLang/`, экземпляры наборов — в
-  `tests/GVLs/ScenariosLang/GVL_ScenarioTestsLang` (`PRG_Tests` корпуса SCL не меняется). Сборка проверяет,
-  что имена объектов и членов GVL двух корпусов не совпадают (CODESYS — плоское пространство имён, RuSTy — E004).
+  инструкции STL), тесты сценариев — `tests/POUs/ScenariosLang/` (в `PRG_Tests` — после рукописных наборов).
+  Сборка проверяет, что имена объектов и членов GVL двух корпусов не совпадают (CODESYS — плоское
+  пространство имён, RuSTy — E004). Тест 1.0.0 `test_write_into_fresh_copy_then_check_is_clean` копирует в
+  свой мини-репозиторий и корпус `samples/lang`: без него `PRG_Tests` копии не совпал бы с репозиторием.
 - Сценарии `scenarios/lang/`: `FB_Starter.csv` (9 сценариев, 47 вызовов) проверяет все четыре перевода
   пускателя через `aliases.json`, `FB_PumpInterlockLad.csv` (5 сценариев, 25 вызовов); модели —
   `scenarios/lang/reference/`, контрольные точки посчитаны вручную. Мутация «S7 SR → одноимённый SR CODESYS»

@@ -18,6 +18,11 @@ VAR
     fbS7TpTest : FB_S7Tp_Test;  // рукописный набор
     fbStandardCounterTest : FB_StandardCounter_Test;  // рукописный набор
     fbStandardFlipFlopTest : FB_StandardFlipFlop_Test;  // рукописный набор
+    fbPumpInterlockLad_ScenarioTest : FB_PumpInterlockLad_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
+    fbStarterFbd_ScenarioTest : FB_StarterFbd_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
+    fbStarterLad_ScenarioTest : FB_StarterLad_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
+    fbStarterScl_ScenarioTest : FB_StarterScl_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
+    fbStarterStl_ScenarioTest : FB_StarterStl_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
     fbAlarmDelay_ScenarioTest : FB_AlarmDelay_ScenarioTest;  // сценарии CSV (сгенерировано)
     fbAnalogIn_ScenarioTest : FB_AnalogIn_ScenarioTest;  // сценарии CSV (сгенерировано)
     fbMotor_ScenarioTest : FB_Motor_ScenarioTest;  // сценарии CSV (сгенерировано)

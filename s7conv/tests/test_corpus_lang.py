@@ -67,18 +67,20 @@ def test_language_report_has_languages_section(built: C.CorpusBuild) -> None:
     assert "## По языкам" not in built.files[C.REPORT_REL]
 
 
-def test_language_scenario_suites_are_registered_in_gvl_not_prg_tests(built: C.CorpusBuild) -> None:
+def test_language_scenario_suites_are_in_own_folder_and_prg_tests(built: C.CorpusBuild) -> None:
+    """Наборы корпуса всех языков — в ScenariosLang; PRG_Tests объявляет их (иначе coUnit их не выполнит:
+    экземпляры в GVL, на которую не ссылается задача, в сборку CODESYS не попадают — проверено в Control Win)."""
     assert built.lang_tests is not None
     suites = sorted(s.obj.name for s in built.lang_tests.suites)
     assert suites == sorted(
         f"{b}{TG.SUITE_SUFFIX}"
         for b in ("FB_StarterLad", "FB_StarterFbd", "FB_StarterStl", "FB_StarterScl", "FB_PumpInterlockLad")
     )
-    gvl = built.lang_files[f"tests/GVLs/{TG.LANG_SCENARIO_FOLDER}/{TG.LANG_SUITES_GVL}.gvl.st"]
-    for name in suites:
-        assert f": {name};" in gvl
+    assert all(s.obj.folder == [TG.LANG_SCENARIO_FOLDER] for s in built.lang_tests.suites)
     prg = built.files["tests/POUs/PRG_Tests/PRG_Tests.decl.st"]
-    assert not any(name in prg for name in suites)
+    for name in suites:
+        assert f": {name};  // сценарии CSV всех языков (сгенерировано)" in prg
+    assert built.tests.hand_written and not set(suites) & set(built.tests.hand_written)
 
 
 def test_corpus_without_language_samples_ignores_lang_dirs(tmp_path: Path) -> None:

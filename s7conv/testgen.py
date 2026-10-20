@@ -44,9 +44,8 @@ from s7conv.nodes import BLOCK_FB
 AUTO_GENERATED = "AUTO-GENERATED — не редактировать"
 SUITE_SUFFIX = "_ScenarioTest"
 SCENARIO_FOLDER = "Scenarios"
-# Наборы сценариев корпуса всех языков: своя папка и регистрация в GVL (PRG_Tests 1.0.0 не меняется)
+# Наборы сценариев корпуса всех языков (samples/lang): своя папка; в PRG_Tests — после рукописных
 LANG_SCENARIO_FOLDER = "ScenariosLang"
-LANG_SUITES_GVL = "GVL_ScenarioTestsLang"
 PRG_TESTS = "PRG_Tests"
 CLOCK = "GVL_S7Clock"
 IND = "    "
@@ -513,22 +512,25 @@ def is_test_suite(obj: L.StObject) -> bool:
 def hand_written_suites(
     root: Path, subdir: str = "tests", exclude_folder: str = SCENARIO_FOLDER
 ) -> list[tuple[list[str], str]]:
-    """Рукописные наборы тестов в root/subdir (кроме папок сгенерированных): [(папки, имя)]."""
+    """Наборы тестов в root/subdir вне папки сценариев корпуса SCL: [(папки, имя)].
+
+    Сюда попадают рукописные наборы и наборы корпуса всех языков (папка ScenariosLang) — generate()
+    разделяет их по папке.
+    """
     if not (root / subdir).is_dir():
         return []
     scan = L.scan(str(root), subdir)
-    generated = {exclude_folder, LANG_SCENARIO_FOLDER}
     found = [
         (list(o.folder), o.name)
         for o in scan.objects
-        if is_test_suite(o) and (not o.folder or o.folder[0] not in generated)
+        if is_test_suite(o) and (not o.folder or o.folder[0] != exclude_folder)
     ]
     return sorted(found, key=lambda x: ([f.lower() for f in x[0]], x[1].lower()))
 
 
-def generate_prg_tests(generated: Sequence[str], hand_written: Sequence[str]) -> L.StObject:
+def generate_prg_tests(generated: Sequence[str], hand_written: Sequence[str], lang: Sequence[str] = ()) -> L.StObject:
     """PRG_Tests: экземпляры всех наборов (объявление регистрирует набор в coUnit) и coUnit.RUN()."""
-    suites = [*hand_written, *generated]
+    suites = [*hand_written, *lang, *generated]
     decl = [
         f"// {AUTO_GENERATED}: s7conv gen-tests — список наборов собирается из tests/ (рукописные наборы",
         "//             EXTENDS coUnit.FB_TestSuite) и сценариев scenarios/*.csv; новый набор — пересоздать.",
@@ -542,6 +544,7 @@ def generate_prg_tests(generated: Sequence[str], hand_written: Sequence[str]) ->
         "VAR",
     ]
     kinds = dict.fromkeys(hand_written, "рукописный набор")
+    kinds.update(dict.fromkeys(lang, "сценарии CSV всех языков (сгенерировано)"))
     kinds.update(dict.fromkeys(generated, "сценарии CSV (сгенерировано)"))
     for suite in suites:
         decl.append(f"{IND}{instance_name(suite)} : {suite};  // {kinds[suite]}")
@@ -636,70 +639,54 @@ def aliased(files: list[ScenarioFile], aliases: dict[str, list[str]]) -> list[Sc
     return out
 
 
-def generate(scenario_dir: Path, result: ConversionResult, tests_root: Path, subdir: str, base: Path) -> TestsBuild:
+def generate(
+    scenario_dir: Path,
+    result: ConversionResult,
+    tests_root: Path,
+    subdir: str,
+    base: Path,
+    lang_suites: Sequence[str] | None = None,
+) -> TestsBuild:
     """Наборы по всем CSV каталога и PRG_Tests (рукописные наборы — из tests_root/subdir).
 
     base — корень для путей CSV в шапках; объекты получают subdir (раскладка tests_root/subdir).
+    lang_suites — имена наборов корпуса всех языков для PRG_Tests: build-corpus строит их сам, а без
+    параметра (gen-tests) они берутся с диска, из папки ScenariosLang.
     """
     source = ScenarioSource(scenario_dir, result, load_aliases(scenario_dir))
-    return generate_sources([source], tests_root, subdir, base)
-
-
-def generate_lang(source: ScenarioSource, subdir: str, base: Path) -> TestsBuild:
-    """Наборы сценариев корпуса всех языков: папка ScenariosLang и GVL с экземплярами наборов.
-
-    Экземпляр набора в GVL регистрирует его в coUnit так же, как объявление в PRG_Tests (FB_init), и
-    раннер coUnit выполняет все зарегистрированные наборы: PRG_Tests корпуса SCL при этом не меняется.
-    """
-    suites = [
-        generate_suite(sf, source.result) for sf in aliased(scenario_files(source.scenario_dir, base), source.aliases)
-    ]
+    suites = [generate_suite(sf, result) for sf in aliased(scenario_files(scenario_dir, base), source.aliases)]
     for s in suites:
         s.obj.subdir = subdir
-        s.obj.folder = [LANG_SCENARIO_FOLDER]
-    lines = [
-        f"// {AUTO_GENERATED}: s7conv build-corpus, сценарии {source.scenario_dir.name}/ корпуса всех языков",
-        "// Назначение: экземпляры наборов сценариев корпуса всех языков (samples/lang). Объявление",
-        "//             экземпляра регистрирует набор в coUnit; раннер coUnit.RUN() в PRG_Tests выполняет все",
-        "//             зарегистрированные наборы. Только для тестового приложения (CODESYS Control Win).",
-        f"// Автор:      s7conv {__version__} (сгенерировано)",
-        "// Версия:     не указана",
-        "// Документ:   scenarios/lang/README.md, docs/TEST_REPORT.md",
-        "{attribute 'qualified_only'}",
-        "VAR_GLOBAL",
-    ]
-    for s in suites:
-        lines.append(f"{IND}{instance_name(s.obj.name)} : {s.obj.name};  // сценарии CSV (сгенерировано)")
-    lines.append("END_VAR")
-    gvl = L.StObject(L.KIND_GVL, LANG_SUITES_GVL, "\n".join(lines) + "\n", folder=[LANG_SCENARIO_FOLDER])
-    gvl.subdir = subdir
-    _check_widths(gvl)
-    return TestsBuild([*(s.obj for s in suites), gvl], suites, [])
-
-
-def generate_sources(sources: Sequence[ScenarioSource], tests_root: Path, subdir: str, base: Path) -> TestsBuild:
-    """Наборы по нескольким каталогам сценариев (корпус SCL и корпус всех языков) и общий PRG_Tests."""
-    suites = [
-        generate_suite(sf, src.result)
-        for src in sources
-        for sf in aliased(scenario_files(src.scenario_dir, base), src.aliases)
-    ]
-    for s in suites:
-        s.obj.subdir = subdir
-    hand = [name for _folders, name in hand_written_suites(tests_root, subdir)]
+    found = hand_written_suites(tests_root, subdir)
+    hand = [name for folders, name in found if not folders or folders[0] != LANG_SCENARIO_FOLDER]
+    if lang_suites is None:
+        lang = sorted(
+            (name for folders, name in found if folders and folders[0] == LANG_SCENARIO_FOLDER), key=str.lower
+        )
+    else:
+        lang = sorted(lang_suites, key=str.lower)
     generated = [s.obj.name for s in suites]
     clash = sorted(set(hand) & set(generated))
     if clash:
         raise ScenarioError(f"рукописный набор с именем сгенерированного: {', '.join(clash)}")
-    prg = generate_prg_tests(generated, hand)
+    prg = generate_prg_tests(generated, hand, lang)
     prg.subdir = subdir
     return TestsBuild([*(s.obj for s in suites), prg], suites, hand)
+
+
+def generate_lang(source: ScenarioSource, subdir: str, base: Path) -> TestsBuild:
+    """Наборы сценариев корпуса всех языков (папка ScenariosLang); в PRG_Tests их добавляет generate()."""
+    files = aliased(scenario_files(source.scenario_dir, base), source.aliases)
+    suites = [generate_suite(sf, source.result) for sf in files]
+    for s in suites:
+        s.obj.subdir = subdir
+        s.obj.folder = [LANG_SCENARIO_FOLDER]
+    return TestsBuild([s.obj for s in suites], suites, [])
 
 
 __all__ = [
     "AUTO_GENERATED",
     "LANG_SCENARIO_FOLDER",
-    "LANG_SUITES_GVL",
     "PRG_TESTS",
     "SCENARIO_FOLDER",
     "Column",
@@ -713,7 +700,6 @@ __all__ = [
     "generate",
     "generate_lang",
     "generate_prg_tests",
-    "generate_sources",
     "generate_suite",
     "hand_written_suites",
     "instance_name",

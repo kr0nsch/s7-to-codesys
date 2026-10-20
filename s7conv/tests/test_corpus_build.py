@@ -110,7 +110,7 @@ def test_update_config_tasks_errors() -> None:
 def _mini_repo(tmp: Path) -> Path:
     """Копия того, что нужно сборке: корпус, сценарии, рукописные src/ и tests/, config.json."""
     root = tmp / "repo"
-    for rel in ("samples/scl", "scenarios"):
+    for rel in ("samples/scl", "samples/lang", "scenarios"):
         shutil.copytree(REPO_ROOT / rel, root / rel, ignore=shutil.ignore_patterns("__pycache__", "reference"))
     shutil.copytree(REPO_ROOT / "src", root / "src", ignore=shutil.ignore_patterns(C.FOLDER))
     shutil.copytree(REPO_ROOT / "tests" / "POUs" / "S7Compat", root / "tests" / "POUs" / "S7Compat")

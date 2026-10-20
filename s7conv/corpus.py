@@ -61,7 +61,6 @@ MANAGED_DIRS = (
 LANG_MANAGED_DIRS = (
     *(f"src/{cat}/{LANG_FOLDER}" for cat in L.CATEGORIES),
     f"tests/POUs/{TG.LANG_SCENARIO_FOLDER}",
-    f"tests/GVLs/{TG.LANG_SCENARIO_FOLDER}",
 )
 
 
@@ -259,13 +258,13 @@ def build(root: Path = REPO_ROOT) -> CorpusBuild:
         files[CONFIG_REL] = update_config_tasks(config_path.read_text(encoding="utf-8"), config_tasks(result))
     else:
         warnings.append(f"{CONFIG_REL} нет — задачи только в отчёте ({REPORT_REL})")
-    tests = TG.generate(root / SCENARIOS_REL, result, root, "tests", root)
-    files.update(_object_files(tests.objects, "tests"))
     html = R.render_html(result, [CORPUS_REL])
-    built = CorpusBuild(files=files, result=result, tests=tests, html=html, warnings=warnings)
-    lang = root / LANG_CORPUS_REL
-    if lang.is_dir():
+    built = CorpusBuild(files=files, result=result, tests=TG.TestsBuild([], [], []), html=html, warnings=warnings)
+    if (root / LANG_CORPUS_REL).is_dir():
         _build_lang(root, built)
+    lang_suites = [s.obj.name for s in built.lang_tests.suites] if built.lang_tests is not None else []
+    built.tests = TG.generate(root / SCENARIOS_REL, result, root, "tests", root, lang_suites)
+    files.update(_object_files(built.tests.objects, "tests"))
     check_names_unique(root, built)
     return built
 
