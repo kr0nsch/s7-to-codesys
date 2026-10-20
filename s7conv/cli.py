@@ -199,6 +199,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     gen.add_argument("--check", action="store_true", help="ничего не писать: код 1, если файлы устарели")
     gen.add_argument("-q", "--quiet", action="store_true", help="без итоговой сводки")
+    ir = sub.add_parser(
+        "ir",
+        help="промежуточное представление SimaticML (NetIR, StlIR) с трассой до сети, UId и строки",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ir.add_argument("inputs", nargs="+", metavar="XML", help="файлы SimaticML *.xml или каталоги")
+    ir.add_argument("--format", choices=("json",), default="json", help="формат вывода (json)")
+    ir.add_argument("--out", metavar="ФАЙЛ", help="записать в файл (по умолчанию — в stdout)")
+
+    eq = sub.add_parser(
+        "equiv",
+        help="эталон S7 против интерпретатора ST на сконвертированном коде (сценарии и случайные входы)",
+        epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    eq.add_argument("inputs", nargs="+", metavar="ВХОД", help="SimaticML *.xml или каталоги")
+    eq.add_argument("--scenarios", metavar="КАТАЛОГ", help="сценарии CSV (и aliases.json) — например, scenarios/lang")
+    eq.add_argument("--random", type=int, default=0, metavar="N", help="число случайных вызовов на блок")
+    eq.add_argument("--seed", type=int, default=20261019, metavar="S", help="зерно случайных входов (20261019)")
+    eq.add_argument("--cpu", choices=("s7-300", "s7-1500"), default=None, help="профиль STL (по умолчанию — по XML)")
+    eq.add_argument("--stl-jumps", choices=("structured", "pc"), default="structured", help="переходы STL")
+    eq.add_argument("-q", "--quiet", action="store_true", help="только расхождения")
     return parser
 
 
@@ -383,6 +406,48 @@ def cmd_gen_tests(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_ir(args: argparse.Namespace) -> int:
+    from s7conv import irdump
+
+    paths: list[Path] = []
+    for raw in args.inputs:
+        path = Path(raw)
+        if path.is_dir():
+            paths.extend(sorted(path.glob("*.xml")))
+        elif path.is_file():
+            paths.append(path)
+        else:
+            raise P.InputError(f"{raw}: файл или каталог не найден")
+    text = irdump.dump_json(paths)
+    if args.out:
+        _write(args.out, text)
+    else:
+        sys.stdout.write(text)
+    return EXIT_OK
+
+
+def cmd_equiv(args: argparse.Namespace) -> int:
+    from s7conv import equiv as E
+
+    scenarios = Path(args.scenarios) if args.scenarios else None
+    report = E.run_equiv(args.inputs, scenarios, args.random, args.seed, args.cpu, args.stl_jumps)
+    for b in report.blocks:
+        if b.divergence is not None:
+            print(f"s7conv equiv: РАСХОЖДЕНИЕ {b.divergence.format()}")
+        elif not args.quiet:
+            if b.skipped:
+                print(f"s7conv equiv: {b.block} ({b.lang}): пропущен — {b.skipped}")
+            else:
+                print(
+                    f"s7conv equiv: {b.block} ({b.lang}, {b.reference}): вызовов по сценариям {b.scenario_calls}, "
+                    f"случайных {b.random_calls} — расхождений нет"
+                )
+    if not args.quiet:
+        state = "без расхождений" if report.ok else "есть расхождения"
+        print(f"s7conv equiv: блоков {len(report.blocks)}, {state}")
+    return EXIT_OK if report.ok else EXIT_THRESHOLD
+
+
 def configure_output() -> None:
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
@@ -404,6 +469,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "check": cmd_check,
         "build-corpus": cmd_build_corpus,
         "gen-tests": cmd_gen_tests,
+        "ir": cmd_ir,
+        "equiv": cmd_equiv,
     }
     try:
         return handlers[args.command](args)
