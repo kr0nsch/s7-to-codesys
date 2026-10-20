@@ -1,0 +1,74 @@
+{
+  "title": "Windows PowerShell",
+  "theme": "dark",
+  "prompt": "\u001b[90mPS \u001b[94ms7-to-codesys\u001b[0m> ",
+  "steps": [
+    {
+      "cmd": "python -m s7conv check samples/lang",
+      "events": [
+        [
+          0.506,
+          "stdout",
+          "s7conv check: файлов 8, блоков 8, без ошибок\r\n"
+        ]
+      ],
+      "exit_code": 0,
+      "duration": 0.533,
+      "pause": 1.2
+    },
+    {
+      "cmd": "python -m s7conv convert samples/lang --out build/lang --timers s7compat --emit-support --clean",
+      "events": [
+        [
+          0.614,
+          "stdout",
+          "s7conv: файлов SCL 0, SimaticML 8, записано 22 файлов в build/lang\r\ns7conv: конструкций 173: автоматически 164 (95 %), требуют проверки 9, не поддерживаются 0\r\n"
+        ]
+      ],
+      "exit_code": 0,
+      "duration": 0.638,
+      "pause": 1.2
+    },
+    {
+      "cmd": "python -m s7conv equiv samples/lang --scenarios scenarios/lang --random 500",
+      "events": [
+        [
+          2.852,
+          "stdout",
+          "s7conv equiv: FB_PumpInterlockLad (LAD, эталон LAD): вызовов по сценариям 25, случайных 500 — расхождений нет\r\ns7conv equiv: FB_StarterFbd (FBD, эталон FBD): вызовов по сценариям 47, случайных 500 — расхождений нет\r\ns7conv equiv: FB_StarterLad (LAD, эталон LAD): вызовов по сценариям 47, случайных 500 — расхождений нет\r\ns7conv equiv: FB_StarterScl (SCL, семейство FB_Starter: эталон FB_StarterLad (LAD)): вызовов по сценариям 47, случайных 500 — расхождений нет\r\ns7conv equiv: FB_StarterStl (STL, эталон STL): вызовов по сценариям 47, случайных 500 — расхождений нет\r\ns7conv equiv: блоков 5, без расхождений\r\n"
+        ]
+      ],
+      "exit_code": 0,
+      "duration": 2.875,
+      "pause": 1.2
+    },
+    {
+      "cmd": "python tools/codesys/cds.py test --clean",
+      "events": [
+        [
+          0.774,
+          "stdout",
+          "[cds] рантайм: PID 11908, работает 95.2 мин\r\n[cds] CODESYS CODESYS V3.5 SP17 Patch 3: run_tests.py (test) ...\r\n"
+        ],
+        [
+          65.57,
+          "stdout",
+          "[cds] результаты: ~\\work\\s7-to-codesys\\build\\test-results.json, JUnit: ~\\work\\s7-to-codesys\\build\\junit.xml\r\n[cds]   LIBRARY coUnit (CfUnit) 1.2.0.0 (co♻e - A unittest framework for CODESYS, 1.2.0.0 (www.co5e.org))\r\n[cds]   LIBRARY Standard (плейсхолдер, разрешает профиль CODESYS) (#Standard -> Standard, * (System))\r\n[cds] import: OK (создано 217, обновлено 0, удалено 0, перемещено 0, без изменений 0, 17.6 с)\r\n[cds] build: OK (ошибок 0, предупреждений 0, 1.4 с)\r\n[cds] test: OK (наборов 21, тестов 128, пройдено 128, упало 0, пропущено 0, 39.5 с)\r\n"
+        ]
+      ],
+      "exit_code": 0,
+      "duration": 65.592,
+      "pause": 1.2
+    }
+  ],
+  "meta": {
+    "captured_with": "term2gif.py capture",
+    "captured_at": "2026-10-20T03:44:06",
+    "shell": "powershell",
+    "cwd": "~\\work\\s7-to-codesys",
+    "columns_env": 100,
+    "host": "Windows-11-10.0.26300-SP0",
+    "mockup": false,
+    "home_redacted": true
+  }
+}
