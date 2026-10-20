@@ -249,6 +249,8 @@ LANG_RULE_TITLES = {
     "stl.bracket_depth": "STL: глубина скобок",
     "stl.unknown": "STL: неизвестный токен",
     "s5.timer": "S5: таймер",
+    "s5.timebase": "S5: пуск таймера — время и шкала по модели S7Compat",
+    "s5.address": "S5: операнд не таймер и не счётчик",
     "s5.counter": "S5: счётчик",
     "xml.profile_mismatch": "XML: профиль CPU не совпадает с MemoryLayout",
     "xml.unit_unsupported": "XML: сеть на неподдерживаемом языке",

@@ -45,6 +45,7 @@ _MODE_B = "stl.mode_b"
 _ADDR = "stl.addr_register"
 _DB = "stl.db_register"
 _S5 = "s5.timer"
+_S5T = "s5.timebase"
 _S5C = "s5.counter"
 _MCR = "stl.mcr"
 
@@ -96,15 +97,15 @@ TOKENS: dict[str, TokenRule] = {
     "OPEN_DB": _t(TODO, "stl.db_offset", "OPN DB — открыть DB (адресация по смещению)", "OPN", "AUF"),
     "OPEN_DI": _t(TODO, "stl.db_offset", "OPN DI", "OPN DI", "AUF DI"),
     # таймеры и счётчики S5
-    "Pulse": _t(TODO, _S5, "SP — импульс", "SP", "SI"),
-    "Extend": _t(TODO, _S5, "SE — продлённый импульс", "SE", "SV"),
-    "OnDelay": _t(TODO, _S5, "SD — задержка включения", "SD", "SE"),
-    "Retentive": _t(TODO, _S5, "SS — задержка включения с памятью", "SS"),
-    "OffDelay": _t(TODO, _S5, "SF — задержка выключения", "SF", "SA"),
-    "Free": _t(TODO, _S5, "FR — разрешение таймера/счётчика", "FR"),
-    "LC": _t(TODO, _S5, "LC — загрузить таймер/счётчик в BCD", "LC"),
-    "CU": _t(TODO, _S5C, "CU — счёт вверх", "CU", "ZV"),
-    "CD": _t(TODO, _S5C, "CD — счёт вниз", "CD", "ZR"),
+    "Pulse": _t(CHECK, _S5T, "SP — импульс (F_S5Pulse)", "SP", "SI"),
+    "Extend": _t(CHECK, _S5T, "SE — продлённый импульс (F_S5ExtPulse)", "SE", "SV"),
+    "OnDelay": _t(CHECK, _S5T, "SD — задержка включения (F_S5OnDelay)", "SD", "SE"),
+    "Retentive": _t(CHECK, _S5T, "SS — задержка включения с памятью (F_S5RetOnDelay)", "SS"),
+    "OffDelay": _t(CHECK, _S5T, "SF — задержка выключения (F_S5OffDelay)", "SF", "SA"),
+    "Free": _t(AUTO, _S5, "FR — разрешение таймера/счётчика (F_S5Enable, F_S5CounterEnable)", "FR"),
+    "LC": _t(AUTO, _S5, "LC — загрузить таймер/счётчик в BCD (F_S5Bcd, F_S5CounterBcd)", "LC"),
+    "CU": _t(AUTO, _S5C, "CU — счёт вверх (F_S5CountUp)", "CU", "ZV"),
+    "CD": _t(AUTO, _S5C, "CD — счёт вниз (F_S5CountDown)", "CD", "ZR"),
     # вызовы
     "CALL": _t(AUTO, "stl.call", "CALL блока или инструкции (TON/TOF/TP ...)", "CALL"),
     "CC": _t(AUTO, "stl.call", "CC — условный вызов FC без параметров", "CC"),

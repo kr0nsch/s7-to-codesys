@@ -7,6 +7,25 @@
 
 ## [Unreleased]
 
+### Added
+
+- Таймеры и счётчики S5 из STL S7-300/400: SP, SE, SD, SS, SF, FR, R, `A/L/LC T n`; CU, CD, S, R, FR,
+  `A/L/LC C n`. Слой S7Compat — структуры `ST_S5Timer`, `ST_S5Counter` и функции `F_S5*` с VAR_IN_OUT над
+  элементами генерируемых `GVL_S5Timers.aTimer[n]` / `GVL_S5Counters.aCounter[n]` (в S7 таймер — глобальный
+  объект CPU); время — `F_S7Now()`, остаток пересчитывается при обращении, `L T` — единицы шкалы (вверх),
+  `LC T` — BCD со шкалой, `F_S5TimeWord` — S5T# с выбором шкалы. Пуск таймера — `MIGRATION-CHECK`
+  `s5.timebase`. Наборы coUnit `FB_S5Timer_Test` (10 тестов) и `FB_S5Counter_Test` (5).
+- Эталон S5 `s7conv/semantics/s5.py` в машине STL и `equiv`; сверка эталона с awlsim 0.77.1 (внешнее средство,
+  GPL; в CI ставится отдельно, без него тест пропускается) на случайных последовательностях — совпадает.
+- Корпус: `FB_ConveyorStl` — конвейер на STL с пятью видами таймеров S5, FR и счётчиком; сценарии
+  `scenarios/lang/FB_ConveyorStl.csv` (7 сценариев, 58 вызовов) по описанию логики; генератор тестов
+  обнуляет глобальные слова S5 в начале каждого сценария.
+- `stsim`: VAR_IN_OUT функций по ссылке, присваивание структур копией, `SHL`/`SHR`.
+
+### Changed
+
+- Матрица токенов STL: SP, SE, SD, SS, SF — `check` (`s5.timebase`), FR, LC, CU, CD — `auto`.
+
 ## [1.1.0] - 2026-10-20
 
 Все языки S7, кроме GRAPH: блоки LAD, FBD и STL из экспорта SimaticML переводятся в тот же ST CODESYS,

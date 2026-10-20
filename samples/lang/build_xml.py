@@ -110,6 +110,14 @@ def access_xml(text: str, uid: int | None, ind: str) -> list[str]:
         return [f'{ind}<Access Scope="GlobalVariable"{u}><Symbol>{comps}</Symbol></Access>']
     if text.startswith("label:"):
         return [f'{ind}<Access Scope="Label"{u}><Label Name="{escape(text[6:])}" /></Access>']
+    s5 = re.fullmatch(r"%([TC])(\d+)", text)
+    if s5:
+        # таймер/счётчик S5 по адресу: номер — в BitOffset (docs/ASSUMPTIONS.md, запись L16)
+        area = "Timer" if s5.group(1) == "T" else "Counter"
+        return [
+            f'{ind}<Access Scope="Address"{u}><Address Area="{area}" Type="{area}" BitOffset="{s5.group(2)}" />'
+            "</Access>"
+        ]
     if _TYPED_RE.match(text):
         return [
             f'{ind}<Access Scope="TypedConstant"{u}><Constant><ConstantValue>{escape(text)}</ConstantValue>'

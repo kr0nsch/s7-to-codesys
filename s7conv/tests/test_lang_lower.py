@@ -544,3 +544,79 @@ def test_stl_dint_real_arithmetic_and_compare() -> None:
         "#dOut := #d1 MOD #d2;",
         "#q := #r1 >= #r2;",
     ]
+
+
+# ---------------------------------------------------------------------------
+# Таймеры и счётчики S5 (выпуск 1.2.0)
+# ---------------------------------------------------------------------------
+
+S5_MEMBERS = [*BOOLS, B.Member("i", "Int"), B.Member("w", "Word")]
+
+
+def test_stl_s5_timers_lower_to_s7compat_calls() -> None:
+    """Пуск, опрос, L/LC, FR, R таймера S5 → псевдовызовы S5_*; пуск — MIGRATION-CHECK s5.timebase."""
+    s = B.Stl("x")
+    s.op("A", "#a").op("L", "S5T#2S").op("OnDelay", "%T5").op("A", "%T5").op("Assign", "#q")
+    s.op("L", "%T5").op("T", "#i").op("LC", "%T5").op("T", "#w")
+    s.op("A", "#b").op("Free", "%T5").op("A", "#c").op("R", "%T5")
+    blk = stl_fb(s, members=S5_MEMBERS)
+    assert body(lower(blk)) == [
+        "S5_SD(T_NO := 5, RLO := #a, TV := T#2S);",
+        "#q := S5_Q(T_NO := 5);",
+        "#i := WORD_TO_INT(S5_BI(T_NO := 5));",
+        "#w := S5_BCD(T_NO := 5);",
+        "S5_FR(T_NO := 5, RLO := #b);",
+        "S5_R(T_NO := 5, RLO := #c);",
+    ]
+    assert {"s5.timebase"} <= lower_rules(blk)
+    st = st_body(blk, name="FB_S")
+    assert "F_S5OnDelay(stTimer := GVL_S5Timers.aTimer[5], xRlo := a, wS5Time := F_S5TimeWord(T#2S));" in st
+    assert "q := F_S5Q(stTimer := GVL_S5Timers.aTimer[5]);" in st
+
+
+def test_stl_s5_all_start_kinds_and_word_preset() -> None:
+    """SP, SE, SD, SS, SF; заданное время из слова передаётся как есть."""
+    s = B.Stl("x")
+    for kind, n in (("Pulse", 1), ("Extend", 2), ("OnDelay", 3), ("Retentive", 4), ("OffDelay", 5)):
+        s.op("A", "#a").op("L", "#w").op(kind, f"%T{n}")
+    blk = stl_fb(s, members=S5_MEMBERS)
+    names = [ln.split("(", 1)[0] for ln in body(lower(blk))]
+    assert names == ["S5_SP", "S5_SE", "S5_SD", "S5_SS", "S5_SF"]
+    st = st_body(blk, name="FB_S")
+    assert "F_S5OffDelay(stTimer := GVL_S5Timers.aTimer[5], xRlo := a, wS5Time := w);" in st
+
+
+def test_stl_s5_counters_lower_to_s7compat_calls() -> None:
+    s = B.Stl("x")
+    s.op("A", "#a").op("CU", "%C2").op("A", "#b").op("CD", "%C2")
+    s.op("A", "#c").op("L", "C#100").op("S", "%C2").op("A", "#q").op("R", "%C2")
+    s.op("A", "#m").op("Free", "%C2").op("A", "%C2").op("Assign", "#r").op("L", "%C2").op("T", "#i")
+    blk = stl_fb(s, members=S5_MEMBERS)
+    assert body(lower(blk)) == [
+        "S5_CU(C_NO := 2, RLO := #a);",
+        "S5_CD(C_NO := 2, RLO := #b);",
+        "S5_CS(C_NO := 2, RLO := #c, PV := W#16#0100);",
+        "S5_CR(C_NO := 2, RLO := #q);",
+        "S5_CFR(C_NO := 2, RLO := #m);",
+        "#r := S5_CQ(C_NO := 2);",
+        "#i := WORD_TO_INT(S5_CBI(C_NO := 2));",
+    ]
+    st = st_body(blk, name="FB_S")
+    assert "F_S5CounterSet(stCounter := GVL_S5Counters.aCounter[2], xRlo := c, wBcd := WORD#16#0100);" in st
+
+
+def test_stl_s5_read_before_write_is_frozen() -> None:
+    """Выражение, прочитавшее таймер до его пуска, вычисляется до пуска (временная)."""
+    s = B.Stl("x")
+    s.op("A", "%T1").op("A", "#a").op("L", "S5T#1S").op("Pulse", "%T1").op("Assign", "#q")
+    lines = body(lower(stl_fb(s, members=S5_MEMBERS)))
+    assert lines[0] == "#xRlo1_1 := S5_Q(T_NO := 1) AND #a;"
+    assert lines[1] == "S5_SP(T_NO := 1, RLO := #xRlo1_1, TV := T#1S);"
+    assert lines[2] == "#q := #xRlo1_1;"
+
+
+def test_stl_s5_start_without_preset_or_with_bad_operand_is_todo() -> None:
+    s = B.Stl("x").op("A", "#a").op("S", "%T3")
+    assert "s5.address" in lower_rules(stl_fb(s, members=S5_MEMBERS))
+    s = B.Stl("x").op("A", "#a").op("OnDelay", "%T3")
+    assert "stl.accu_unknown" in lower_rules(stl_fb(s, members=S5_MEMBERS))

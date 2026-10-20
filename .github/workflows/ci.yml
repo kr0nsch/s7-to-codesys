@@ -49,6 +49,11 @@ jobs:
       - name: Зависимости
         run: python -m pip install -r requirements-dev.txt
 
+      # awlsim (GPL-2.0+) — внешний эталон STL S7-300 для сверки моделей таймеров и счётчиков S5
+      # (s7conv/tests/test_s5_awlsim.py). В репозиторий и зависимости конвертера не входит; без него тест пропускается.
+      - name: awlsim для сверки S5
+        run: python -m pip install awlsim==0.77.1
+
       # До pytest: с переменной IEC_CHECKER интеграционные тесты идут с настоящим разборщиком,
       # в том числе проверка, что tools/check/iec_checker_allow.toml соответствует src/ и tests/.
       - name: Загрузка iec_checker ${{ env.IEC_CHECKER_VERSION }}

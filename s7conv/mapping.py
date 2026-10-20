@@ -186,6 +186,56 @@ SUPPORT_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     "FB_S7FTrig": (),
     # ENO арифметики S7 для LAD/FBD (lower/net_to_ast.py, правило lad.eno_error)
     **{f"F_S7Eno{op}{ty}": () for op in ("Add", "Sub", "Mul") for ty in ("Int", "Dint")},
+    # таймеры и счётчики S5 для STL (lower/stl_lift.py, правила s5.timebase, s5.timer, s5.counter)
+    "ST_S5Timer": (),
+    "ST_S5Counter": (),
+    "F_S5FromBcd": (),
+    "F_S5ToBcd": (),
+    "F_S5BaseMs": (),
+    "F_S5TimeWord": ("F_S5BaseMs", "F_S5ToBcd"),
+    "F_S5Start": ("ST_S5Timer", "F_S5FromBcd", "F_S5BaseMs", "F_S7Now"),
+    "F_S5Update": ("ST_S5Timer", "F_S7Now"),
+    **{
+        f"F_S5{kind}": ("F_S5Start", "F_S5Update")
+        for kind in ("Pulse", "ExtPulse", "OnDelay", "RetOnDelay", "OffDelay")
+    },
+    "F_S5Enable": ("ST_S5Timer",),
+    "F_S5Reset": ("ST_S5Timer",),
+    "F_S5Q": ("F_S5Update",),
+    "F_S5Bin": ("F_S5Update", "F_S5BaseMs"),
+    "F_S5Bcd": ("F_S5Bin", "F_S5ToBcd"),
+    **{f"F_S5{kind}": ("ST_S5Counter",) for kind in ("CountUp", "CountDown", "CounterReset", "CounterEnable")},
+    "F_S5CounterQ": ("ST_S5Counter",),
+    "F_S5CounterBin": ("ST_S5Counter",),
+    "F_S5CounterSet": ("ST_S5Counter", "F_S5FromBcd"),
+    "F_S5CounterBcd": ("ST_S5Counter", "F_S5ToBcd"),
+}
+
+# Псевдовызовы S5, которые вставляет понижение STL (lower/stl_lift.py): имя -> (функция S7Compat, тип
+# результата). Номер таймера (T_NO) или счётчика (C_NO) эмиттер заменяет элементом генерируемого GVL
+# GVL_S5Timers.aTimer[n] / GVL_S5Counters.aCounter[n]; RLO -> xRlo, TV -> wS5Time (TIME — через F_S5TimeWord),
+# PV -> wBcd.
+S5_TIMER_CALLS: dict[str, tuple[str, str]] = {
+    "S5_SP": ("F_S5Pulse", "BOOL"),
+    "S5_SE": ("F_S5ExtPulse", "BOOL"),
+    "S5_SD": ("F_S5OnDelay", "BOOL"),
+    "S5_SS": ("F_S5RetOnDelay", "BOOL"),
+    "S5_SF": ("F_S5OffDelay", "BOOL"),
+    "S5_FR": ("F_S5Enable", "BOOL"),
+    "S5_R": ("F_S5Reset", "BOOL"),
+    "S5_Q": ("F_S5Q", "BOOL"),
+    "S5_BI": ("F_S5Bin", "WORD"),
+    "S5_BCD": ("F_S5Bcd", "WORD"),
+}
+S5_COUNTER_CALLS: dict[str, tuple[str, str]] = {
+    "S5_CU": ("F_S5CountUp", "INT"),
+    "S5_CD": ("F_S5CountDown", "INT"),
+    "S5_CS": ("F_S5CounterSet", "INT"),
+    "S5_CR": ("F_S5CounterReset", "INT"),
+    "S5_CFR": ("F_S5CounterEnable", "INT"),
+    "S5_CQ": ("F_S5CounterQ", "BOOL"),
+    "S5_CBI": ("F_S5CounterBin", "WORD"),
+    "S5_CBCD": ("F_S5CounterBcd", "WORD"),
 }
 
 

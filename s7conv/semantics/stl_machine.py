@@ -10,7 +10,9 @@
 - +I/-I/*I//I: только ACCU1-L и ACCU2-L, ACCU1-H не меняется, ACCU2 не меняется (2 ACCU, §7.3); OV/OS при
   переполнении; +D/-D/*D//D/MOD — 32 бита; сравнения ==I … ставят RLO как первая проверка (CC0/CC1);
 - JC/JCN/JU — переходы к меткам; после JC/JCN: /FC := 0, RLO := 1 (§6.x);
-- CALL TON/TOF/TP — таймер IEC с экземпляром, параметры по операндам.
+- CALL TON/TOF/TP — таймер IEC с экземпляром, параметры по операндам;
+- таймеры S5 (SP, SE, SD, SS, SF, FR, R, A/L/LC T n) и счётчики S5 (CU, CD, S, R, FR, A/L/LC C n) — модели
+  semantics/s5.py; `L S5T#…` загружает слово S5TIME, `L C#n` — BCD.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ from dataclasses import dataclass, field
 
 from s7conv.frontends.simaticml import XBlock
 from s7conv.ir.stl import StlBlock, StlInstr, add_statement_list
+from s7conv.semantics.s5 import S5Counter, S5Timer, parse_s5time, s5time_word
 from s7conv.semantics.values import UNDEF, Memory, Timer, Value, type_key, wrap
 
 _WIDTH = {"BOOL": 1, "BYTE": 8, "CHAR": 8, "INT": 16, "WORD": 16, "DINT": 32, "DWORD": 32, "TIME": 32, "REAL": 32}
@@ -75,6 +78,8 @@ class StlEvaluator:
         self.writes: dict[str, str] = {}
         self.temps = [m.name.lower() for s in block.sections if s.name == "Temp" for m in s.members]
         self.m = Machine()
+        self.s5_timers: dict[int, S5Timer] = {}
+        self.s5_counters: dict[int, S5Counter] = {}
 
     # -- RLO ---------------------------------------------------------------------------
     def effective(self) -> Value:
@@ -110,6 +115,12 @@ class StlEvaluator:
 
     # -- аккумуляторы ---------------------------------------------------------------------
     def load_value(self, operand: str) -> int:
+        s5 = parse_s5time(operand)
+        if s5 is not None:
+            return s5time_word(s5)
+        up = operand.upper()
+        if up.startswith("C#") and up[2:].isdigit():
+            return int(up[2:], 16)  # C#123 — BCD 16#0123
         value = self.mem.read(operand)
         typ = type_key(self.mem.type_of(operand)) if operand.startswith("#") else ""
         if isinstance(value, bool):
@@ -191,10 +202,66 @@ class StlEvaluator:
         self.mem.write(operand, value)
         self.writes[operand.lstrip("#").lower()] = ins.trace
 
+    def s5_object(self, operand: str | None) -> S5Timer | S5Counter | None:
+        text = (operand or "").upper()
+        if len(text) > 2 and text[0] == "%" and text[1] in "TC" and text[2:].isdigit():
+            n = int(text[2:])
+            if text[1] == "T":
+                return self.s5_timers.setdefault(n, S5Timer())
+            return self.s5_counters.setdefault(n, S5Counter())
+        return None
+
+    def rlo_bool(self, ins: StlInstr) -> bool:
+        v = self.effective()
+        if v is UNDEF:
+            raise StlError(f"{ins.trace}: RLO не определён для таймера/счётчика S5")
+        return bool(v)
+
+    def step_s5(self, ins: StlInstr, obj: S5Timer | S5Counter, now: int) -> None:
+        t, m = ins.token, self.m
+        if t in ("A", "AN", "O", "ON", "X", "XN"):
+            self.logic(t, obj.read_q(now) if isinstance(obj, S5Timer) else obj.value != 0)
+            return
+        if t in ("L", "LC"):
+            if isinstance(obj, S5Timer):
+                value = obj.read_bin(now) if t == "L" else obj.read_bcd(now)
+            else:
+                value = obj.value if t == "L" else int(str(obj.value), 16)
+            m.accu2, m.accu1 = m.accu1, value
+            return
+        rlo = self.rlo_bool(ins)
+        kinds = {"Pulse": "SP", "Extend": "SE", "OnDelay": "SD", "Retentive": "SS", "OffDelay": "SF"}
+        if isinstance(obj, S5Timer):
+            if t in kinds:
+                obj.start(kinds[t], rlo, m.accu1 & 0xFFFF, now)
+            elif t == "Free":
+                obj.enable(rlo)
+            elif t == "R":
+                obj.reset(rlo)
+            else:
+                raise StlError(f"{ins.trace}: {t} с таймером эталоном не моделируется")
+        elif t == "CU":
+            obj.up(rlo)
+        elif t == "CD":
+            obj.down(rlo)
+        elif t == "S":
+            obj.set(rlo, m.accu1 & 0xFFFF)
+        elif t == "R":
+            obj.reset(rlo)
+        elif t == "Free":
+            obj.enable(rlo)
+        else:
+            raise StlError(f"{ins.trace}: {t} со счётчиком эталоном не моделируется")
+        self.finish(rlo)
+
     def step(self, ins: StlInstr, now: int) -> int | None:
         t = ins.token
         m = self.m
         if t in ("COMMENT", "EMPTY_LINE", "NOP_0", "NOP_1", "BLD"):
+            return None
+        s5 = self.s5_object(ins.operand)
+        if s5 is not None:
+            self.step_s5(ins, s5, now)
             return None
         if t in ("A", "AN", "O", "ON", "X", "XN"):
             if ins.operand is None:

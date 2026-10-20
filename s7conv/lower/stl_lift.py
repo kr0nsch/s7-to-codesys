@@ -11,7 +11,9 @@ RLO — выражение, ACCU1/ACCU2 — типизированные выр�
 
 Профиль S7-300 (2 ACCU): арифметика пишет ACCU1, ACCU2 не меняется (AWL_e.pdf, §7.3); `L` обнуляет ACCU1
 перед загрузкой (§9.2) — `L` INT/WORD с записью в DINT/DWORD дополняется нулями (stl.zero_extend).
-Слово состояния (OV, BR, CC), TAK/PUSH/POP, адресные регистры, S5-таймеры и MCR — режим B, P1: пока todo.
+Таймеры и счётчики S5 (SP, SE, SD, SS, SF, FR, R, CU, CD, S, A/L/LC T n и C n) — псевдовызовы S5_* в SCL, их
+эмиттер переводит в функции S7Compat над элементами GVL_S5Timers/GVL_S5Counters (правила s5.*).
+Слово состояния (OV, BR, CC), TAK/PUSH/POP, адресные регистры и MCR — режим B: пока todo.
 """
 
 from __future__ import annotations
@@ -57,6 +59,27 @@ _WIDTH = {"BYTE": 8, "SINT": 8, "USINT": 8, "CHAR": 8, "INT": 16, "WORD": 16, "U
 _WIDTH.update({"DINT": 32, "DWORD": 32, "UDINT": 32, "REAL": 32, "TIME": 32, "TIME_OF_DAY": 32})
 _PREFIX = {"INT": "i", "DINT": "di", "REAL": "r", "WORD": "w", "DWORD": "dw", "BYTE": "b", "TIME": "t", "BOOL": "x"}
 _SIGNED_INT = {"INT", "DINT", "SINT"}
+_S5_OPERAND = re.compile(r"%([TC])(\d+)\Z", re.I)
+# токен пуска таймера S5 -> (псевдовызов, мнемоника EN, функция S7Compat)
+_S5_STARTS = {
+    "Pulse": ("S5_SP", "SP", "F_S5Pulse"),
+    "Extend": ("S5_SE", "SE", "F_S5ExtPulse"),
+    "OnDelay": ("S5_SD", "SD", "F_S5OnDelay"),
+    "Retentive": ("S5_SS", "SS", "F_S5RetOnDelay"),
+    "OffDelay": ("S5_SF", "SF", "F_S5OffDelay"),
+}
+
+
+def s5_operand(operand: str | None) -> tuple[str, int] | None:
+    """%T5 → ("T", 5), %C3 → ("C", 3); иначе None."""
+    m = _S5_OPERAND.match(operand or "")
+    return (m.group(1).upper(), int(m.group(2))) if m else None
+
+
+def s5_read(kind: str, n: int, what: str = "Q") -> str:
+    """Псевдовызов чтения S5: Q (A T n), BI (L T n), BCD (LC T n); счётчики — CQ, CBI, CBCD."""
+    name = f"S5_{what}" if kind == "T" else f"S5_C{what}"
+    return f"{name}({kind}_NO := {n})"
 
 
 @dataclass
@@ -234,9 +257,16 @@ class StlLifter:
             tok = ins.token
             if tok in ("COMMENT", "EMPTY_LINE", "NOP_0", "NOP_1", "BLD") or tok in _LOGIC_OPS or tok in _BRACKETS:
                 continue
-            if tok in ("BRACKET", "NEG", "SET", "CLR", "Rise", "Fall", "Assign", "S", "R", "SAVE"):
+            reads_accu1 = tok in _S5_STARTS or (tok == "S" and (s5_operand(ins.operand) or ("",))[0] == "C")
+            if reads_accu1:
+                # пуск таймера S5 (заданное время) и S C n (значение) читают ACCU1, не меняя аккумуляторы
+                for k, v in where.items():
+                    if v == "accu1":
+                        live["accu1" if k == "a1" else "accu2"] = True
                 continue
-            if tok == "L":
+            if tok in ("BRACKET", "NEG", "SET", "CLR", "Rise", "Fall", "Assign", "S", "R", "SAVE", "Free", "CU", "CD"):
+                continue
+            if tok in ("L", "LC"):
                 src2 = next((k for k, v in where.items() if v == "accu1"), None)
                 for k in list(where):
                     if where[k] == "accu2":
@@ -353,8 +383,10 @@ class StlLifter:
             if ins.operand_scope == "Statusword" or ins.operand.upper() in ("OV", "OS", "BR", "UO", "==0", "<>0"):
                 self.todo(ins, "stl.mode_b", "проверка слова состояния — режим B (P1)")
                 return
-            if ins.operand.upper().startswith(("%T", "%C")):
-                self.todo(ins, "s5.timer", "опрос таймера/счётчика S5 — P1")
+            s5 = s5_operand(ins.operand)
+            if s5 is not None:
+                self.mark(ins, AUTO, "s5.timer" if s5[0] == "T" else "s5.counter")
+                self.logic(token, atom(s5_read(*s5)))
                 return
             self.logic(token, atom(ins.operand))
             return
@@ -396,6 +428,9 @@ class StlLifter:
             return
         if token == "L":
             self.load(ins)
+            return
+        if token in _S5_STARTS or token in ("Free", "CU", "CD", "LC"):
+            self.s5(ins)
             return
         if token == "T":
             self.transfer(ins)
@@ -493,8 +528,9 @@ class StlLifter:
         if ins.operand is None:
             self.todo(ins, "stl.operand", "S/R без операнда")
             return
-        if ins.operand.upper().startswith(("%T", "%C")) or ins.operand_scope in ("Timer", "Counter"):
-            self.todo(ins, "s5.timer", "S/R таймера или счётчика S5 — P1")
+        s5 = s5_operand(ins.operand)
+        if s5 is not None:
+            self.s5(ins)
             return
         v = self.need_rlo(ins)
         if v is None:
@@ -521,8 +557,16 @@ class StlLifter:
         if ins.extra.upper() == "STW" or ins.operand.upper() in ("STW",):
             self.todo(ins, "stl.mode_b", "L STW — режим B (P1)")
             return
-        if ins.operand.upper().startswith(("%T", "%C")) or ins.operand_scope in ("Timer", "Counter"):
-            self.todo(ins, "s5.timer", "L таймера/счётчика S5 — P1")
+        s5 = s5_operand(ins.operand)
+        if s5 is not None:
+            self.mark(ins, AUTO, "s5.timer" if s5[0] == "T" else "s5.counter")
+            self.s.accu2 = self.s.accu1
+            self.s.accu1 = Val(atom(s5_read(*s5, "BI")), "WORD")
+            return
+        if ins.operand.upper().startswith("C#") and ins.operand[2:].isdigit():
+            # константа счётчика C#n — BCD в ACCU1-L (установка S C n)
+            self.s.accu2 = self.s.accu1
+            self.s.accu1 = Val(atom(f"W#16#{int(ins.operand[2:]):04d}"), "WORD")
             return
         if ins.operand_scope == "Address" and ins.operand.upper().startswith(("DB", "DI")):
             self.todo(ins, "stl.db_offset", "частично квалифицированный доступ к DB по смещению — P1")
@@ -545,6 +589,68 @@ class StlLifter:
             return
         self.invalidate(ins, target)
         self.emit(f"{target} := {text};", ins, notes)
+
+    def s5(self, ins: StlInstr) -> None:
+        """Таймеры и счётчики S5: пуск, FR, R, S, CU, CD — оператор-псевдовызов; LC — чтение в ACCU1."""
+        token = ins.token
+        s5 = s5_operand(ins.operand)
+        if s5 is None:
+            self.todo(ins, "s5.address", f"{rule_of(token).en}: операнд не таймер и не счётчик (%T n, %C n)")
+            return
+        kind, n = s5
+        if token == "LC":
+            self.mark(ins, AUTO, "s5.timer" if kind == "T" else "s5.counter")
+            self.s.accu2 = self.s.accu1
+            self.s.accu1 = Val(atom(s5_read(kind, n, "BCD")), "WORD")
+            return
+        extra = ""
+        notes: list[LowerNote] = []
+        if token in _S5_STARTS and kind == "T":
+            name, mnemonic, func = _S5_STARTS[token]
+            if self.s.accu1 is None:
+                self.todo(ins, "stl.accu_unknown", f"{mnemonic} T{n}: заданное время (ACCU1) не определено символьно")
+                return
+            tv = self.s.accu1.ex[0]
+            if self.s.accu1.type == "S5TIME" and tv.upper().startswith(("S5T#", "S5TIME#")):
+                tv = "T#" + tv.split("#", 1)[1]
+            extra = f", TV := {tv}"
+            notes.append(
+                self.note(
+                    ins,
+                    CHECK,
+                    "s5.timebase",
+                    f"{mnemonic} T{n} → {func} (S7Compat): время — F_S7Now(), остаток пересчитывается при обращении "
+                    "к таймеру; фаза часового процесса CPU (точность ±1 единица шкалы) не моделируется",
+                ),
+            )
+        elif token == "Free":
+            name = "S5_FR" if kind == "T" else "S5_CFR"
+        elif token == "R":
+            name = "S5_R" if kind == "T" else "S5_CR"
+        elif token == "S" and kind == "C":
+            if self.s.accu1 is None:
+                self.todo(ins, "stl.accu_unknown", f"S C{n}: значение установки (ACCU1) не определено символьно")
+                return
+            name, extra = "S5_CS", f", PV := {self.s.accu1.ex[0]}"
+        elif token in ("CU", "CD") and kind == "C":
+            name = f"S5_{token}"
+        else:
+            self.todo(ins, "s5.address", f"{self.source_text(ins)}: инструкция не применима к {kind}{n}")
+            return
+        self.mark(ins, AUTO, "s5.timer" if kind == "T" else "s5.counter")
+        if notes:
+            self.mark(ins, CHECK, "s5.timebase")
+        v = self.need_rlo(ins)
+        if v is None:
+            return
+        reads = f"({kind}_NO := {n})"
+        if reads in v[0] or self.rlo_read_next(ins.index):
+            v = self.freeze(ins, v)
+        self.s.fc, self.s.terms, self.s.cur, self.s.rlo_after = False, [], None, None
+        self.invalidate(ins, reads)
+        self.emit(f"{name}({kind}_NO := {n}, RLO := {v[0]}{extra});", ins, notes)
+        self.s.fc, self.s.terms, self.s.cur = False, [], None
+        self.s.rlo_after = v
 
     def compare(self, ins: StlInstr, op: str, typ: str) -> None:
         a, b = self.s.accu2, self.s.accu1

@@ -47,6 +47,13 @@ RULE_TESTS: dict[str, tuple[str, ...]] = {
     "stl.logic": ("test_stl_and_before_or_and_brackets", "test_random_stl_chains_match_machine"),
     "stl.edge": ("test_stl_fp_jcn_label_becomes_if_without_jmp",),
     "stl.edge_memory": ("test_stl_edge_memory_in_temp_is_flagged",),
+    "s5.timebase": (
+        "test_stl_s5_timers_lower_to_s7compat_calls",
+        "test_stl_s5_all_start_kinds_and_word_preset",
+        "test_reference_s5_timer_matches_awlsim",
+    ),
+    "s5.timer": ("test_stl_s5_timers_lower_to_s7compat_calls", "test_stl_s5_read_before_write_is_frozen"),
+    "s5.counter": ("test_stl_s5_counters_lower_to_s7compat_calls", "test_reference_s5_counter_matches_awlsim"),
     "stl.accu": ("test_stl_load_transfer_and_int_arithmetic", "test_zero_extension_mutation_is_caught"),
     "stl.math": ("test_stl_load_transfer_and_int_arithmetic", "test_stl_dint_real_arithmetic_and_compare"),
     "stl.compare": ("test_stl_compare_is_first_check", "test_stl_dint_real_arithmetic_and_compare"),

@@ -40,6 +40,8 @@ COMPAT_SUITES = [
     "FB_StandardCounter_Test",
     "FB_StandardFlipFlop_Test",
     "FB_F_S7Eno_Test",
+    "FB_S5Timer_Test",
+    "FB_S5Counter_Test",
 ]
 
 
@@ -50,6 +52,7 @@ LANG_SUITES = [
     "FB_StarterStl_ScenarioTest",
     "FB_StarterScl_ScenarioTest",
     "FB_PumpInterlockLad_ScenarioTest",
+    "FB_ConveyorStl_ScenarioTest",
 ]
 
 
@@ -172,3 +175,13 @@ def test_old_flipflop_mapping_breaks_starter_scenario(objects: list[L.StObject])
     lad.impl = head[:set_start] + reset_block + "\n" + head[set_start:] + rest
     out = Sim(mutated, f_trig=F_TRIG_S7).run_suite("FB_StarterLad_ScenarioTest", cycles=1)
     assert "StartAndStopTogether" in out.failures
+
+
+def test_s5_on_delay_stop_mutation_is_caught(objects: list[L.StObject]) -> None:
+    """Мутация «SD не останавливается при RLO = 0» в S7Compat роняет сценарий HornCutShort конвейера на STL
+    (остаток задержки должен замереть) и тест FB_S5Timer_Test.OnDelayNeedsRloHeld."""
+    mutated = _replace(objects, "F_S5OnDelay", None, "    stTimer.xRunning := FALSE;\n", "")
+    scenario = Sim(mutated, f_trig=F_TRIG_S7).run_suite("FB_ConveyorStl_ScenarioTest", cycles=3)
+    assert "HornCutShort" in scenario.failures
+    unit = Sim(mutated).run_suite("FB_S5Timer_Test", cycles=3)
+    assert "OnDelayNeedsRloHeld" in unit.failures

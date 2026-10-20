@@ -14,26 +14,27 @@
 
 | Показатель | Значение |
 |---|---:|
-| Файлов | 8 |
-| Блоков S7 | 8 |
-| Конструкций | 173 |
-| Автоматически | 164 (95 %) |
-| Требуют проверки | 9 (5 %) |
+| Файлов | 9 |
+| Блоков S7 | 9 |
+| Конструкций | 212 |
+| Автоматически | 197 (93 %) |
+| Требуют проверки | 15 (7 %) |
 | Не поддерживаются | 0 (0 %) |
 
 ### По видам конструкций
 
 | Вид | Всего | Автоматически | Требуют проверки | Не поддерживаются |
 |---|---:|---:|---:|---:|
-| Блоки | 8 | 6 | 2 | 0 |
-| Объявления | 88 | 88 | 0 | 0 |
-| Операторы | 77 | 70 | 7 | 0 |
+| Блоки | 9 | 6 | 3 | 0 |
+| Объявления | 102 | 102 | 0 | 0 |
+| Операторы | 101 | 89 | 12 | 0 |
 
 ## По файлам
 
 | Файл | Блоков | Конструкций | Автоматически | Требуют проверки | Не поддерживаются | Авто, % |
 |---|---:|---:|---:|---:|---:|---:|
 | `samples/lang/DB_Process.xml` | 1 | 7 | 6 | 1 | 0 | 86 % |
+| `samples/lang/FB_ConveyorStl.xml` | 1 | 39 | 33 | 6 | 0 | 85 % |
 | `samples/lang/FB_PumpInterlockLad.xml` | 1 | 52 | 47 | 5 | 0 | 90 % |
 | `samples/lang/FB_StarterFbd.xml` | 1 | 25 | 24 | 1 | 0 | 96 % |
 | `samples/lang/FB_StarterLad.xml` | 1 | 25 | 24 | 1 | 0 | 96 % |
@@ -41,7 +42,7 @@
 | `samples/lang/FB_StarterStl.xml` | 1 | 28 | 27 | 1 | 0 | 96 % |
 | `samples/lang/FC_ClampPctLad.xml` | 1 | 9 | 9 | 0 | 0 | 100 % |
 | `samples/lang/UDT_Valve.xml` | 1 | 4 | 4 | 0 | 0 | 100 % |
-| **Итого** | 8 | 173 | 164 | 9 | 0 | 95 % |
+| **Итого** | 9 | 212 | 197 | 15 | 0 | 93 % |
 
 ## По языкам
 
@@ -55,7 +56,7 @@
 | LAD | сеть | 3 | 19 | 15 | 4 | 0 | 0 |
 | FBD | элемент | 1 | 11 | 7 | 4 | 0 | 0 |
 | FBD | сеть | 1 | 4 | 1 | 3 | 0 | 0 |
-| STL | инструкция | 1 | 27 | 27 | 0 | 0 | 0 |
+| STL | инструкция | 2 | 74 | 69 | 5 | 0 | 0 |
 | SCL | сеть | 1 | 1 | 1 | 0 | 0 | 0 |
 
 ### Блоки: язык, стратегия, переходы STL
@@ -63,6 +64,7 @@
 | Блок | Язык | Стратегия | Профиль и переходы STL | Источник |
 |---|---|---|---|---|
 | `DB_Process` | DB | `st` | — | `samples/lang/DB_Process.xml` |
+| `FB_ConveyorStl` | STL | `st` | по MemoryLayout; переходы: structured | `samples/lang/FB_ConveyorStl.xml` |
 | `FB_PumpInterlockLad` | LAD | `st` | — | `samples/lang/FB_PumpInterlockLad.xml` |
 | `FB_StarterFbd` | FBD | `st` | — | `samples/lang/FB_StarterFbd.xml` |
 | `FB_StarterLad` | LAD | `st` | — | `samples/lang/FB_StarterLad.xml` |
@@ -77,6 +79,7 @@
 |---|---|---|---:|
 | `lad.vocab_unverified` | LAD: форма XML элемента не подтверждена экспортом | проверка | 8 |
 | `fbd.vocab_unverified` | FBD: форма XML элемента не подтверждена экспортом | проверка | 7 |
+| `s5.timebase` | S5: пуск таймера — время и шкала по модели S7Compat | проверка | 5 |
 | `lad.eno_error` | LAD: ENO = EN AND NOT ошибка | проверка | 2 |
 
 
@@ -92,7 +95,7 @@ OB в исходниках нет.
 Standard CODESYS, `s7compat` — рукописные ФБ с семантикой S7; [MAPPING.md](MAPPING.md),
 «Слой совместимости S7Compat»).
 
-Сконвертированный код вызывает рукописные объекты (не генерируются, лежат в `src/*/S7Compat`): `FB_S7Ton`, `F_S7EnoAddInt`, `F_S7Now`, `GVL_S7Clock`. Конструкции, переведённые через них, считаются «автоматически»: их поведение задают описания в
+Сконвертированный код вызывает рукописные объекты (не генерируются, лежат в `src/*/S7Compat`): `FB_S7Ton`, `F_S5BaseMs`, `F_S5Bcd`, `F_S5Bin`, `F_S5CountUp`, `F_S5CounterBcd`, `F_S5CounterBin`, `F_S5CounterReset`, `F_S5Enable`, `F_S5ExtPulse`, `F_S5FromBcd`, `F_S5OffDelay`, `F_S5OnDelay`, `F_S5Pulse`, `F_S5Q`, `F_S5Reset`, `F_S5RetOnDelay`, `F_S5Start`, `F_S5TimeWord`, `F_S5ToBcd`, `F_S5Update`, `F_S7EnoAddInt`, `F_S7Now`, `GVL_S7Clock`, `ST_S5Counter`, `ST_S5Timer`. Конструкции, переведённые через них, считаются «автоматически»: их поведение задают описания в
 объявлениях этих объектов и тесты `tests/POUs/S7Compat`, результат прогона в CODESYS —
 [TEST_REPORT.md](TEST_REPORT.md).
 
@@ -105,7 +108,8 @@ Standard CODESYS, `s7compat` — рукописные ФБ с семантико
 | Правило | Что | Пометок |
 |---|---|---:|
 | `lad.vocab_unverified` | LAD: форма XML элемента не подтверждена экспортом | 5 |
-| `block.non_optimized` | неоптимизированный доступ | 2 |
+| `s5.timebase` | S5: пуск таймера — время и шкала по модели S7Compat | 5 |
+| `block.non_optimized` | неоптимизированный доступ | 3 |
 | `db.retain_standard` | стандартный DB: retain | 1 |
 | `fbd.vocab_unverified` | FBD: форма XML элемента не подтверждена экспортом | 1 |
 | `lad.eno_error` | LAD: ENO = EN AND NOT ошибка | 1 |
@@ -122,6 +126,21 @@ Standard CODESYS, `s7compat` — рукописные ФБ с семантико
 |---:|---|---|---|---|
 | SW.Blocks.GlobalDB «DB_Process» | ! требует проверки | DB_Process | `block.non_optimized` | стандартный (неоптимизированный) доступ S7: абсолютная адресация и порядок байтов не переносятся |
 | SW.Blocks.GlobalDB «DB_Process» | ! требует проверки | DB_Process | `db.retain_standard` | стандартный DB без NON_RETAIN: в S7 он реманентный — объявлен RETAIN |
+
+### `samples/lang/FB_ConveyorStl.xml`
+
+Конструкций 39: автоматически 33, требуют проверки 6, не поддерживаются 0.
+
+Блоки: FUNCTION_BLOCK «FB_ConveyorStl» → `FB_ConveyorStl`.
+
+| Место | Статус | Блок | Правило | Причина |
+|---:|---|---|---|---|
+| SW.Blocks.FB «FB_ConveyorStl» | ! требует проверки | FB_ConveyorStl | `block.non_optimized` | стандартный (неоптимизированный) доступ S7: абсолютная адресация и порядок байтов не переносятся |
+| сеть 2, строка 3 | ! требует проверки | FB_ConveyorStl | `s5.timebase` | SP T1 → F_S5Pulse (S7Compat): время — F_S7Now(), остаток пересчитывается при обращении к таймеру; фаза часового процесса CPU (точность ±1 единица шкалы) не моделируется |
+| сеть 3, строка 3 | ! требует проверки | FB_ConveyorStl | `s5.timebase` | SD T2 → F_S5OnDelay (S7Compat): время — F_S7Now(), остаток пересчитывается при обращении к таймеру; фаза часового процесса CPU (точность ±1 единица шкалы) не моделируется |
+| сеть 4, строка 3 | ! требует проверки | FB_ConveyorStl | `s5.timebase` | SF T3 → F_S5OffDelay (S7Compat): время — F_S7Now(), остаток пересчитывается при обращении к таймеру; фаза часового процесса CPU (точность ±1 единица шкалы) не моделируется |
+| сеть 5, строка 3 | ! требует проверки | FB_ConveyorStl | `s5.timebase` | SE T4 → F_S5ExtPulse (S7Compat): время — F_S7Now(), остаток пересчитывается при обращении к таймеру; фаза часового процесса CPU (точность ±1 единица шкалы) не моделируется |
+| сеть 5, строка 8 | ! требует проверки | FB_ConveyorStl | `s5.timebase` | SS T5 → F_S5RetOnDelay (S7Compat): время — F_S7Now(), остаток пересчитывается при обращении к таймеру; фаза часового процесса CPU (точность ±1 единица шкалы) не моделируется |
 
 ### `samples/lang/FB_PumpInterlockLad.xml`
 

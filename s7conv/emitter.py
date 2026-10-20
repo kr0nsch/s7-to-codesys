@@ -564,6 +564,7 @@ class Emitter:
         self.instances: list[tuple[str, str, str, list[Note], bool]] = []
         self.implicit: dict[str, tuple[str, str]] = {}  # имя DB (lower) -> (st_name, тип ST)
         self.obs: list[T.ObInfo] = []
+        self.s5_used: dict[str, set[int]] = {"T": set(), "C": set()}  # номера таймеров и счётчиков S5
         self.cur: BlockCtx | None = None
         self.result: FileResult | None = None
         self._line_hint = 0
@@ -2036,6 +2037,8 @@ class Emitter:
             var = self.lookup(name)
             if var is not None:
                 return self.instance_call(var.st_name, var, c.args)
+            if upper in M.S5_TIMER_CALLS or upper in M.S5_COUNTER_CALLS:
+                return self.s5_call(c, upper)
             rule = M.FUNCTIONS.get(upper)
             if rule is None and (upper.startswith("NORM_X_") or upper.startswith("SCALE_X_")):
                 rule = M.FUNCTIONS[upper[: upper.index("_X_") + 2]]
@@ -2208,6 +2211,41 @@ class Emitter:
             return text
         self.hit("conv.instruction_type")
         return f"{source.name}_TO_{target}({text})"
+
+    def s5_call(self, c: Call, name: str) -> str:
+        """Псевдовызов S5 из понижения STL → функция S7Compat с элементом GVL_S5Timers/GVL_S5Counters.
+
+        S5_SD(T_NO := 3, RLO := x, TV := T#2S) → F_S5OnDelay(stTimer := GVL_S5Timers.aTimer[3], xRlo := x,
+        wS5Time := F_S5TimeWord(T#2S)); значение S5TIME из слова (L MW10) передаётся как есть.
+        """
+        timer = name in M.S5_TIMER_CALLS
+        target, _ret = (M.S5_TIMER_CALLS if timer else M.S5_COUNTER_CALLS)[name]
+        args = {a.name.upper(): a.value for a in c.args if a.name}
+        number = args.get("T_NO" if timer else "C_NO")
+        if not isinstance(number, Literal) or number.kind != "int":
+            raise Unsupported(f"{name}: номер таймера/счётчика не константа", "s5.address")
+        n = int(number.text)
+        self.s5_used["T" if timer else "C"].add(n)
+        gvl = self.g(S.GVL_S5TIMERS if timer else S.GVL_S5COUNTERS)
+        parts = [f"{'stTimer' if timer else 'stCounter'} := {gvl}.{'aTimer' if timer else 'aCounter'}[{n}]"]
+        if "RLO" in args:
+            parts.append(f"xRlo := {self.ex(args['RLO'], 'BOOL')}")
+        for key, param in (("TV", "wS5Time"), ("PV", "wBcd")):
+            if key not in args:
+                continue
+            value = args[key]
+            kind = _ty_name(self.infer(value))
+            text = self.ex(value, kind or None)
+            if kind in ("TIME", "S5TIME"):
+                self.support.add("F_S5TimeWord")
+                text = f"F_S5TimeWord({text})"
+            elif kind and kind != "WORD":
+                text = f"{kind}_TO_WORD({text})"
+            parts.append(f"{param} := {text}")
+        self.support.add(target)
+        self.support.add("ST_S5Timer" if timer else "ST_S5Counter")
+        self.hit("s5.timer" if timer else "s5.counter")
+        return f"{target}({', '.join(parts)})"
 
     def builtin(self, rule: M.FuncRule, c: Call, name: str) -> str:
         if rule.severity == TODO:
@@ -2386,6 +2424,9 @@ class Emitter:
         callee = e.callee
         if isinstance(callee, Ident | GlobalRef):
             upper = callee.name.upper()
+            s5 = M.S5_TIMER_CALLS.get(upper) or M.S5_COUNTER_CALLS.get(upper)
+            if s5 is not None:
+                return Ty(s5[1])
             if upper in ("NORM_X", "SCALE_X") or upper.startswith(("NORM_X_", "SCALE_X_")):
                 return Ty("REAL")
             if upper in ("ABS", "LIMIT", "MIN", "MAX", "SEL", "MUX", "SQR", "SQRT", "EXPT"):
@@ -2414,6 +2455,7 @@ class Emitter:
         self.io_gvls()
         self.tags_gvl()
         self.const_gvl()
+        self.s5_gvls()
 
     def _project_header(self, purpose: str, doc: str) -> list[str]:
         return [
@@ -2465,6 +2507,29 @@ class Emitter:
             L.StObject(L.KIND_GVL, self.g(S.GVL_INSTANCES), "\n".join(lines), folder=list(self.o.folder))
         )
         self.hit("gvl.instances")
+
+    def s5_gvls(self) -> None:
+        """GVL_S5Timers / GVL_S5Counters: слова таймеров и счётчиков S5 (в S7 — глобальные объекты CPU)."""
+        for kind, gvl, member, type_name, what in (
+            ("T", S.GVL_S5TIMERS, "aTimer", "ST_S5Timer", "таймеров"),
+            ("C", S.GVL_S5COUNTERS, "aCounter", "ST_S5Counter", "счётчиков"),
+        ):
+            used = sorted(self.s5_used[kind])
+            if not used:
+                continue
+            listed = ", ".join(f"{kind}{n}" for n in used)
+            lines = [
+                *self._project_header(
+                    f"слова {what} S5 из STL (в S7 — глобальные объекты CPU, индекс — номер): {listed}",
+                    "docs/MAPPING_STL.md, правила s5.timebase, s5.timer, s5.counter",
+                ),
+                "{attribute 'qualified_only'}",
+                "VAR_GLOBAL",
+                f"{IND}{member} : ARRAY[0..{used[-1]}] OF {type_name};  // используются: {listed}",
+                "END_VAR",
+            ]
+            self.objects.append(L.StObject(L.KIND_GVL, self.g(gvl), "\n".join(lines), folder=list(self.o.folder)))
+            self.hit(f"gvl.s5_{'timers' if kind == 'T' else 'counters'}")
 
     def io_gvls(self) -> None:
         groups: dict[str, list[S.IoVar]] = {S.GVL_IO: [], S.GVL_MARKERS: []}

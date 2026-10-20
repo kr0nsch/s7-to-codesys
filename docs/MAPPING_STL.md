@@ -14,7 +14,7 @@ AWL переводит мнемонику EN/DE в те же имена. Кла�
 типов: `stl.zero_extend` (`L` WORD/INT → DINT дополняется нулями), `stl.accu_high` (старшая часть
 ACCU1), `stl.bitcopy` (копия битов между INT/DINT и REAL), `stl.jump_pc` (автомат переходов).
 
-Итог классификации: 172 из 172 токенов; auto — 69, check — 0, todo — 103, impossible — 0.
+Итог классификации: 172 из 172 токенов; auto — 73, check — 5, todo — 94, impossible — 0.
 
 | Токен XSD | EN | DE | Класс | Правило | Что | Тесты |
 |---|---|---|---|---|---|---|
@@ -49,12 +49,12 @@ ACCU1), `stl.bitcopy` (копия битов между INT/DINT и REAL), `stl.
 | `CAR` | `CAR` | `TAR` | todo | `stl.addr_register` | обмен AR1 и AR2 | — |
 | `CAW` | `CAW` | `TAW` | todo | `stl.convert` | обмен байтов ACCU1-L | — |
 | `CC` | `CC` | `CC` | auto | `stl.call` | CC — условный вызов FC без параметров | `test_language_corpus_suites_pass_in_simulation`<br>`test_external_samples_convert_with_expected_outcome` |
-| `CD` | `CD` | `ZR` | todo | `s5.counter` | CD — счёт вниз | — |
+| `CD` | `CD` | `ZR` | auto | `s5.counter` | CD — счёт вниз (F_S5CountDown) | `test_stl_s5_counters_lower_to_s7compat_calls`<br>`test_reference_s5_counter_matches_awlsim` |
 | `CDB` | `CDB` | `TDB` | todo | `stl.db_register` | обмен регистров DB и DI | — |
 | `CLR` | `CLR` | `CLR` | auto | `stl.logic` | RLO := 0 | `test_stl_and_before_or_and_brackets`<br>`test_random_stl_chains_match_machine` |
 | `COMMENT` | `//` | `//` | auto | `stl.nop` | строка-комментарий | `test_language_corpus_suites_pass_in_simulation` |
 | `COS` | `COS` | `COS` | todo | `stl.math` | COS REAL | — |
-| `CU` | `CU` | `ZV` | todo | `s5.counter` | CU — счёт вверх | — |
+| `CU` | `CU` | `ZV` | auto | `s5.counter` | CU — счёт вверх (F_S5CountUp) | `test_stl_s5_counters_lower_to_s7compat_calls`<br>`test_reference_s5_counter_matches_awlsim` |
 | `DEC` | `DEC` | `DEC` | todo | `stl.math` | DEC — ACCU1-L-L - n | — |
 | `DIV_D` | `/D` | `/D` | auto | `stl.math` | /D | `test_stl_load_transfer_and_int_arithmetic`<br>`test_stl_dint_real_arithmetic_and_compare` |
 | `DIV_I` | `/I` | `/I` | auto | `stl.math` | /I | `test_stl_load_transfer_and_int_arithmetic`<br>`test_stl_dint_real_arithmetic_and_compare` |
@@ -67,9 +67,9 @@ ACCU1), `stl.bitcopy` (копия битов между INT/DINT и REAL), `stl.
 | `EQ_I` | `==I` | `==I` | auto | `stl.compare` | сравнение ==I | `test_stl_compare_is_first_check`<br>`test_stl_dint_real_arithmetic_and_compare` |
 | `EQ_R` | `==R` | `==R` | auto | `stl.compare` | сравнение ==R | `test_stl_compare_is_first_check`<br>`test_stl_dint_real_arithmetic_and_compare` |
 | `EXP` | `EXP` | `EXP` | todo | `stl.math` | EXP REAL | — |
-| `Extend` | `SE` | `SV` | todo | `s5.timer` | SE — продлённый импульс | — |
+| `Extend` | `SE` | `SV` | check | `s5.timebase` | SE — продлённый импульс (F_S5ExtPulse) | `test_stl_s5_timers_lower_to_s7compat_calls`<br>`test_stl_s5_all_start_kinds_and_word_preset`<br>`test_reference_s5_timer_matches_awlsim` |
 | `Fall` | `FN` | `FN` | auto | `stl.edge` | FN: спад RLO, явный бит памяти | `test_stl_fp_jcn_label_becomes_if_without_jmp` |
-| `Free` | `FR` | `FR` | todo | `s5.timer` | FR — разрешение таймера/счётчика | — |
+| `Free` | `FR` | `FR` | auto | `s5.timer` | FR — разрешение таймера/счётчика (F_S5Enable, F_S5CounterEnable) | `test_stl_s5_timers_lower_to_s7compat_calls`<br>`test_stl_s5_read_before_write_is_frozen` |
 | `GE_D` | `>=D` | `>=D` | auto | `stl.compare` | сравнение >=D | `test_stl_compare_is_first_check`<br>`test_stl_dint_real_arithmetic_and_compare` |
 | `GE_I` | `>=I` | `>=I` | auto | `stl.compare` | сравнение >=I | `test_stl_compare_is_first_check`<br>`test_stl_dint_real_arithmetic_and_compare` |
 | `GE_R` | `>=R` | `>=R` | auto | `stl.compare` | сравнение >=R | `test_stl_compare_is_first_check`<br>`test_stl_dint_real_arithmetic_and_compare` |
@@ -108,7 +108,7 @@ ACCU1), `stl.bitcopy` (копия битов между INT/DINT и REAL), `stl.
 | `LAR1_AR2` | `LAR1 AR2` | `LAR1 AR2` | todo | `stl.addr_register` | LAR1 AR2 | — |
 | `LAR2` | `LAR2` | `LAR2` | todo | `stl.addr_register` | загрузить AR2 | — |
 | `LAR2_ACCU1` | `LAR2` | `LAR2` | todo | `stl.addr_register` | LAR2 из ACCU1 | — |
-| `LC` | `LC` | `LC` | todo | `s5.timer` | LC — загрузить таймер/счётчик в BCD | — |
+| `LC` | `LC` | `LC` | auto | `s5.timer` | LC — загрузить таймер/счётчик в BCD (F_S5Bcd, F_S5CounterBcd) | `test_stl_s5_timers_lower_to_s7compat_calls`<br>`test_stl_s5_read_before_write_is_frozen` |
 | `LE_D` | `<=D` | `<=D` | auto | `stl.compare` | сравнение <=D | `test_stl_compare_is_first_check`<br>`test_stl_dint_real_arithmetic_and_compare` |
 | `LE_I` | `<=I` | `<=I` | auto | `stl.compare` | сравнение <=I | `test_stl_compare_is_first_check`<br>`test_stl_dint_real_arithmetic_and_compare` |
 | `LE_R` | `<=R` | `<=R` | auto | `stl.compare` | сравнение <=R | `test_stl_compare_is_first_check`<br>`test_stl_dint_real_arithmetic_and_compare` |
@@ -139,19 +139,19 @@ ACCU1), `stl.bitcopy` (копия битов между INT/DINT и REAL), `stl.
 | `O` | `O` | `O` | auto | `stl.logic` | OR с операндом; без операнда — AND перед OR | `test_stl_and_before_or_and_brackets`<br>`test_random_stl_chains_match_machine` |
 | `O_BRACK` | `O(` | `O(` | auto | `stl.logic` | O( — скобка | `test_stl_and_before_or_and_brackets`<br>`test_random_stl_chains_match_machine` |
 | `OD` | `OD` | `OD` | todo | `stl.word_logic` | OD — логика двойных слов | — |
-| `OffDelay` | `SF` | `SA` | todo | `s5.timer` | SF — задержка выключения | — |
+| `OffDelay` | `SF` | `SA` | check | `s5.timebase` | SF — задержка выключения (F_S5OffDelay) | `test_stl_s5_timers_lower_to_s7compat_calls`<br>`test_stl_s5_all_start_kinds_and_word_preset`<br>`test_reference_s5_timer_matches_awlsim` |
 | `ON` | `ON` | `ON` | auto | `stl.logic` | OR NOT | `test_stl_and_before_or_and_brackets`<br>`test_random_stl_chains_match_machine` |
 | `ON_BRACK` | `ON(` | `ON(` | auto | `stl.logic` | ON( — скобка | `test_stl_and_before_or_and_brackets`<br>`test_random_stl_chains_match_machine` |
-| `OnDelay` | `SD` | `SE` | todo | `s5.timer` | SD — задержка включения | — |
+| `OnDelay` | `SD` | `SE` | check | `s5.timebase` | SD — задержка включения (F_S5OnDelay) | `test_stl_s5_timers_lower_to_s7compat_calls`<br>`test_stl_s5_all_start_kinds_and_word_preset`<br>`test_reference_s5_timer_matches_awlsim` |
 | `OPEN_DB` | `OPN` | `AUF` | todo | `stl.db_offset` | OPN DB — открыть DB (адресация по смещению) | — |
 | `OPEN_DI` | `OPN DI` | `AUF DI` | todo | `stl.db_offset` | OPN DI | — |
 | `OW` | `OW` | `OW` | todo | `stl.word_logic` | OW — логика слов | — |
 | `POP` | `POP` | `POP` | todo | `stl.mode_b` | POP | — |
 | `PSEUDO` | `PSEUDO` | `PSEUDO` | todo | `stl.unknown` | псевдоинструкция TIA (смысл не документирован) | — |
-| `Pulse` | `SP` | `SI` | todo | `s5.timer` | SP — импульс | — |
+| `Pulse` | `SP` | `SI` | check | `s5.timebase` | SP — импульс (F_S5Pulse) | `test_stl_s5_timers_lower_to_s7compat_calls`<br>`test_stl_s5_all_start_kinds_and_word_preset`<br>`test_reference_s5_timer_matches_awlsim` |
 | `PUSH` | `PUSH` | `PUSH` | todo | `stl.mode_b` | PUSH | — |
 | `R` | `R` | `R` | auto | `stl.logic` | сбросить бит (с таймером/счётчиком — S5) | `test_stl_and_before_or_and_brackets`<br>`test_random_stl_chains_match_machine` |
-| `Retentive` | `SS` | `SS` | todo | `s5.timer` | SS — задержка включения с памятью | — |
+| `Retentive` | `SS` | `SS` | check | `s5.timebase` | SS — задержка включения с памятью (F_S5RetOnDelay) | `test_stl_s5_timers_lower_to_s7compat_calls`<br>`test_stl_s5_all_start_kinds_and_word_preset`<br>`test_reference_s5_timer_matches_awlsim` |
 | `Rise` | `FP` | `FP` | auto | `stl.edge` | FP: фронт RLO, явный бит памяти | `test_stl_fp_jcn_label_becomes_if_without_jmp` |
 | `RLD` | `RLD` | `RLD` | todo | `stl.shift` | циклический сдвиг влево | — |
 | `RLDA` | `RLDA` | `RLDA` | todo | `stl.mode_b` | сдвиг через CC1 влево | — |

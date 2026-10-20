@@ -360,6 +360,26 @@ class SuiteBuild:
     tests: int
 
 
+_S5_ARRAY_RE = re.compile(r"\b(aTimer|aCounter) : ARRAY\[0\.\.(\d+)\] OF (ST_S5Timer|ST_S5Counter);")
+
+
+def s5_resets(result: ConversionResult, block_st: str) -> list[tuple[str, str, str, int]]:
+    """Глобальные слова S5, которые читает блок: (GVL, массив, тип, верхняя граница).
+
+    Таймеры и счётчики S5 в S7 — объекты CPU, после перевода — элементы GVL_S5Timers/GVL_S5Counters: между
+    сценариями (и тестами разных наборов) они не сбрасываются сами, поэтому каждый сценарий их обнуляет.
+    """
+    impl = next((o.impl or "" for o in result.objects if o.name.lower() == block_st.lower()), "")
+    found: list[tuple[str, str, str, int]] = []
+    for obj in result.objects:
+        if obj.kind != L.KIND_GVL or not obj.name.startswith(("GVL_S5Timers", "GVL_S5Counters")):
+            continue
+        m = _S5_ARRAY_RE.search(obj.decl)
+        if m and f"{obj.name}.{m.group(1)}[" in impl:
+            found.append((obj.name, m.group(1), m.group(3), int(m.group(2))))
+    return found
+
+
 def generate_suite(sf: ScenarioFile, result: ConversionResult) -> SuiteBuild:
     """Набор тестов coUnit для одного файла сценариев."""
     sym = result.project.block(sf.block) if result.project is not None else None
@@ -409,11 +429,17 @@ def generate_suite(sf: ScenarioFile, result: ConversionResult) -> SuiteBuild:
         subdir="tests",
     )
     asserts = 0
+    resets = s5_resets(result, sym.st_name)
     for scenario, rows in scenarios:
         mdecl = [
             f"// {AUTO_GENERATED}: {sf.path}, сценарий {scenario} (строк: {len(rows)})",
             f"METHOD PRIVATE {scenario}",
         ]
+        if resets:
+            mdecl.append("VAR")
+            for _gvl, member, type_name, _hi in resets:
+                mdecl.append(f"{IND}st{member[1:]}Zero : {type_name};  // пустое слово S5 для сброса")
+            mdecl += [f"{IND}iS5 : INT;  // номер таймера/счётчика S5", "END_VAR"]
         inst = f"fb{scenario}"
         body = [
             f"// {AUTO_GENERATED}: {sf.path}, сценарий {scenario}",
@@ -422,6 +448,13 @@ def generate_suite(sf: ScenarioFile, result: ConversionResult) -> SuiteBuild:
             f"{IND}x{scenario}Done := TRUE;",
             f"{IND}{CLOCK}.xSimulation := TRUE;",
         ]
+        for gvl, member, _type_name, hi in resets:
+            body += [
+                f"{IND}// слова S5 — глобальные ({gvl}): сценарий начинается с чистых таймеров и счётчиков",
+                f"{IND}FOR iS5 := 0 TO {hi} DO",
+                f"{IND}{IND}{gvl}.{member}[iS5] := st{member[1:]}Zero;",
+                f"{IND}END_FOR",
+            ]
         last: dict[str, str] = {}
         for row in rows:
             mark = ", на пороге таймера" if row.boundary else ""

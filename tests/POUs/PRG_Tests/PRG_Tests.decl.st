@@ -12,12 +12,15 @@ VAR
     fbF_S7EnoTest : FB_F_S7Eno_Test;  // рукописный набор
     fbF_S7NowTest : FB_F_S7Now_Test;  // рукописный набор
     fbF_ScaleXTest : FB_F_ScaleX_Test;  // рукописный набор
+    fbS5CounterTest : FB_S5Counter_Test;  // рукописный набор
+    fbS5TimerTest : FB_S5Timer_Test;  // рукописный набор
     fbS7FTrigTest : FB_S7FTrig_Test;  // рукописный набор
     fbS7TofTest : FB_S7Tof_Test;  // рукописный набор
     fbS7TonTest : FB_S7Ton_Test;  // рукописный набор
     fbS7TpTest : FB_S7Tp_Test;  // рукописный набор
     fbStandardCounterTest : FB_StandardCounter_Test;  // рукописный набор
     fbStandardFlipFlopTest : FB_StandardFlipFlop_Test;  // рукописный набор
+    fbConveyorStl_ScenarioTest : FB_ConveyorStl_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
     fbPumpInterlockLad_ScenarioTest : FB_PumpInterlockLad_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
     fbStarterFbd_ScenarioTest : FB_StarterFbd_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
     fbStarterLad_ScenarioTest : FB_StarterLad_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)

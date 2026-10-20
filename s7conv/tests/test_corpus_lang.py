@@ -74,7 +74,14 @@ def test_language_scenario_suites_are_in_own_folder_and_prg_tests(built: C.Corpu
     suites = sorted(s.obj.name for s in built.lang_tests.suites)
     assert suites == sorted(
         f"{b}{TG.SUITE_SUFFIX}"
-        for b in ("FB_StarterLad", "FB_StarterFbd", "FB_StarterStl", "FB_StarterScl", "FB_PumpInterlockLad")
+        for b in (
+            "FB_StarterLad",
+            "FB_StarterFbd",
+            "FB_StarterStl",
+            "FB_StarterScl",
+            "FB_PumpInterlockLad",
+            "FB_ConveyorStl",
+        )
     )
     assert all(s.obj.folder == [TG.LANG_SCENARIO_FOLDER] for s in built.lang_tests.suites)
     prg = built.files["tests/POUs/PRG_Tests/PRG_Tests.decl.st"]

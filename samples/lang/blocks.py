@@ -10,6 +10,8 @@
 - FB_PumpInterlockLad — блокировки насоса по уровню и давлению: S/R, сравнения, MOVE, прыжок вперёд,
   P-фронт с битом, который читается в другой сети, ADD с ENO, цепочка трёх вызовов EN → ENO → EN;
 - FC_ClampPctLad — ограничение значения (LAD), вызывается из FB_PumpInterlockLad;
+- FB_ConveyorStl — конвейер на STL S7-300 с таймерами S5 (SP, SE, SD, SS, SF, FR, R, L/LC T) и счётчиком S5
+  (CU, R, L/LC C);
 - DB_Process (стандартный доступ, смещения членов) и UDT_Valve — данные для STL.
 """
 
@@ -469,6 +471,86 @@ def clamp_pct_lad() -> Block:
 
 
 # ---------------------------------------------------------------------------
+# FB_ConveyorStl: таймеры и счётчик S5 на STL S7-300
+# ---------------------------------------------------------------------------
+
+CONVEYOR_DESCRIPTION = """Ленточный конвейер выдачи реагента (STL S7-300): таймеры и счётчик S5.
+1. Запрос работы xReq: S по xStart, затем R по xStop OR xJam (сброс главнее; xJam — прошлого вызова).
+2. Сирена: SP T1 1 с по фронту xReq — xHorn = T1; снятие запроса обрывает сирену.
+3. Задержка пуска: SD T2 2 с, RLO = xReq.
+4. Выбег: SF T3 3 с, RLO = T2 — xMotor = T3 (двигатель работает, пока T2 = 1, и 3 с после).
+5. Контроль потока: SE T4 4 с по каждому фронту xSensor — xFlowOk = T4. Взвод контроля: SS T5 5 с по фронту
+   xMotor, сброс T5 (R) при xMotor = 0. Затор: T5 AND NOT T4 → S xJam. Квитирование xAck: FR T4 (при
+   удерживаемом xSensor контроль запускается снова), R xJam.
+6. Диагностика: iDelayLeft := L T2 (остаток задержки, единицы 10 мс), wRunOutBcd := LC T3 (BCD со шкалой).
+7. Счётчик изделий C1: CU по xSensor, R по xCountReset (по уровню); iCount := L C1, wCountBcd := LC C1.
+Таймеры и счётчик S5 — глобальные объекты CPU (T1–T5, C1)."""
+
+
+def conveyor_stl() -> Block:
+    n1 = Stl("Запрос работы")
+    n1.op("A", "#xStart").op("S", "#xReq").op("A", "#xStop").op("O", "#xJam").op("R", "#xReq")
+    n2 = Stl("Сирена 1 с при запросе (SP)")
+    n2.op("A", "#xReq").op("L", "S5T#1S").op("Pulse", "%T1").op("A", "%T1").op("Assign", "#xHorn")
+    n3 = Stl("Задержка пуска 2 с (SD)")
+    n3.op("A", "#xReq").op("L", "S5T#2S").op("OnDelay", "%T2")
+    n4 = Stl("Выбег 3 с после снятия запроса (SF)")
+    n4.op("A", "%T2").op("L", "S5T#3S").op("OffDelay", "%T3").op("A", "%T3").op("Assign", "#xMotor")
+    n5 = Stl("Контроль потока (SE) и затор (SS)")
+    n5.op("A", "#xSensor").op("L", "S5T#4S").op("Extend", "%T4").op("A", "%T4").op("Assign", "#xFlowOk")
+    n5.op("A", "#xMotor").op("L", "S5T#5S").op("Retentive", "%T5")
+    n5.op("AN", "#xMotor").op("R", "%T5")
+    n5.op("A", "%T5").op("AN", "%T4").op("S", "#xJam")
+    n5.op("A", "#xAck").op("Free", "%T4")
+    n5.op("A", "#xAck").op("R", "#xJam")
+    n6 = Stl("Диагностика: остатки таймеров")
+    n6.op("L", "%T2").op("T", "#iDelayLeft").op("LC", "%T3").op("T", "#wRunOutBcd")
+    n7 = Stl("Счётчик изделий (C1)")
+    n7.op("A", "#xSensor").op("CU", "%C1").op("A", "#xCountReset").op("R", "%C1")
+    n7.op("L", "%C1").op("T", "#iCount").op("LC", "%C1").op("T", "#wCountBcd")
+    return Block(
+        "FB",
+        "FB_ConveyorStl",
+        110,
+        lang="STL",
+        title="Конвейер выдачи реагента (STL, таймеры S5)",
+        comment=CONVEYOR_DESCRIPTION,
+        family="Dosing",
+        layout="Standard",
+        sections=[
+            Section(
+                "Input",
+                [
+                    Member("xStart", "Bool", "Пуск ленты"),
+                    Member("xStop", "Bool", "Стоп ленты"),
+                    Member("xSensor", "Bool", "Датчик изделия на выходе ленты"),
+                    Member("xAck", "Bool", "Квитирование аварии"),
+                    Member("xCountReset", "Bool", "Сброс счётчика изделий"),
+                ],
+            ),
+            Section(
+                "Output",
+                [
+                    Member("xHorn", "Bool", "Сирена перед пуском"),
+                    Member("xMotor", "Bool", "Двигатель ленты"),
+                    Member("xFlowOk", "Bool", "Поток изделий в норме (идёт T4)"),
+                    Member("xJam", "Bool", "Авария: затор"),
+                    Member("iDelayLeft", "Int", "Остаток задержки пуска, единицы 10 мс"),
+                    Member("wRunOutBcd", "Word", "Остаток выбега, BCD со шкалой"),
+                    Member("iCount", "Int", "Изделий"),
+                    Member("wCountBcd", "Word", "Изделий, BCD"),
+                ],
+            ),
+            Section("InOut"),
+            Section("Static", [Member("xReq", "Bool", "Запрос работы")]),
+            Section("Temp"),
+            Section("Constant"),
+        ],
+        units=[stl_unit(x) for x in (n1, n2, n3, n4, n5, n6, n7)],
+    )
+
+
+# ---------------------------------------------------------------------------
 # DB_Process и UDT_Valve
 # ---------------------------------------------------------------------------
 
@@ -525,6 +607,7 @@ def all_blocks(tia: str = "V21") -> list[Block]:
         starter_fbd(),
         starter_stl(),
         starter_scl(),
+        conveyor_stl(),
         pump_interlock_lad(),
         clamp_pct_lad(),
         udt_valve(),
@@ -532,4 +615,4 @@ def all_blocks(tia: str = "V21") -> list[Block]:
     ]
 
 
-__all__ = ["STARTER_DESCRIPTION", "STARTER_SCL", "Unit", "all_blocks"]
+__all__ = ["CONVEYOR_DESCRIPTION", "STARTER_DESCRIPTION", "STARTER_SCL", "Unit", "all_blocks"]
