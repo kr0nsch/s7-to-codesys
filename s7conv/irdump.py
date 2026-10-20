@@ -2,7 +2,8 @@
 
 Для каждого блока: интерфейс (секции и члены) и сети: LAD/FBD — NetIR (операнды и элементы с UId, провода
 «источник → приёмники»), STL — StlIR (инструкции с номером сети и строки, токен XSD, операнд, метка,
-вызов), SCL — текст сети. Вывод детерминирован (сортировка ключей, LF).
+вызов), SCL — текст сети, GRAPH — SeqIR (шаги с действиями, переходы, ветви, связи) и топология переходов
+(шаги-предшественники и преемники, приоритет альтернативы). Вывод детерминирован (сортировка ключей, LF).
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from typing import Any
 
 from s7conv.frontends.simaticml import XBlock, XUnit, parse_document, tokens_text
 from s7conv.ir.net import End, build_network
+from s7conv.ir.seq import Node, parse_graph, topology
 from s7conv.ir.stl import StlBlock, add_statement_list
 from s7conv.pipeline import display_path, read_source
 
@@ -80,7 +82,62 @@ def _unit(unit: XUnit) -> dict[str, Any]:
         ]
     elif unit.body_kind == "StructuredText":
         base["text"] = tokens_text(unit.body)
+    elif unit.body_kind == "Graph":
+        base.update(_graph(unit))
     return base
+
+
+def _node(n: Node) -> dict[str, Any]:
+    return {"kind": n.kind, "number": n.number, "port": n.port}
+
+
+def _graph(unit: XUnit) -> dict[str, Any]:
+    graph = parse_graph(unit.body)  # type: ignore[arg-type]
+    sequences = []
+    for seq in graph.sequences:
+        topo = topology(seq)
+        sequences.append(
+            {
+                "title": seq.title,
+                "steps": [
+                    {
+                        "number": s.number,
+                        "name": s.name,
+                        "init": s.init,
+                        "actions": [
+                            {
+                                "qualifier": a.qualifier,
+                                "event": a.event,
+                                "interlock": a.interlock,
+                                "operand": a.operand,
+                                "text": a.text,
+                                "time": a.time,
+                            }
+                            for a in s.actions
+                        ],
+                        "supervision": s.supervision is not None,
+                        "interlock": s.interlock is not None,
+                        "max_time": s.max_time,
+                        "warn_time": s.warn_time,
+                    }
+                    for s in seq.steps
+                ],
+                "transitions": [{"number": t.number, "name": t.name, "lang": t.lang} for t in seq.transitions],
+                "branches": [{"number": b.number, "type": b.type, "cardinality": b.cardinality} for b in seq.branches],
+                "connections": [{"from": _node(c.src), "to": _node(c.dst), "link": c.link} for c in seq.connections],
+                "links": [
+                    {"number": k.number, "preds": k.preds, "succs": k.succs, "priority": k.priority, "end": k.end}
+                    for k in topo.links
+                ],
+                "issues": topo.issues,
+            }
+        )
+    return {
+        "sequences": sequences,
+        "pre_operations": len(graph.pre),
+        "post_operations": len(graph.post),
+        "issues": graph.issues,
+    }
 
 
 def _block(blk: XBlock) -> dict[str, Any]:

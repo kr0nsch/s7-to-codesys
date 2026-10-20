@@ -327,3 +327,26 @@ def test_convert_cli_writes_plcopen(tmp_path: Path) -> None:
     assert main(args) == EXIT_OK
     assert (plc / "FB_BackwashGraph.xml").read_text(encoding="utf-8").startswith('<?xml version="1.0"')
     assert (out / "src" / "POUs" / "FB_BackwashGraph" / "FB_BackwashGraph.impl.st").is_file()
+
+
+def test_ir_dump_shows_sequence_and_topology() -> None:
+    """`s7conv ir` для сети GRAPH: шаги с действиями, переходы, ветви, связи и топология переходов."""
+    from s7conv import irdump
+
+    (doc,) = irdump.dump([LANG / "FB_BackwashGraph.xml"])
+    (net,) = doc["blocks"][0]["networks"]
+    assert (net["kind"], net["post_operations"], net["pre_operations"]) == ("Graph", 1, 0)
+    (seq,) = net["sequences"]
+    assert [s["name"] for s in seq["steps"]] == ["Idle", "Drain", "Air", "Rinse", "QuickRinse", "Refill"]
+    assert seq["steps"][1]["supervision"] and seq["steps"][3]["interlock"]
+    assert seq["steps"][2]["actions"][1] == {
+        "qualifier": "D",
+        "event": "",
+        "interlock": False,
+        "operand": "#xAirValve",
+        "text": "#xAirValve,T#2S",
+        "time": "T#2S",
+    }
+    links = {k["number"]: (k["preds"], k["succs"], k["priority"]) for k in seq["links"]}
+    assert links[2] == ([2], [3, 4], 0) and links[3] == ([2], [5], 1) and links[4] == ([3, 4], [6], 0)
+    assert any(c["link"] == "Jump" for c in seq["connections"]) and seq["issues"] == []
