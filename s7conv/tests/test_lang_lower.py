@@ -280,11 +280,12 @@ def test_unknown_part_is_todo_with_uid() -> None:
     assert '"FancyBox"(in := #a);' in text
 
 
-def test_graph_network_is_todo_with_network_reference() -> None:
-    """GRAPH в 1.1.0 не переводится: сеть закомментирована с MIGRATION-TODO и ссылкой на файл и сеть."""
-    ns = "http://www.siemens.com/automation/Openness/SW/NetworkSource/Graph/v4"
-    graph = B.Unit("GRAPH", "Шаги", "", "Graph", [f'<Graph xmlns="{ns}"><Sequence /></Graph>'])
-    blk = fb("FB_Seq", [graph], BOOLS, lang="GRAPH")
+def test_unknown_network_kind_is_todo_with_network_reference() -> None:
+    """Сеть неизвестного вида (здесь — матрица CEM) не переводится: она закомментирована с MIGRATION-TODO и
+    ссылкой на файл и сеть (GRAPH с 1.2.0 переводится: s7conv/tests/test_graph.py)."""
+    ns = "http://www.siemens.com/automation/Openness/SW/NetworkSource/Cem/v1"
+    cem = B.Unit("CEM", "Матрица", "", "Cem", [f'<Cem xmlns="{ns}" />'])
+    blk = fb("FB_Seq", [cem], BOOLS, lang="CEM")
     assert "xml.unit_unsupported" in lower_rules(blk)
     path = Path("FB_Seq.xml")
     doc = parse_document(B.render(blk), str(path))
@@ -295,7 +296,7 @@ def test_graph_network_is_todo_with_network_reference() -> None:
     sf.lowering = lowering
     obj = next(o for o in convert([sf], Project(), Options()).objects if o.name == "FB_Seq")
     assert obj.impl is not None
-    assert "// MIGRATION-TODO: сеть 1: язык GRAPH (Graph) не поддерживается (FB_Seq.xml, сеть 1)" in obj.impl
+    assert "// MIGRATION-TODO: сеть 1: язык CEM (Cem) не поддерживается (FB_Seq.xml, сеть 1)" in obj.impl
     assert all(ln.startswith("//") for ln in obj.impl.splitlines() if ln.strip())
 
 

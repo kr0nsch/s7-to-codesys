@@ -187,6 +187,7 @@ SUPPORT_DEPENDENCIES: dict[str, tuple[str, ...]] = {
     # ENO арифметики S7 для LAD/FBD (lower/net_to_ast.py, правило lad.eno_error)
     **{f"F_S7Eno{op}{ty}": () for op in ("Add", "Sub", "Mul") for ty in ("Int", "Dint")},
     # таймеры и счётчики S5 для STL (lower/stl_lift.py, правила s5.timebase, s5.timer, s5.counter)
+    "F_S7TimeDiff": (),
     "ST_S5Timer": (),
     "ST_S5Counter": (),
     "F_S5FromBcd": (),

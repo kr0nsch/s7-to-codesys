@@ -50,6 +50,8 @@ LANG_FOLDERS = ("Lang", "Converted")
 LANG_SUFFIX = "_Lang"
 LANG_REPORT_REL = "docs/CONVERSION_REPORT_LANG.md"
 LANG_REPORT_HTML_REL = "build/report-lang.html"
+# Вариант SFC блоков S7-GRAPH (PLCopen XML для импорта в CODESYS: tools_project/cds_plcopen.py)
+LANG_PLCOPEN_REL = "plcopen/Lang/Converted"
 
 # Каталоги, которыми сборка владеет целиком: лишние файлы в них удаляются (--check сообщает о них)
 MANAGED_DIRS = (
@@ -61,6 +63,7 @@ MANAGED_DIRS = (
 LANG_MANAGED_DIRS = (
     *(f"src/{cat}/{LANG_FOLDER}" for cat in L.CATEGORIES),
     f"tests/POUs/{TG.LANG_SCENARIO_FOLDER}",
+    LANG_PLCOPEN_REL,
 )
 
 
@@ -290,6 +293,12 @@ def _build_lang(root: Path, built: CorpusBuild) -> None:
         title="Отчёт конвертации S7 (LAD, FBD, STL, SCL) → ST CODESYS",
     )
     built.warnings.extend(lang_result.errors)
+    from s7conv.plcopen import graph_sfc
+
+    sfc = graph_sfc(list(lang_inputs.xml), base=root)
+    for name, xml in sfc.files.items():
+        lang_files[f"{LANG_PLCOPEN_REL}/{name}.xml"] = xml
+    built.warnings.extend(f"{name}: вариант SFC не построен — {why}" for name, why in sfc.skipped.items())
     lang_scenarios = root / LANG_SCENARIOS_REL
     if any(lang_scenarios.glob("*.csv")):  # свои блоки XML без сценариев: код и отчёт без наборов
         source = TG.ScenarioSource(lang_scenarios, lang_result, TG.load_aliases(lang_scenarios))
@@ -417,6 +426,7 @@ __all__ = [
     "LANG_CORPUS_REL",
     "LANG_FOLDER",
     "LANG_FOLDERS",
+    "LANG_PLCOPEN_REL",
     "LANG_REPORT_REL",
     "LANG_SCENARIOS_REL",
     "LANG_SUFFIX",

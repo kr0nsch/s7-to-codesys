@@ -17,7 +17,8 @@
           "Interface": "Interface/v5",
           "FlgNet": "NetworkSource/FlgNet/v5",
           "StatementList": "NetworkSource/StatementList/v5",
-          "StructuredText": "NetworkSource/StructuredText/v4"
+          "StructuredText": "NetworkSource/StructuredText/v4",
+          "Graph": "NetworkSource/Graph/v6"
         },
         "schemas": {
           "Sections": "SW.InterfaceSections_v5.xsd",

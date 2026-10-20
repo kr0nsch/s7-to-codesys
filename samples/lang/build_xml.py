@@ -24,14 +24,15 @@ from xml.sax.saxutils import escape, quoteattr
 
 HERE = Path(__file__).resolve().parent
 SW = "http://www.siemens.com/automation/Openness/SW"
-# Пространства имён по версиям TIA: Interface и FlgNet V21 — из экспортов lad-cookbook (V21), STL и SCL —
-# по номеру файла XSD своей версии (STL_v5, SCL_v4) [M]
+# Пространства имён по версиям TIA: Interface и FlgNet V21 — из экспортов lad-cookbook (V21), STL, SCL и GRAPH —
+# по номеру файла XSD своей версии (STL_v5, SCL_v4, Graph_v6) [M]
 NAMESPACES: dict[str, dict[str, str]] = {
     "V21": {
         "Interface": f"{SW}/Interface/v5",
         "FlgNet": f"{SW}/NetworkSource/FlgNet/v5",
         "StatementList": f"{SW}/NetworkSource/StatementList/v5",
         "StructuredText": f"{SW}/NetworkSource/StructuredText/v4",
+        "Graph": f"{SW}/NetworkSource/Graph/v6",
     },
 }
 DEFAULT_TIA = "V21"
@@ -211,6 +212,12 @@ class Net:
         self.wire(acc, (c, "operand"))
         return c
 
+    def cond_coil(self, src: Src, kind: str = "TrCoil") -> int:
+        """Катушка условия GRAPH: переход (TrCoil), контроль (SvCoil), блокировка (IlCoil)."""
+        c = self.part(kind)
+        self.wire(src, (c, "in"))
+        return c
+
     def orr(self, *srcs: Src) -> tuple[int, str]:
         o = self.part("O", templates=[("Card", "Cardinality", str(len(srcs)))])
         for n, s in enumerate(srcs, start=1):
@@ -388,6 +395,161 @@ class Stl:
 
 
 # ---------------------------------------------------------------------------
+# GRAPH: последовательность (Graph_v6)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class GAction:
+    """Действие шага: квалификатор, операнд или инструкция SCL, событие, блокировка, время (D, L)."""
+
+    qualifier: str
+    text: str
+    event: str = ""
+    interlock: bool = False
+    time: str = ""
+
+
+@dataclass
+class GStep:
+    number: int
+    name: str
+    init: bool = False
+    actions: list[GAction] = field(default_factory=list)
+    supervision: Net | None = None
+    interlock: Net | None = None
+    max_time: str | None = None
+    warn_time: str | None = None
+
+
+@dataclass
+class GTransition:
+    number: int
+    name: str
+    net: Net
+
+
+@dataclass
+class GBranch:
+    number: int
+    type: str  # AltBegin | AltEnd | SimBegin | SimEnd
+    cardinality: int
+
+
+# узел связи: ("S", n) | ("T", n) | ("B", n, вход, выход) | ("END",)
+GNode = tuple[object, ...]
+
+
+@dataclass
+class GSequence:
+    title: str
+    steps: list[GStep] = field(default_factory=list)
+    transitions: list[GTransition] = field(default_factory=list)
+    branches: list[GBranch] = field(default_factory=list)
+    connections: list[tuple[GNode, GNode, str]] = field(default_factory=list)  # (откуда, куда, Direct|Jump)
+
+
+def _gnode_xml(node: GNode) -> str:
+    kind = node[0]
+    if kind == "S":
+        return f'<StepRef Number="{node[1]}" />'
+    if kind == "T":
+        return f'<TransitionRef Number="{node[1]}" />'
+    if kind == "B":
+        attrs = f'Number="{node[1]}"'
+        if len(node) > 2 and node[2] is not None:
+            attrs += f' In="{node[2]}"'
+        if len(node) > 3 and node[3] is not None:
+            attrs += f' Out="{node[3]}"'
+        return f"<BranchRef {attrs} />"
+    return "<EndConnection />"
+
+
+def _gaction_xml(a: GAction, ind: str) -> list[str]:
+    attrs = f'Event="{a.event}" Interlock="{str(a.interlock).lower()}" Qualifier="{a.qualifier}"'
+    if a.time:
+        pieces = [access_xml(a.text, None, "")[0], '<Token Text="," />', access_xml(a.time, None, "")[0]]
+    elif a.text.startswith("#") and " " not in a.text:
+        pieces = [access_xml(a.text, None, "")[0]]
+    else:
+        pieces = Scl("", a.text).pieces()
+    return [f"{ind}<Action {attrs}>", *[f"{ind}  {p}" for p in pieces], f"{ind}</Action>"]
+
+
+def _gcond_xml(tag: str, net: Net | None, flgnet_ns: str, ind: str) -> list[str]:
+    """Supervisions/Interlocks шага: условие — сеть LAD с катушкой SvCoil/IlCoil; нет условия — пустая сеть
+    (`<Parts />` без `<Wires />`: в XSD LADFBD_v5 Wires необязателен, но пустым быть не может)."""
+    inner = tag[:-1]
+    out = [f"{ind}<{tag}>", f'{ind}  <{inner} ProgrammingLanguage="LAD">']
+    if net is not None:
+        out += net.xml(flgnet_ns, ind + "    ")
+    else:
+        out.append(f'{ind}    <FlgNet xmlns="{flgnet_ns}"><Parts /></FlgNet>')
+    out += [f"{ind}  </{inner}>", f"{ind}</{tag}>"]
+    return out
+
+
+def graph_unit(seq: GSequence, pre: Sequence[Net] = (), post: Sequence[Net] = (), tia: str = DEFAULT_TIA) -> Unit:
+    """Последовательность GRAPH → сеть CompileUnit с <Graph> (одна последовательность, пред- и постоперации)."""
+    ns = NAMESPACES[tia]
+    ind = "            "
+    i2, i3, i4, i5 = ind + "  ", ind + "    ", ind + "      ", ind + "        "
+    out = [f'{ind}<Graph xmlns="{ns["Graph"]}">', f"{i2}<PreOperations>"]
+    for net in pre:
+        out += [f'{i3}<PermanentOperation ProgrammingLanguage="{net.lang}">', *net.xml(ns["FlgNet"], i4)]
+        out.append(f"{i3}</PermanentOperation>")
+    out += [f"{i2}</PreOperations>", f"{i2}<Sequence>", f"{i3}<Steps>"]
+    for st in seq.steps:
+        attrs = f'Number="{st.number}" Init="{str(st.init).lower()}" Name="{escape(st.name)}"'
+        if st.max_time:
+            attrs += f' MaximumStepTime="{st.max_time}"'
+        if st.warn_time:
+            attrs += f' WarningTime="{st.warn_time}"'
+        out += [f"{i4}<Step {attrs}>", f"{i5}<Actions>"]
+        for a in st.actions:
+            out += _gaction_xml(a, i5 + "  ")
+        out.append(f"{i5}</Actions>")
+        out += _gcond_xml("Supervisions", st.supervision, ns["FlgNet"], i5)
+        out += _gcond_xml("Interlocks", st.interlock, ns["FlgNet"], i5)
+        out.append(f"{i4}</Step>")
+    out += [f"{i3}</Steps>", f"{i3}<Transitions>"]
+    for tr in seq.transitions:
+        out.append(f'{i4}<Transition Name="{escape(tr.name)}" Number="{tr.number}" ProgrammingLanguage="LAD">')
+        out += tr.net.xml(ns["FlgNet"], i5)
+        out.append(f"{i4}</Transition>")
+    out += [f"{i3}</Transitions>", f"{i3}<Branches>"]
+    out += [f'{i4}<Branch Number="{b.number}" Type="{b.type}" Cardinality="{b.cardinality}" />' for b in seq.branches]
+    out += [f"{i3}</Branches>", f"{i3}<Connections>"]
+    for src, dst, link in seq.connections:
+        out.append(
+            f"{i4}<Connection><NodeFrom>{_gnode_xml(src)}</NodeFrom><NodeTo>{_gnode_xml(dst)}</NodeTo>"
+            f"<LinkType>{link}</LinkType></Connection>"
+        )
+    out += [f"{i3}</Connections>", f"{i2}</Sequence>", f"{i2}<PostOperations>"]
+    for net in post:
+        out += [f'{i3}<PermanentOperation ProgrammingLanguage="{net.lang}">', *net.xml(ns["FlgNet"], i4)]
+        out.append(f"{i3}</PermanentOperation>")
+    out += [
+        f"{i2}</PostOperations>",
+        f"{i2}<AlarmsSettings>",
+        f'{i3}<AlarmSupervisionCategories><AlarmSupervisionCategory Id="1" DisplayClass="0" />'
+        "</AlarmSupervisionCategories>",
+        f'{i3}<AlarmInterlockCategory Id="1" />',
+        f'{i3}<AlarmSubcategory1Interlock Id="0" />',
+        f'{i3}<AlarmSubcategory2Interlock Id="0" />',
+        f'{i3}<AlarmCategorySupervision Id="1" />',
+        f'{i3}<AlarmSubcategory1Supervision Id="0" />',
+        f'{i3}<AlarmSubcategory2Supervision Id="0" />',
+        f'{i3}<AlarmWarningCategory Id="2" />',
+        f'{i3}<AlarmSubcategory1Warning Id="0" />',
+        f'{i3}<AlarmSubcategory2Warning Id="0" />',
+        f"{i2}</AlarmsSettings>",
+        f"{ind}</Graph>",
+    ]
+    return Unit("GRAPH", seq.title, "", "Graph", out)
+
+
+# ---------------------------------------------------------------------------
 # SCL в XML: токены StructuredText
 # ---------------------------------------------------------------------------
 
@@ -412,6 +574,11 @@ class Scl:
         self.instances = instances or {}  # #имя экземпляра -> инструкция (TON) или FB
 
     def xml(self, ns: str, ind: str) -> list[str]:
+        pieces = self.pieces()
+        return [f'{ind}<StructuredText xmlns="{ns}">', *[f"{ind}  {p}" for p in pieces], f"{ind}</StructuredText>"]
+
+    def pieces(self) -> list[str]:
+        """Текст SCL → элементы Token, Blank, NewLine, Access (без обёртки StructuredText)."""
         pieces: list[str] = []
         tokens = list(_SCL_TOKEN_RE.finditer(self.text))
         pos = 0
@@ -446,7 +613,7 @@ class Scl:
             i += 1
         if pos != len(self.text):
             raise ValueError(f"SCL: не разобран хвост {self.text[pos:]!r}")
-        return [f'{ind}<StructuredText xmlns="{ns}">', *[f"{ind}  {p}" for p in pieces], f"{ind}</StructuredText>"]
+        return pieces
 
     def _call(self, inst: str, tokens: list[re.Match[str]], i: int) -> tuple[str, int, int]:
         """`#inst(A := x, B := y)` → Access Scope=Call с Instruction/CallInfo и Parameter."""

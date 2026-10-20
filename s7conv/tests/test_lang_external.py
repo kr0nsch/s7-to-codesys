@@ -65,7 +65,7 @@ def _strip(el: Any) -> Any:
     return el
 
 
-FRAGMENTS = ("Sections", "FlgNet", "StatementList", "StructuredText")
+FRAGMENTS = ("Sections", "FlgNet", "StatementList", "StructuredText", "Graph")
 
 
 def test_corpus_validates_against_v21_xsd() -> None:

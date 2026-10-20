@@ -184,7 +184,13 @@ def _sorted_notes(notes: Sequence[Note]) -> list[Note]:
 # ---------------------------------------------------------------------------
 
 LANG_ORDER = ("LAD", "FBD", "STL", "SCL", "GRAPH", "DB", "UDT")
-UNIT_KINDS = {"element": "элемент", "network": "сеть", "instruction": "инструкция", "step": "шаг"}
+UNIT_KINDS = {
+    "element": "элемент",
+    "network": "сеть",
+    "instruction": "инструкция",
+    "step": "шаг",
+    "transition": "переход",
+}
 UNIT_STATUSES = (AUTO, CHECK, TODO, "impossible")
 UNIT_STATUS_LABEL = {AUTO: "авто", CHECK: "проверка", TODO: "нет", "impossible": "невозможно"}
 LANG_RULE_TITLES = {
@@ -249,6 +255,15 @@ LANG_RULE_TITLES = {
     "stl.bracket_depth": "STL: глубина скобок",
     "stl.unknown": "STL: неизвестный токен",
     "s5.timer": "S5: таймер",
+    "graph.supervision": "GRAPH: контроль шага с квитированием",
+    "graph.timer_clock": "GRAPH: действие D/L по времени шага",
+    "graph.alt_priority": "GRAPH: приоритет альтернативной ветви",
+    "graph.cycle_order": "GRAPH: порядок цикла последовательности",
+    "graph.action_unsupported": "GRAPH: действие не переводится",
+    "graph.event_unsupported": "GRAPH: событие не переводится",
+    "graph.mode_unsupported": "GRAPH: режимы и ручной выбор шагов",
+    "graph.step_time_limits": "GRAPH: предел времени шага (MaximumStepTime, WarningTime)",
+    "lad.graph_condition": "GRAPH: условие перехода, контроля, блокировки",
     "s5.timebase": "S5: пуск таймера — время и шкала по модели S7Compat",
     "s5.address": "S5: операнд не таймер и не счётчик",
     "s5.counter": "S5: счётчик",

@@ -24,6 +24,7 @@ from s7conv import pipeline as P
 from s7conv import testgen as TG
 from s7conv.emitter import ConversionResult, Options
 from s7conv.frontends.simaticml import XBlock, parse_document
+from s7conv.semantics.graph_seq import GraphEvaluator
 from s7conv.semantics.net_eval import EvalError, NetEvaluator
 from s7conv.semantics.stl_machine import StlError, StlEvaluator
 from s7conv.semantics.values import UNDEF, Value, type_key
@@ -187,13 +188,17 @@ def _same(a: Value, b: Value) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _reference(blk: XBlock, registry: dict[str, XBlock], cpu: str | None) -> NetEvaluator | StlEvaluator:
+def _reference(
+    blk: XBlock, registry: dict[str, XBlock], cpu: str | None
+) -> NetEvaluator | StlEvaluator | GraphEvaluator:
     lang = blk.lang.upper()
     if lang in ("LAD", "FBD", "LAD_IEC", "FBD_IEC"):
         return NetEvaluator(blk, registry)
     if lang == "STL":
         profile = cpu or ("s7-1500" if blk.memory_layout.lower() == "optimized" else "s7-300")
         return StlEvaluator(blk, profile)
+    if lang == "GRAPH":
+        return GraphEvaluator(blk)
     raise EvalError(f"эталона для {lang} нет")
 
 

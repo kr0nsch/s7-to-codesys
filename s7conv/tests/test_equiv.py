@@ -54,7 +54,15 @@ def test_semantics_does_not_import_the_translator() -> None:
 def test_corpus_has_no_divergences(jumps: str) -> None:
     report = E.run_equiv([str(LANG)], SCENARIOS, random_calls=200, seed=20261019, stl_jumps=jumps)
     names = {b.block for b in report.blocks}
-    assert {"FB_StarterLad", "FB_StarterFbd", "FB_StarterStl", "FB_StarterScl", "FB_PumpInterlockLad"} <= names
+    assert {
+        "FB_StarterLad",
+        "FB_StarterFbd",
+        "FB_StarterStl",
+        "FB_StarterScl",
+        "FB_PumpInterlockLad",
+        "FB_ConveyorStl",
+        "FB_BackwashGraph",
+    } <= names
     for b in report.blocks:
         assert not b.skipped, (b.block, b.skipped)
         assert b.divergence is None, b.divergence.format()

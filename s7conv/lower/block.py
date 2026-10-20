@@ -104,8 +104,12 @@ def _name(name: str) -> str:
     return name if name.replace("_", "a").isalnum() and not name[0].isdigit() else f'"{name}"'
 
 
-def _interface(blk: XBlock, out: _Out, temps: list[tuple[str, str, str]]) -> None:
+def _interface(
+    blk: XBlock, out: _Out, temps: list[tuple[str, str, str]], statics: list[tuple[str, str, str]] | None = None
+) -> None:
     temps_done = False
+    statics = statics or []
+    statics_done = False
     for sec in blk.sections:
         if sec.name in ("Return", "None", "Base") or (not sec.members and sec.name != "Temp"):
             continue
@@ -121,6 +125,9 @@ def _interface(blk: XBlock, out: _Out, temps: list[tuple[str, str, str]]) -> Non
             groups = [(kw, sec.members)]
         for keyword, members in groups:
             extra = temps if sec.name == "Temp" else []
+            if sec.name == "Static" and keyword == "VAR":
+                extra = statics
+                statics_done = True
             temps_done = temps_done or sec.name == "Temp"
             if not members and not extra:
                 continue
@@ -130,6 +137,11 @@ def _interface(blk: XBlock, out: _Out, temps: list[tuple[str, str, str]]) -> Non
             for name, typ, comment in extra:
                 out.add(f"      {name} : {typ};   // {comment}", "временные понижения")
             out.add("   END_VAR", f"интерфейс, {sec.name}")
+    if statics and not statics_done:
+        out.add("   VAR", "состояние последовательности")
+        for name, typ, comment in statics:
+            out.add(f"      {name} : {typ};   // {comment}", "состояние последовательности")
+        out.add("   END_VAR", "состояние последовательности")
     if temps and not temps_done:
         out.add("   VAR_TEMP", "временные понижения")
         for name, typ, comment in temps:
@@ -199,7 +211,7 @@ def lower_block(blk: XBlock, registry: dict[str, XBlock], options: LowerOptions)
         out.add("END_DATA_BLOCK", head_trace)
         return out.lines, bl
     temps = [(t.name, t.type, t.comment) for t in bl.temps]
-    _interface(blk, out, temps)
+    _interface(blk, out, temps, [(t.name, t.type, t.comment) for t in bl.statics])
     out.add("BEGIN", head_trace)
     if blk.kind in ("FB", "FC", "OB"):
         first = True
@@ -251,6 +263,10 @@ def _lower_body(bl: BlockLower) -> None:
         flush()
         if kind == "StructuredText":
             _scl_unit(bl, unit)
+        elif kind == "Graph":
+            from s7conv.lower.seq_to_ast import lower_graph
+
+            lower_graph(bl, unit)
         elif not kind:
             _empty_unit(bl, unit)
         else:
@@ -260,6 +276,20 @@ def _lower_body(bl: BlockLower) -> None:
             bl.emit(f'"{kind}"(); // сеть {unit.number}, {unit.lang}', f"сеть {unit.number}", [note])
             bl.unit("network", TODO, "xml.unit_unsupported", f"сеть {unit.number}")
     flush()
+
+
+def _strategy(blk: XBlock) -> str:
+    """Стратегия перевода для отчёта: GRAPH — ST-двойник и, если последовательность выражается в SFC, вариант
+    SFC в PLCopen XML (`s7conv convert --plcopen`, build-corpus: plcopen/Lang/Converted)."""
+    if not any(u.body_kind == "Graph" for u in blk.units):
+        return "st"
+    from s7conv.plcopen.sfc import SfcError, sfc_project
+
+    try:
+        sfc_project(blk, blk.name)
+    except SfcError:
+        return "st"
+    return "st + sfc"
 
 
 def lower_document(
@@ -273,7 +303,7 @@ def lower_document(
         lines, bl = lower_block(blk, registry, options)
         support |= bl.support
         lowering.langs[blk.name.lower()] = bl.lang
-        lowering.strategies[blk.name.lower()] = "st"
+        lowering.strategies[blk.name.lower()] = _strategy(blk)
         version = f", пространство имён {blk.interface_ns}" if blk.interface_ns else ""
         lowering.origin[blk.name.lower()] = f'{bl.lang}, {KIND_LABEL[blk.kind]} "{blk.name}"{version}'
         lowering.units.extend(bl.units)

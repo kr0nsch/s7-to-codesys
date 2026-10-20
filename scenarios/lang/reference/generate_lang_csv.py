@@ -23,6 +23,7 @@ for path in (HERE, LIB_DIR):
     if path not in sys.path:
         sys.path.insert(0, path)
 
+import model_fb_backwash_graph  # noqa: E402
 import model_fb_conveyor_stl  # noqa: E402
 import model_fb_pump_interlock_lad  # noqa: E402
 import model_fb_starter  # noqa: E402
@@ -32,6 +33,7 @@ BLOCKS: tuple[BlockScenarios, ...] = (
     model_fb_starter.BLOCK,
     model_fb_pump_interlock_lad.BLOCK,
     model_fb_conveyor_stl.BLOCK,
+    model_fb_backwash_graph.BLOCK,
 )
 
 

@@ -43,6 +43,10 @@ RULE_TESTS: dict[str, tuple[str, ...]] = {
     "unknown_part": ("test_unknown_part_is_todo_with_uid",),
     "wire": ("test_corrupted_xml_never_crashes",),
     "vocab_unverified": ("test_unverified_vocabulary_is_at_most_check",),
+    "graph_condition": (
+        "test_graph_condition_coils_become_st_assignments",
+        "test_twin_and_reference_agree_on_scenarios_and_random_calls",
+    ),
     # M4: STL
     "stl.logic": ("test_stl_and_before_or_and_brackets", "test_random_stl_chains_match_machine"),
     "stl.edge": ("test_stl_fp_jcn_label_becomes_if_without_jmp",),

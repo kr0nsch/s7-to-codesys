@@ -80,6 +80,25 @@ HAND_CHECKS: list[tuple[str, str, int, str, Value]] = [
     ("FB_PumpInterlockLad", "MaintenanceJump", 6, "iRunCount", 2),
     ("FB_PumpInterlockLad", "SetpointClamp", 3, "iSetpoint_pct", 20),  # 15 → 15 → 15 → 20
     ("FB_PumpInterlockLad", "SetpointClamp", 4, "iSetpoint_pct", 20),  # 5 → 5 → 10 → 20
+    # FB_ConveyorStl: шкала S5T#2S — 10 мс, остаток L T — в единицах шкалы
+    ("FB_ConveyorStl", "StartSequence", 1, "iDelayLeft", 200),  # 2 с / 10 мс
+    ("FB_ConveyorStl", "StartSequence", 2, "iDelayLeft", 170),  # прошло 0,3 с
+    ("FB_ConveyorStl", "StartSequence", 3, "xHorn", False),  # SP 1 с истёк ровно в 1 с
+    ("FB_ConveyorStl", "StartSequence", 5, "xMotor", True),  # SD 2 с истёк, SF T3 = 1 сразу
+    ("FB_ConveyorStl", "HornCutShort", 3, "iDelayLeft", 170),  # RLO SD = 0: остаток замер
+    ("FB_ConveyorStl", "CountResetIsLevel", 6, "iCount", 0),  # R по уровню после CU того же вызова
+    # FB_BackwashGraph: активация Air в t = 1000 мс; квитирование — до переходов того же вызова
+    ("FB_BackwashGraph", "LongWash", 2, "iWashCount", 1),  # событие S1 при активации Drain
+    ("FB_BackwashGraph", "LongWash", 3, "iWashCount", 1),  # шаг активен, события нет
+    ("FB_BackwashGraph", "LongWash", 5, "xAirValve", False),  # D 2 с: прошло 0,1 с
+    ("FB_BackwashGraph", "LongWash", 6, "xAirValve", True),  # ровно 2 с
+    ("FB_BackwashGraph", "LongWash", 7, "xBlower", True),  # Air.T = 9,7 с < 10 с
+    ("FB_BackwashGraph", "LongWash", 8, "xInletValve", True),  # Air.T = 10 с: T4 — Refill
+    ("FB_BackwashGraph", "LongWash", 8, "xWashActive", False),  # R xWashActive в Refill
+    ("FB_BackwashGraph", "Supervision", 5, "xDrainValve", True),  # переход держит ошибка контроля
+    ("FB_BackwashGraph", "Supervision", 6, "ERR_FLT", True),  # квитирование при неисправности — снова
+    ("FB_BackwashGraph", "AckSwitches", 5, "xWashPump", True),  # квитирование и T3 в одном вызове
+    ("FB_BackwashGraph", "AckSwitches", 5, "ERR_FLT", False),  # Drain выключен — контроль не действует
 ]
 
 

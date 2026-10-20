@@ -119,6 +119,19 @@ reason = "Ложное срабатывание iec_checker 0.4: экземпл�
 
 [[allow]]
 id = "UnusedVariable"
+file = "tests/POUs/Graph/*/*_SeqTest.decl.st"
+match = "variable: CYCLES$"
+reason = "Артефакт понижения: число циклов шага многоциклового набора GRAPH (VAR CONSTANT) используется в методах-тестах, которые сборка выносит в отдельные функции"
+
+[[allow]]
+id = "UnusedVariable"
+file = "tests/POUs/Graph/*/*.method.decl.st"
+match = "variable: FBDUT$"
+checker = "v0.4"
+reason = "Ложное срабатывание iec_checker 0.4: экземпляр проверяемого блока используется вызовом fbDut(...) и чтением выходов — это он не считает использованием (как в tests/POUs/S7Compat)"
+
+[[allow]]
+id = "UnusedVariable"
 file = "tests/POUs/PRG_Tests/PRG_Tests.decl.st"
 match = "variable: FB[A-Z0-9_]*TEST$"
 reason = "Экземпляры наборов регистрируются в coUnit самим объявлением и используются вызовом AreAllTestsFinished()"

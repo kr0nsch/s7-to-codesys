@@ -81,6 +81,7 @@ def test_language_scenario_suites_are_in_own_folder_and_prg_tests(built: C.Corpu
             "FB_StarterScl",
             "FB_PumpInterlockLad",
             "FB_ConveyorStl",
+            "FB_BackwashGraph",
         )
     )
     assert all(s.obj.folder == [TG.LANG_SCENARIO_FOLDER] for s in built.lang_tests.suites)

@@ -2039,6 +2039,17 @@ class Emitter:
                 return self.instance_call(var.st_name, var, c.args)
             if upper in M.S5_TIMER_CALLS or upper in M.S5_COUNTER_CALLS:
                 return self.s5_call(c, upper)
+            if upper == "S7_TIMEDIFF" and len(c.args) == 2:
+                # время активности шага ST-двойника GRAPH: разность моментов F_S7Now по модулю 2^32
+                self.support.add("F_S7TimeDiff")
+                self.hit("graph.time")
+                now, start = (self.ex(a.value, "TIME") for a in c.args)
+                return f"F_S7TimeDiff({now}, {start})"
+            if upper == "S7_NOW" and not c.args:
+                # время ST-двойника GRAPH (lower/seq_to_ast.py): F_S7Now — TIME(), в тестах — часы GVL_S7Clock
+                self.support.add("F_S7Now")
+                self.hit("graph.time")
+                return "F_S7Now()"
             rule = M.FUNCTIONS.get(upper)
             if rule is None and (upper.startswith("NORM_X_") or upper.startswith("SCALE_X_")):
                 rule = M.FUNCTIONS[upper[: upper.index("_X_") + 2]]
@@ -2427,6 +2438,8 @@ class Emitter:
             s5 = M.S5_TIMER_CALLS.get(upper) or M.S5_COUNTER_CALLS.get(upper)
             if s5 is not None:
                 return Ty(s5[1])
+            if upper in ("S7_NOW", "S7_TIMEDIFF"):
+                return Ty("TIME")
             if upper in ("NORM_X", "SCALE_X") or upper.startswith(("NORM_X_", "SCALE_X_")):
                 return Ty("REAL")
             if upper in ("ABS", "LIMIT", "MIN", "MAX", "SEL", "MUX", "SQR", "SQRT", "EXPT"):

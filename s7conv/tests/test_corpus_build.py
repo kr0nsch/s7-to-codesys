@@ -113,7 +113,8 @@ def _mini_repo(tmp: Path) -> Path:
     for rel in ("samples/scl", "samples/lang", "scenarios"):
         shutil.copytree(REPO_ROOT / rel, root / rel, ignore=shutil.ignore_patterns("__pycache__", "reference"))
     shutil.copytree(REPO_ROOT / "src", root / "src", ignore=shutil.ignore_patterns(C.FOLDER))
-    shutil.copytree(REPO_ROOT / "tests" / "POUs" / "S7Compat", root / "tests" / "POUs" / "S7Compat")
+    for suites in ("S7Compat", "Graph"):  # рукописные наборы (PRG_Tests объявляет и их)
+        shutil.copytree(REPO_ROOT / "tests" / "POUs" / suites, root / "tests" / "POUs" / suites)
     (root / "tools" / "codesys").mkdir(parents=True)
     shutil.copy(REPO_ROOT / C.CONFIG_REL, root / C.CONFIG_REL)
     (root / "docs").mkdir()

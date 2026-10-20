@@ -133,6 +133,7 @@ class BlockLower:
     stl_jumps: str = "structured"
     lines: list[LLine] = field(default_factory=list)
     temps: list[Temp] = field(default_factory=list)
+    statics: list[Temp] = field(default_factory=list)  # GRAPH: состояние шагов (VAR синтезированного ФБ)
     units: list[LangUnit] = field(default_factory=list)
     block_notes: list[LowerNote] = field(default_factory=list)
     support: set[str] = field(default_factory=set)
@@ -151,6 +152,16 @@ class BlockLower:
         self.temps.append(Temp(name, type_name, comment))
         return f"#{name}"
 
+    def static(self, name: str, type_name: str, comment: str) -> str:
+        """Статическая переменная с уникальным именем (VAR синтезированного ФБ): сохраняется между вызовами."""
+        base, n = name, 2
+        while name.lower() in self._taken:
+            name = f"{base}_{n}"
+            n += 1
+        self._taken.add(name.lower())
+        self.statics.append(Temp(name, type_name, comment))
+        return f"#{name}"
+
     def emit(self, text: str, trace: str, notes: list[LowerNote] | tuple[LowerNote, ...] = ()) -> None:
         self.lines.append(LLine(text, trace, list(notes)))
 
@@ -164,7 +175,7 @@ class BlockLower:
         name = text[1:].split(".", 1)[0].split("[", 1)[0].strip('"')
         found = self.block.member_type(name)
         if found is None:
-            for t in self.temps:
+            for t in [*self.temps, *self.statics]:
                 if t.name.lower() == name.lower():
                     return t.type
         return found

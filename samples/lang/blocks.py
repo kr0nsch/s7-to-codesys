@@ -12,12 +12,32 @@
 - FC_ClampPctLad — ограничение значения (LAD), вызывается из FB_PumpInterlockLad;
 - FB_ConveyorStl — конвейер на STL S7-300 с таймерами S5 (SP, SE, SD, SS, SF, FR, R, L/LC T) и счётчиком S5
   (CU, R, L/LC C);
+- FB_BackwashGraph — промывка фильтра на GRAPH S7-1500: начальный шаг, альтернативная и параллельная
+  ветви, прыжок, действия N, S, R, D, NC с блокировкой, событие S1, контроль с квитированием ACK_EF,
+  постоперация;
 - DB_Process (стандартный доступ, смещения членов) и UDT_Valve — данные для STL.
 """
 
 from __future__ import annotations
 
-from build_xml import Block, Member, Net, Scl, Section, Stl, Unit, lad_unit, scl_unit, stl_unit
+from build_xml import (
+    Block,
+    GAction,
+    GBranch,
+    GSequence,
+    GStep,
+    GTransition,
+    Member,
+    Net,
+    Scl,
+    Section,
+    Stl,
+    Unit,
+    graph_unit,
+    lad_unit,
+    scl_unit,
+    stl_unit,
+)
 
 STARTER_DESCRIPTION = """Пускатель насоса с контролем обратной связи (один блок на LAD, FBD, STL, SCL).
 1. Пуск/стоп — SR с битом-операндом xRunMem: S = xStart AND xInterlock; R1 = xStop OR NOT xInterlock OR xFault.
@@ -474,17 +494,18 @@ def clamp_pct_lad() -> Block:
 # FB_ConveyorStl: таймеры и счётчик S5 на STL S7-300
 # ---------------------------------------------------------------------------
 
-CONVEYOR_DESCRIPTION = """Ленточный конвейер выдачи реагента (STL S7-300): таймеры и счётчик S5.
-1. Запрос работы xReq: S по xStart, затем R по xStop OR xJam (сброс главнее; xJam — прошлого вызова).
-2. Сирена: SP T1 1 с по фронту xReq — xHorn = T1; снятие запроса обрывает сирену.
-3. Задержка пуска: SD T2 2 с, RLO = xReq.
-4. Выбег: SF T3 3 с, RLO = T2 — xMotor = T3 (двигатель работает, пока T2 = 1, и 3 с после).
-5. Контроль потока: SE T4 4 с по каждому фронту xSensor — xFlowOk = T4. Взвод контроля: SS T5 5 с по фронту
-   xMotor, сброс T5 (R) при xMotor = 0. Затор: T5 AND NOT T4 → S xJam. Квитирование xAck: FR T4 (при
-   удерживаемом xSensor контроль запускается снова), R xJam.
-6. Диагностика: iDelayLeft := L T2 (остаток задержки, единицы 10 мс), wRunOutBcd := LC T3 (BCD со шкалой).
-7. Счётчик изделий C1: CU по xSensor, R по xCountReset (по уровню); iCount := L C1, wCountBcd := LC C1.
-Таймеры и счётчик S5 — глобальные объекты CPU (T1–T5, C1)."""
+CONVEYOR_DESCRIPTION = "\n".join(
+    [
+        "Ленточный конвейер выдачи реагента (STL S7-300); таймеры T1–T5 и счётчик C1 S5 — глобальные.",
+        "1. Запрос xReq: S по xStart, затем R по xStop OR xJam (сброс главнее; xJam — прошлого вызова).",
+        "2. Сирена: SP T1 1 с по фронту xReq, xHorn = T1; снятие запроса обрывает. 3. SD T2 2 с, RLO = xReq.",
+        "4. Выбег: SF T3 3 с, RLO = T2, xMotor = T3. 5. Поток: SE T4 4 с по фронту xSensor, xFlowOk = T4;",
+        "взвод SS T5 5 с по фронту xMotor, R T5 при xMotor = 0; затор T5 AND NOT T4 → S xJam; xAck: FR T4",
+        "(при удерживаемом xSensor контроль запускается снова), R xJam.",
+        "6. iDelayLeft := L T2 (остаток задержки, единицы 10 мс), wRunOutBcd := LC T3 (BCD со шкалой).",
+        "7. Счётчик C1: CU по xSensor, R по xCountReset (по уровню); iCount := L C1, wCountBcd := LC C1.",
+    ]
+)
 
 
 def conveyor_stl() -> Block:
@@ -511,7 +532,7 @@ def conveyor_stl() -> Block:
     return Block(
         "FB",
         "FB_ConveyorStl",
-        110,
+        115,
         lang="STL",
         title="Конвейер выдачи реагента (STL, таймеры S5)",
         comment=CONVEYOR_DESCRIPTION,
@@ -547,6 +568,151 @@ def conveyor_stl() -> Block:
             Section("Constant"),
         ],
         units=[stl_unit(x) for x in (n1, n2, n3, n4, n5, n6, n7)],
+    )
+
+
+# ---------------------------------------------------------------------------
+# FB_BackwashGraph: последовательность GRAPH (S7-1500)
+# ---------------------------------------------------------------------------
+
+BACKWASH_DESCRIPTION = "\n".join(
+    [
+        "Промывка скорого фильтра (GRAPH S7-1500), шаги S1–S6. S1 Idle (начальный): N xReady.",
+        "T1 Start: xStart. S2 Drain: N xDrainValve, S xWashActive, событие S1 — iWashCount + 1;",
+        "контроль xValveFault держит шаг до квитирования ACK_EF (ERR_FLT = 1). После S2 альтернатива:",
+        "T2 LongWash (xLevelLow AND NOT xShortWash) — параллельно S3 Air (N xBlower, D xAirValve 2 с)",
+        "и S4 Rinse (NC xWashPump, блокировка xPumpOk), синхронизация T4 AirDone: Air.T >= 10 с;",
+        "T3 ShortWash (xLevelLow AND xShortWash) — S5 QuickRinse (N xWashPump), T5 QuickDone: xLevelHigh.",
+        "S6 Refill: N xInletValve, R xWashActive; T6 Full: xLevelHigh — прыжок к S1. Постоперация:",
+        "xValvesBusy := xDrainValve OR xInletValve. INIT_SQ — начальное состояние, OFF_SQ — шаги выключены.",
+    ]
+)
+
+
+def _cond(title: str, *contacts: tuple[str, bool], kind: str = "TrCoil") -> Net:
+    """Сеть условия: последовательные контакты (операнд, отрицание) → катушка условия."""
+    n = Net(title)
+    src: object = "rail"
+    for var, neg in contacts:
+        src = n.contact(src, var, neg)  # type: ignore[arg-type]
+    n.cond_coil(src, kind)  # type: ignore[arg-type]
+    return n
+
+
+def backwash_graph() -> Block:
+    air_done = Net("Air.T >= 10 с")
+    ge = air_done.part("Ge", templates=[("SrcType", "Type", "Time")])
+    air_done.wire("rail", (ge, "pre"))
+    air_done.operand_in(ge, "in1", "#Air.T")
+    air_done.operand_in(ge, "in2", "T#10S")
+    air_done.cond_coil((ge, "out"))
+    seq = GSequence(
+        "Промывка фильтра",
+        steps=[
+            GStep(1, "Idle", init=True, actions=[GAction("N", "#xReady")]),
+            GStep(
+                2,
+                "Drain",
+                actions=[
+                    GAction("N", "#xDrainValve"),
+                    GAction("S", "#xWashActive"),
+                    GAction("N", "#iWashCount := #iWashCount + 1;", event="S1"),
+                ],
+                supervision=_cond("Неисправность задвижки", ("#xValveFault", False), kind="SvCoil"),
+            ),
+            GStep(3, "Air", actions=[GAction("N", "#xBlower"), GAction("D", "#xAirValve", time="T#2S")]),
+            GStep(
+                4,
+                "Rinse",
+                actions=[GAction("N", "#xWashPump", interlock=True)],
+                interlock=_cond("Насос промывки исправен", ("#xPumpOk", False), kind="IlCoil"),
+            ),
+            GStep(5, "QuickRinse", actions=[GAction("N", "#xWashPump")]),
+            GStep(6, "Refill", actions=[GAction("N", "#xInletValve"), GAction("R", "#xWashActive")]),
+        ],
+        transitions=[
+            GTransition(1, "Start", _cond("Пуск", ("#xStart", False))),
+            GTransition(2, "LongWash", _cond("Длинная", ("#xLevelLow", False), ("#xShortWash", True))),
+            GTransition(3, "ShortWash", _cond("Короткая", ("#xLevelLow", False), ("#xShortWash", False))),
+            GTransition(4, "AirDone", air_done),
+            GTransition(5, "QuickDone", _cond("Заполнено", ("#xLevelHigh", False))),
+            GTransition(6, "Full", _cond("Заполнено", ("#xLevelHigh", False))),
+        ],
+        branches=[
+            GBranch(1, "AltBegin", 2),
+            GBranch(2, "SimBegin", 2),
+            GBranch(3, "SimEnd", 2),
+            GBranch(4, "AltEnd", 2),
+        ],
+        connections=[
+            (("S", 1), ("T", 1), "Direct"),
+            (("T", 1), ("S", 2), "Direct"),
+            (("S", 2), ("B", 1, 0, None), "Direct"),
+            (("B", 1, None, 0), ("T", 2), "Direct"),
+            (("B", 1, None, 1), ("T", 3), "Direct"),
+            (("T", 2), ("B", 2, 0, None), "Direct"),
+            (("B", 2, None, 0), ("S", 3), "Direct"),
+            (("B", 2, None, 1), ("S", 4), "Direct"),
+            (("S", 3), ("B", 3, 0, None), "Direct"),
+            (("S", 4), ("B", 3, 1, None), "Direct"),
+            (("B", 3, None, 0), ("T", 4), "Direct"),
+            (("T", 4), ("B", 4, 0, None), "Direct"),
+            (("T", 3), ("S", 5), "Direct"),
+            (("S", 5), ("T", 5), "Direct"),
+            (("T", 5), ("B", 4, 1, None), "Direct"),
+            (("B", 4, None, 0), ("S", 6), "Direct"),
+            (("S", 6), ("T", 6), "Direct"),
+            (("T", 6), ("S", 1), "Jump"),
+        ],
+    )
+    post = Net("Задвижки в работе")
+    busy = post.orr(post.contact("rail", "#xDrainValve"), post.contact("rail", "#xInletValve"))
+    post.coil(busy, "#xValvesBusy")
+    return Block(
+        "FB",
+        "FB_BackwashGraph",
+        120,
+        lang="GRAPH",
+        title="Промывка фильтра (GRAPH)",
+        comment=BACKWASH_DESCRIPTION,
+        family="Filters",
+        layout="Optimized",
+        sections=[
+            Section(
+                "Input",
+                [
+                    Member("OFF_SQ", "Bool", "Выключить последовательность"),
+                    Member("INIT_SQ", "Bool", "Начальное состояние"),
+                    Member("ACK_EF", "Bool", "Квитирование ошибок контроля"),
+                    Member("xStart", "Bool", "Пуск промывки"),
+                    Member("xLevelLow", "Bool", "Уровень ниже сливного"),
+                    Member("xLevelHigh", "Bool", "Фильтр заполнен"),
+                    Member("xShortWash", "Bool", "Короткая промывка (без продувки)"),
+                    Member("xPumpOk", "Bool", "Насос промывки исправен", start="TRUE"),
+                    Member("xValveFault", "Bool", "Неисправность сливной задвижки"),
+                ],
+            ),
+            Section(
+                "Output",
+                [
+                    Member("ERR_FLT", "Bool", "Ошибка контроля (до квитирования)"),
+                    Member("xReady", "Bool", "Готов к промывке"),
+                    Member("xDrainValve", "Bool", "Сливная задвижка"),
+                    Member("xBlower", "Bool", "Воздуходувка"),
+                    Member("xAirValve", "Bool", "Задвижка воздуха"),
+                    Member("xWashPump", "Bool", "Насос промывки"),
+                    Member("xInletValve", "Bool", "Задвижка подачи"),
+                    Member("xWashActive", "Bool", "Промывка идёт"),
+                    Member("xValvesBusy", "Bool", "Задвижки в работе"),
+                    Member("iWashCount", "Int", "Число промывок"),
+                ],
+            ),
+            Section("InOut"),
+            Section("Static"),
+            Section("Temp"),
+            Section("Constant"),
+        ],
+        units=[graph_unit(seq, post=[post])],
     )
 
 
@@ -608,6 +774,7 @@ def all_blocks(tia: str = "V21") -> list[Block]:
         starter_stl(),
         starter_scl(),
         conveyor_stl(),
+        backwash_graph(),
         pump_interlock_lad(),
         clamp_pct_lad(),
         udt_valve(),
@@ -615,4 +782,4 @@ def all_blocks(tia: str = "V21") -> list[Block]:
     ]
 
 
-__all__ = ["CONVEYOR_DESCRIPTION", "STARTER_DESCRIPTION", "STARTER_SCL", "Unit", "all_blocks"]
+__all__ = ["BACKWASH_DESCRIPTION", "CONVEYOR_DESCRIPTION", "STARTER_DESCRIPTION", "STARTER_SCL", "Unit", "all_blocks"]

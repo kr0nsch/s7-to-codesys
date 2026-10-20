@@ -53,6 +53,7 @@ LANG_SUITES = [
     "FB_StarterScl_ScenarioTest",
     "FB_PumpInterlockLad_ScenarioTest",
     "FB_ConveyorStl_ScenarioTest",
+    "FB_BackwashGraph_ScenarioTest",
 ]
 
 

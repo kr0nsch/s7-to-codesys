@@ -8,6 +8,7 @@
 // Документ:   docs/TEST_REPORT.md, docs/methodology.md
 PROGRAM PRG_Tests
 VAR
+    fbBackwashGraph_SeqTest : FB_BackwashGraph_SeqTest;  // рукописный набор
     fbF_NormXTest : FB_F_NormX_Test;  // рукописный набор
     fbF_S7EnoTest : FB_F_S7Eno_Test;  // рукописный набор
     fbF_S7NowTest : FB_F_S7Now_Test;  // рукописный набор
@@ -20,6 +21,7 @@ VAR
     fbS7TpTest : FB_S7Tp_Test;  // рукописный набор
     fbStandardCounterTest : FB_StandardCounter_Test;  // рукописный набор
     fbStandardFlipFlopTest : FB_StandardFlipFlop_Test;  // рукописный набор
+    fbBackwashGraph_ScenarioTest : FB_BackwashGraph_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
     fbConveyorStl_ScenarioTest : FB_ConveyorStl_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
     fbPumpInterlockLad_ScenarioTest : FB_PumpInterlockLad_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)
     fbStarterFbd_ScenarioTest : FB_StarterFbd_ScenarioTest;  // сценарии CSV всех языков (сгенерировано)

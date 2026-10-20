@@ -36,6 +36,7 @@ LAD_ST = {
     "call": "вызов FB/FC под `IF en`; вызываемый на LAD/FBD без ENO/BR — ENO = EN",
     "jump": "прыжок вперёд через сети → `IF NOT rlo THEN … END_IF`",
     "return": "`IF rlo THEN RETURN; END_IF`",
+    "graph_condition": "ST-двойник: `xT<n>_Cond := rlo;` (контроль, блокировка — так же); SFC: выражение перехода",
 }
 
 

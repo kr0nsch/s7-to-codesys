@@ -153,6 +153,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     conv.add_argument("--report-md", metavar="ФАЙЛ", help="записать отчёт Markdown")
     conv.add_argument("--report-html", metavar="ФАЙЛ", help="записать отчёт HTML")
+    conv.add_argument(
+        "--plcopen",
+        metavar="КАТАЛОГ",
+        help="записать вариант SFC блоков S7-GRAPH: <КАТАЛОГ>/<Блок>.xml (PLCopen XML для импорта в CODESYS)",
+    )
 
     rep = sub.add_parser(
         "report",
@@ -281,6 +286,8 @@ def cmd_convert(args: argparse.Namespace) -> int:
         _write(args.report_html, R.render_html(result, labels))
     for error in result.errors:
         print(f"s7conv: предупреждение: {error}", file=sys.stderr)
+    if args.plcopen:
+        _write_plcopen(inputs, Path(args.plcopen), args.quiet)
     if not args.quiet:
         xml = f", SimaticML {len(inputs.xml)}" if inputs.xml else ""
         print(f"s7conv: файлов SCL {len(inputs.scl)}{xml}, записано {len(written)} файлов в {args.out}")
@@ -289,6 +296,18 @@ def cmd_convert(args: argparse.Namespace) -> int:
             names = ", ".join(sorted(result.support))
             print(f"s7conv: нужны объекты поддержки {names} (src/*/S7Compat репозитория или --emit-support)")
     return EXIT_THRESHOLD if _threshold(result, args.fail_on) else EXIT_OK
+
+
+def _write_plcopen(inputs: P.Inputs, out: Path, quiet: bool) -> None:
+    from s7conv.plcopen import graph_sfc
+
+    sfc = graph_sfc(list(inputs.xml))
+    for name, xml in sfc.files.items():
+        _write(str(out / f"{name}.xml"), xml)
+    for name, why in sfc.skipped.items():
+        print(f"s7conv: предупреждение: {name}: вариант SFC не построен — {why}", file=sys.stderr)
+    if not quiet:
+        print(f"s7conv: вариантов SFC (PLCopen XML) {len(sfc.files)} в {out}")
 
 
 def cmd_report(args: argparse.Namespace) -> int:

@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- s7-to-codesys, корпус всех языков: собрано samples/lang/build_xml.py из samples/lang/blocks.py, руками не править -->
+<Document>
+  <Engineering version="V21" />
+  <SW.Blocks.FB ID="0">
+    <AttributeList>
+      <AutoNumber>false</AutoNumber>
+      <HeaderAuthor>WTP2</HeaderAuthor>
+      <HeaderFamily>Filters</HeaderFamily>
+      <HeaderVersion>0.1</HeaderVersion>
+      <Interface>
+        <Sections xmlns="http://www.siemens.com/automation/Openness/SW/Interface/v5">
+          <Section Name="Input">
+            <Member Name="OFF_SQ" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Выключить последовательность</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="INIT_SQ" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Начальное состояние</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="ACK_EF" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Квитирование ошибок контроля</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xStart" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Пуск промывки</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xLevelLow" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Уровень ниже сливного</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xLevelHigh" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Фильтр заполнен</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xShortWash" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Короткая промывка (без продувки)</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xPumpOk" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Насос промывки исправен</MultiLanguageText></Comment>
+              <StartValue>TRUE</StartValue>
+            </Member>
+            <Member Name="xValveFault" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Неисправность сливной задвижки</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="Output">
+            <Member Name="ERR_FLT" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Ошибка контроля (до квитирования)</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xReady" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Готов к промывке</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xDrainValve" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Сливная задвижка</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xBlower" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Воздуходувка</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xAirValve" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Задвижка воздуха</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xWashPump" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Насос промывки</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xInletValve" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Задвижка подачи</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xWashActive" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Промывка идёт</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="xValvesBusy" Datatype="Bool">
+              <Comment><MultiLanguageText Lang="ru-RU">Задвижки в работе</MultiLanguageText></Comment>
+            </Member>
+            <Member Name="iWashCount" Datatype="Int">
+              <Comment><MultiLanguageText Lang="ru-RU">Число промывок</MultiLanguageText></Comment>
+            </Member>
+          </Section>
+          <Section Name="InOut" />
+          <Section Name="Static" />
+          <Section Name="Temp" />
+          <Section Name="Constant" />
+        </Sections>
+      </Interface>
+      <MemoryLayout>Optimized</MemoryLayout>
+      <Name>FB_BackwashGraph</Name>
+      <Number>120</Number>
+      <ProgrammingLanguage>GRAPH</ProgrammingLanguage>
+      <SetENOAutomatically>false</SetENOAutomatically>
+    </AttributeList>
+    <ObjectList>
+      <MultilingualText ID="1" CompositionName="Comment">
+        <ObjectList>
+          <MultilingualTextItem ID="2" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Промывка скорого фильтра (GRAPH S7-1500), шаги S1–S6. S1 Idle (начальный): N xReady.
+T1 Start: xStart. S2 Drain: N xDrainValve, S xWashActive, событие S1 — iWashCount + 1;
+контроль xValveFault держит шаг до квитирования ACK_EF (ERR_FLT = 1). После S2 альтернатива:
+T2 LongWash (xLevelLow AND NOT xShortWash) — параллельно S3 Air (N xBlower, D xAirValve 2 с)
+и S4 Rinse (NC xWashPump, блокировка xPumpOk), синхронизация T4 AirDone: Air.T &gt;= 10 с;
+T3 ShortWash (xLevelLow AND xShortWash) — S5 QuickRinse (N xWashPump), T5 QuickDone: xLevelHigh.
+S6 Refill: N xInletValve, R xWashActive; T6 Full: xLevelHigh — прыжок к S1. Постоперация:
+xValvesBusy := xDrainValve OR xInletValve. INIT_SQ — начальное состояние, OFF_SQ — шаги выключены.</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+      <SW.Blocks.CompileUnit ID="3" CompositionName="CompileUnits">
+        <AttributeList>
+          <NetworkSource>
+            <Graph xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/Graph/v6">
+              <PreOperations>
+              </PreOperations>
+              <Sequence>
+                <Steps>
+                  <Step Number="1" Init="true" Name="Idle">
+                    <Actions>
+                      <Action Event="" Interlock="false" Qualifier="N">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xReady" /></Symbol></Access>
+                      </Action>
+                    </Actions>
+                    <Supervisions>
+                      <Supervision ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Supervision>
+                    </Supervisions>
+                    <Interlocks>
+                      <Interlock ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Interlock>
+                    </Interlocks>
+                  </Step>
+                  <Step Number="2" Init="false" Name="Drain">
+                    <Actions>
+                      <Action Event="" Interlock="false" Qualifier="N">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xDrainValve" /></Symbol></Access>
+                      </Action>
+                      <Action Event="" Interlock="false" Qualifier="S">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xWashActive" /></Symbol></Access>
+                      </Action>
+                      <Action Event="S1" Interlock="false" Qualifier="N">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="iWashCount" /></Symbol></Access>
+                        <Blank />
+                        <Token Text=":=" />
+                        <Blank />
+                        <Access Scope="LocalVariable"><Symbol><Component Name="iWashCount" /></Symbol></Access>
+                        <Blank />
+                        <Token Text="+" />
+                        <Blank />
+                        <Access Scope="LiteralConstant"><Constant><ConstantType>Int</ConstantType><ConstantValue>1</ConstantValue></Constant></Access>
+                        <Token Text=";" />
+                      </Action>
+                    </Actions>
+                    <Supervisions>
+                      <Supervision ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                          <Parts>
+                            <Access Scope="LocalVariable" UId="21"><Symbol><Component Name="xValveFault" /></Symbol></Access>
+                            <Part Name="Contact" UId="22" />
+                            <Part Name="SvCoil" UId="23" />
+                          </Parts>
+                          <Wires>
+                            <Wire UId="24"><Powerrail /><NameCon UId="22" Name="in" /></Wire>
+                            <Wire UId="25"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                            <Wire UId="26"><NameCon UId="22" Name="out" /><NameCon UId="23" Name="in" /></Wire>
+                          </Wires>
+                        </FlgNet>
+                      </Supervision>
+                    </Supervisions>
+                    <Interlocks>
+                      <Interlock ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Interlock>
+                    </Interlocks>
+                  </Step>
+                  <Step Number="3" Init="false" Name="Air">
+                    <Actions>
+                      <Action Event="" Interlock="false" Qualifier="N">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xBlower" /></Symbol></Access>
+                      </Action>
+                      <Action Event="" Interlock="false" Qualifier="D">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xAirValve" /></Symbol></Access>
+                        <Token Text="," />
+                        <Access Scope="TypedConstant"><Constant><ConstantValue>T#2S</ConstantValue></Constant></Access>
+                      </Action>
+                    </Actions>
+                    <Supervisions>
+                      <Supervision ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Supervision>
+                    </Supervisions>
+                    <Interlocks>
+                      <Interlock ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Interlock>
+                    </Interlocks>
+                  </Step>
+                  <Step Number="4" Init="false" Name="Rinse">
+                    <Actions>
+                      <Action Event="" Interlock="true" Qualifier="N">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xWashPump" /></Symbol></Access>
+                      </Action>
+                    </Actions>
+                    <Supervisions>
+                      <Supervision ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Supervision>
+                    </Supervisions>
+                    <Interlocks>
+                      <Interlock ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                          <Parts>
+                            <Access Scope="LocalVariable" UId="21"><Symbol><Component Name="xPumpOk" /></Symbol></Access>
+                            <Part Name="Contact" UId="22" />
+                            <Part Name="IlCoil" UId="23" />
+                          </Parts>
+                          <Wires>
+                            <Wire UId="24"><Powerrail /><NameCon UId="22" Name="in" /></Wire>
+                            <Wire UId="25"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                            <Wire UId="26"><NameCon UId="22" Name="out" /><NameCon UId="23" Name="in" /></Wire>
+                          </Wires>
+                        </FlgNet>
+                      </Interlock>
+                    </Interlocks>
+                  </Step>
+                  <Step Number="5" Init="false" Name="QuickRinse">
+                    <Actions>
+                      <Action Event="" Interlock="false" Qualifier="N">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xWashPump" /></Symbol></Access>
+                      </Action>
+                    </Actions>
+                    <Supervisions>
+                      <Supervision ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Supervision>
+                    </Supervisions>
+                    <Interlocks>
+                      <Interlock ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Interlock>
+                    </Interlocks>
+                  </Step>
+                  <Step Number="6" Init="false" Name="Refill">
+                    <Actions>
+                      <Action Event="" Interlock="false" Qualifier="N">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xInletValve" /></Symbol></Access>
+                      </Action>
+                      <Action Event="" Interlock="false" Qualifier="R">
+                        <Access Scope="LocalVariable"><Symbol><Component Name="xWashActive" /></Symbol></Access>
+                      </Action>
+                    </Actions>
+                    <Supervisions>
+                      <Supervision ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Supervision>
+                    </Supervisions>
+                    <Interlocks>
+                      <Interlock ProgrammingLanguage="LAD">
+                        <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5"><Parts /></FlgNet>
+                      </Interlock>
+                    </Interlocks>
+                  </Step>
+                </Steps>
+                <Transitions>
+                  <Transition Name="Start" Number="1" ProgrammingLanguage="LAD">
+                    <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                      <Parts>
+                        <Access Scope="LocalVariable" UId="21"><Symbol><Component Name="xStart" /></Symbol></Access>
+                        <Part Name="Contact" UId="22" />
+                        <Part Name="TrCoil" UId="23" />
+                      </Parts>
+                      <Wires>
+                        <Wire UId="24"><Powerrail /><NameCon UId="22" Name="in" /></Wire>
+                        <Wire UId="25"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                        <Wire UId="26"><NameCon UId="22" Name="out" /><NameCon UId="23" Name="in" /></Wire>
+                      </Wires>
+                    </FlgNet>
+                  </Transition>
+                  <Transition Name="LongWash" Number="2" ProgrammingLanguage="LAD">
+                    <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                      <Parts>
+                        <Access Scope="LocalVariable" UId="21"><Symbol><Component Name="xLevelLow" /></Symbol></Access>
+                        <Part Name="Contact" UId="22" />
+                        <Access Scope="LocalVariable" UId="23"><Symbol><Component Name="xShortWash" /></Symbol></Access>
+                        <Part Name="Contact" UId="24">
+                          <Negated Name="operand" />
+                        </Part>
+                        <Part Name="TrCoil" UId="25" />
+                      </Parts>
+                      <Wires>
+                        <Wire UId="26"><Powerrail /><NameCon UId="22" Name="in" /></Wire>
+                        <Wire UId="27"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                        <Wire UId="28"><NameCon UId="22" Name="out" /><NameCon UId="24" Name="in" /></Wire>
+                        <Wire UId="29"><IdentCon UId="23" /><NameCon UId="24" Name="operand" /></Wire>
+                        <Wire UId="30"><NameCon UId="24" Name="out" /><NameCon UId="25" Name="in" /></Wire>
+                      </Wires>
+                    </FlgNet>
+                  </Transition>
+                  <Transition Name="ShortWash" Number="3" ProgrammingLanguage="LAD">
+                    <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                      <Parts>
+                        <Access Scope="LocalVariable" UId="21"><Symbol><Component Name="xLevelLow" /></Symbol></Access>
+                        <Part Name="Contact" UId="22" />
+                        <Access Scope="LocalVariable" UId="23"><Symbol><Component Name="xShortWash" /></Symbol></Access>
+                        <Part Name="Contact" UId="24" />
+                        <Part Name="TrCoil" UId="25" />
+                      </Parts>
+                      <Wires>
+                        <Wire UId="26"><Powerrail /><NameCon UId="22" Name="in" /></Wire>
+                        <Wire UId="27"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                        <Wire UId="28"><NameCon UId="22" Name="out" /><NameCon UId="24" Name="in" /></Wire>
+                        <Wire UId="29"><IdentCon UId="23" /><NameCon UId="24" Name="operand" /></Wire>
+                        <Wire UId="30"><NameCon UId="24" Name="out" /><NameCon UId="25" Name="in" /></Wire>
+                      </Wires>
+                    </FlgNet>
+                  </Transition>
+                  <Transition Name="AirDone" Number="4" ProgrammingLanguage="LAD">
+                    <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                      <Parts>
+                        <Part Name="Ge" UId="21">
+                          <TemplateValue Name="SrcType" Type="Type">Time</TemplateValue>
+                        </Part>
+                        <Access Scope="LocalVariable" UId="22"><Symbol><Component Name="Air" /><Component Name="T" /></Symbol></Access>
+                        <Access Scope="TypedConstant" UId="23"><Constant><ConstantValue>T#10S</ConstantValue></Constant></Access>
+                        <Part Name="TrCoil" UId="24" />
+                      </Parts>
+                      <Wires>
+                        <Wire UId="25"><Powerrail /><NameCon UId="21" Name="pre" /></Wire>
+                        <Wire UId="26"><IdentCon UId="22" /><NameCon UId="21" Name="in1" /></Wire>
+                        <Wire UId="27"><IdentCon UId="23" /><NameCon UId="21" Name="in2" /></Wire>
+                        <Wire UId="28"><NameCon UId="21" Name="out" /><NameCon UId="24" Name="in" /></Wire>
+                      </Wires>
+                    </FlgNet>
+                  </Transition>
+                  <Transition Name="QuickDone" Number="5" ProgrammingLanguage="LAD">
+                    <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                      <Parts>
+                        <Access Scope="LocalVariable" UId="21"><Symbol><Component Name="xLevelHigh" /></Symbol></Access>
+                        <Part Name="Contact" UId="22" />
+                        <Part Name="TrCoil" UId="23" />
+                      </Parts>
+                      <Wires>
+                        <Wire UId="24"><Powerrail /><NameCon UId="22" Name="in" /></Wire>
+                        <Wire UId="25"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                        <Wire UId="26"><NameCon UId="22" Name="out" /><NameCon UId="23" Name="in" /></Wire>
+                      </Wires>
+                    </FlgNet>
+                  </Transition>
+                  <Transition Name="Full" Number="6" ProgrammingLanguage="LAD">
+                    <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                      <Parts>
+                        <Access Scope="LocalVariable" UId="21"><Symbol><Component Name="xLevelHigh" /></Symbol></Access>
+                        <Part Name="Contact" UId="22" />
+                        <Part Name="TrCoil" UId="23" />
+                      </Parts>
+                      <Wires>
+                        <Wire UId="24"><Powerrail /><NameCon UId="22" Name="in" /></Wire>
+                        <Wire UId="25"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                        <Wire UId="26"><NameCon UId="22" Name="out" /><NameCon UId="23" Name="in" /></Wire>
+                      </Wires>
+                    </FlgNet>
+                  </Transition>
+                </Transitions>
+                <Branches>
+                  <Branch Number="1" Type="AltBegin" Cardinality="2" />
+                  <Branch Number="2" Type="SimBegin" Cardinality="2" />
+                  <Branch Number="3" Type="SimEnd" Cardinality="2" />
+                  <Branch Number="4" Type="AltEnd" Cardinality="2" />
+                </Branches>
+                <Connections>
+                  <Connection><NodeFrom><StepRef Number="1" /></NodeFrom><NodeTo><TransitionRef Number="1" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><TransitionRef Number="1" /></NodeFrom><NodeTo><StepRef Number="2" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><StepRef Number="2" /></NodeFrom><NodeTo><BranchRef Number="1" In="0" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><BranchRef Number="1" Out="0" /></NodeFrom><NodeTo><TransitionRef Number="2" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><BranchRef Number="1" Out="1" /></NodeFrom><NodeTo><TransitionRef Number="3" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><TransitionRef Number="2" /></NodeFrom><NodeTo><BranchRef Number="2" In="0" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><BranchRef Number="2" Out="0" /></NodeFrom><NodeTo><StepRef Number="3" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><BranchRef Number="2" Out="1" /></NodeFrom><NodeTo><StepRef Number="4" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><StepRef Number="3" /></NodeFrom><NodeTo><BranchRef Number="3" In="0" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><StepRef Number="4" /></NodeFrom><NodeTo><BranchRef Number="3" In="1" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><BranchRef Number="3" Out="0" /></NodeFrom><NodeTo><TransitionRef Number="4" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><TransitionRef Number="4" /></NodeFrom><NodeTo><BranchRef Number="4" In="0" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><TransitionRef Number="3" /></NodeFrom><NodeTo><StepRef Number="5" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><StepRef Number="5" /></NodeFrom><NodeTo><TransitionRef Number="5" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><TransitionRef Number="5" /></NodeFrom><NodeTo><BranchRef Number="4" In="1" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><BranchRef Number="4" Out="0" /></NodeFrom><NodeTo><StepRef Number="6" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><StepRef Number="6" /></NodeFrom><NodeTo><TransitionRef Number="6" /></NodeTo><LinkType>Direct</LinkType></Connection>
+                  <Connection><NodeFrom><TransitionRef Number="6" /></NodeFrom><NodeTo><StepRef Number="1" /></NodeTo><LinkType>Jump</LinkType></Connection>
+                </Connections>
+              </Sequence>
+              <PostOperations>
+                <PermanentOperation ProgrammingLanguage="LAD">
+                  <FlgNet xmlns="http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v5">
+                    <Parts>
+                      <Access Scope="LocalVariable" UId="21"><Symbol><Component Name="xDrainValve" /></Symbol></Access>
+                      <Part Name="Contact" UId="22" />
+                      <Access Scope="LocalVariable" UId="23"><Symbol><Component Name="xInletValve" /></Symbol></Access>
+                      <Part Name="Contact" UId="24" />
+                      <Part Name="O" UId="25">
+                        <TemplateValue Name="Card" Type="Cardinality">2</TemplateValue>
+                      </Part>
+                      <Access Scope="LocalVariable" UId="26"><Symbol><Component Name="xValvesBusy" /></Symbol></Access>
+                      <Part Name="Coil" UId="27" />
+                    </Parts>
+                    <Wires>
+                      <Wire UId="28"><Powerrail /><NameCon UId="22" Name="in" /><NameCon UId="24" Name="in" /></Wire>
+                      <Wire UId="29"><IdentCon UId="21" /><NameCon UId="22" Name="operand" /></Wire>
+                      <Wire UId="30"><IdentCon UId="23" /><NameCon UId="24" Name="operand" /></Wire>
+                      <Wire UId="31"><NameCon UId="22" Name="out" /><NameCon UId="25" Name="in1" /></Wire>
+                      <Wire UId="32"><NameCon UId="24" Name="out" /><NameCon UId="25" Name="in2" /></Wire>
+                      <Wire UId="33"><NameCon UId="25" Name="out" /><NameCon UId="27" Name="in" /></Wire>
+                      <Wire UId="34"><IdentCon UId="26" /><NameCon UId="27" Name="operand" /></Wire>
+                    </Wires>
+                  </FlgNet>
+                </PermanentOperation>
+              </PostOperations>
+              <AlarmsSettings>
+                <AlarmSupervisionCategories><AlarmSupervisionCategory Id="1" DisplayClass="0" /></AlarmSupervisionCategories>
+                <AlarmInterlockCategory Id="1" />
+                <AlarmSubcategory1Interlock Id="0" />
+                <AlarmSubcategory2Interlock Id="0" />
+                <AlarmCategorySupervision Id="1" />
+                <AlarmSubcategory1Supervision Id="0" />
+                <AlarmSubcategory2Supervision Id="0" />
+                <AlarmWarningCategory Id="2" />
+                <AlarmSubcategory1Warning Id="0" />
+                <AlarmSubcategory2Warning Id="0" />
+              </AlarmsSettings>
+            </Graph>
+          </NetworkSource>
+          <ProgrammingLanguage>GRAPH</ProgrammingLanguage>
+        </AttributeList>
+        <ObjectList>
+          <MultilingualText ID="4" CompositionName="Comment">
+            <ObjectList>
+              <MultilingualTextItem ID="5" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text></Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+          <MultilingualText ID="6" CompositionName="Title">
+            <ObjectList>
+              <MultilingualTextItem ID="7" CompositionName="Items">
+                <AttributeList>
+                  <Culture>ru-RU</Culture>
+                  <Text>Промывка фильтра</Text>
+                </AttributeList>
+              </MultilingualTextItem>
+            </ObjectList>
+          </MultilingualText>
+        </ObjectList>
+      </SW.Blocks.CompileUnit>
+      <MultilingualText ID="8" CompositionName="Title">
+        <ObjectList>
+          <MultilingualTextItem ID="9" CompositionName="Items">
+            <AttributeList>
+              <Culture>ru-RU</Culture>
+              <Text>Промывка фильтра (GRAPH)</Text>
+            </AttributeList>
+          </MultilingualTextItem>
+        </ObjectList>
+      </MultilingualText>
+    </ObjectList>
+  </SW.Blocks.FB>
+</Document>

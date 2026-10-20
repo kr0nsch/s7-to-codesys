@@ -1,0 +1,433 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://www.plcopen.org/xml/tc6_0200">
+  <fileHeader companyName="s7-to-codesys" productName="s7conv" productVersion="1.2.0" creationDateTime="2026-10-20T00:00:00" />
+  <contentHeader name="FB_BackwashGraph">
+    <coordinateInfo>
+      <fbd><scaling x="1" y="1" /></fbd>
+      <ld><scaling x="1" y="1" /></ld>
+      <sfc><scaling x="1" y="1" /></sfc>
+    </coordinateInfo>
+  </contentHeader>
+  <types>
+    <dataTypes />
+    <pous>
+      <pou name="FB_BackwashGraph_Sfc" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="SFCInit">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">INIT_SQ: начальное состояние (флаг SFC)</xhtml></documentation>
+            </variable>
+            <variable name="xStart">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Пуск промывки</xhtml></documentation>
+            </variable>
+            <variable name="xLevelLow">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Уровень ниже сливного</xhtml></documentation>
+            </variable>
+            <variable name="xLevelHigh">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Фильтр заполнен</xhtml></documentation>
+            </variable>
+            <variable name="xShortWash">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Короткая промывка (без продувки)</xhtml></documentation>
+            </variable>
+            <variable name="xPumpOk">
+              <type><BOOL /></type>
+              <initialValue><simpleValue value="TRUE" /></initialValue>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Насос промывки исправен</xhtml></documentation>
+            </variable>
+            <variable name="xValveFault">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Неисправность сливной задвижки</xhtml></documentation>
+            </variable>
+            <variable name="Drain_SvErr">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S2: ошибка контроля (защёлка обёртки)</xhtml></documentation>
+            </variable>
+          </inputVars>
+          <outputVars>
+            <variable name="xIdle_N1">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S1: действие N</xhtml></documentation>
+            </variable>
+            <variable name="xDrain_N1">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S2: действие N</xhtml></documentation>
+            </variable>
+            <variable name="xDrain_S2">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S2: действие N</xhtml></documentation>
+            </variable>
+            <variable name="xDrain_P3">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S2: действие P</xhtml></documentation>
+            </variable>
+            <variable name="xDrain_Active">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S2: действие N</xhtml></documentation>
+            </variable>
+            <variable name="xAir_N1">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S3: действие N</xhtml></documentation>
+            </variable>
+            <variable name="xAir_D2">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S3: действие D</xhtml></documentation>
+            </variable>
+            <variable name="xRinse_N1">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S4: действие N</xhtml></documentation>
+            </variable>
+            <variable name="xQuickRinse_N1">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S5: действие N</xhtml></documentation>
+            </variable>
+            <variable name="xRefill_N1">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S6: действие N</xhtml></documentation>
+            </variable>
+            <variable name="xRefill_R2">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S6: действие N</xhtml></documentation>
+            </variable>
+          </outputVars>
+        </interface>
+        <body>
+          <SFC>
+            <step localId="1" name="Idle" initialStep="true">
+              <position x="0" y="0" />
+              <connectionPointIn />
+              <connectionPointOut formalParameter="sfc" />
+            </step>
+            <actionBlock localId="17">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="1" /></connectionPointIn>
+              <action localId="18" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xIdle_N1" />
+              </action>
+            </actionBlock>
+            <step localId="2" name="Drain">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="7" /></connectionPointIn>
+              <connectionPointOut formalParameter="sfc" />
+            </step>
+            <actionBlock localId="19">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="2" /></connectionPointIn>
+              <action localId="20" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xDrain_N1" />
+              </action>
+              <action localId="21" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xDrain_S2" />
+              </action>
+              <action localId="22" qualifier="P">
+                <relPosition x="0" y="0" />
+                <reference name="xDrain_P3" />
+              </action>
+              <action localId="23" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xDrain_Active" />
+              </action>
+            </actionBlock>
+            <step localId="3" name="Air">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="14" /></connectionPointIn>
+              <connectionPointOut formalParameter="sfc" />
+            </step>
+            <actionBlock localId="24">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="3" /></connectionPointIn>
+              <action localId="25" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xAir_N1" />
+              </action>
+              <action localId="26" qualifier="D" duration="T#2S">
+                <relPosition x="0" y="0" />
+                <reference name="xAir_D2" />
+              </action>
+            </actionBlock>
+            <step localId="4" name="Rinse">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="14" /></connectionPointIn>
+              <connectionPointOut formalParameter="sfc" />
+            </step>
+            <actionBlock localId="27">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="4" /></connectionPointIn>
+              <action localId="28" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xRinse_N1" />
+              </action>
+            </actionBlock>
+            <step localId="5" name="QuickRinse">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="9" /></connectionPointIn>
+              <connectionPointOut formalParameter="sfc" />
+            </step>
+            <actionBlock localId="29">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="5" /></connectionPointIn>
+              <action localId="30" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xQuickRinse_N1" />
+              </action>
+            </actionBlock>
+            <step localId="6" name="Refill">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="16" /></connectionPointIn>
+              <connectionPointOut formalParameter="sfc" />
+            </step>
+            <actionBlock localId="31">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="6" /></connectionPointIn>
+              <action localId="32" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xRefill_N1" />
+              </action>
+              <action localId="33" qualifier="N">
+                <relPosition x="0" y="0" />
+                <reference name="xRefill_R2" />
+              </action>
+            </actionBlock>
+            <inVariable localId="34">
+              <position x="0" y="0" />
+              <connectionPointOut />
+              <expression>xStart</expression>
+            </inVariable>
+            <transition localId="7">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="1" /></connectionPointIn>
+              <connectionPointOut />
+              <condition><connectionPointIn><connection refLocalId="34" /></connectionPointIn></condition>
+            </transition>
+            <inVariable localId="35">
+              <position x="0" y="0" />
+              <connectionPointOut />
+              <expression>(xLevelLow AND NOT xShortWash) AND NOT Drain_SvErr</expression>
+            </inVariable>
+            <transition localId="8">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="13" /></connectionPointIn>
+              <connectionPointOut />
+              <condition><connectionPointIn><connection refLocalId="35" /></connectionPointIn></condition>
+            </transition>
+            <inVariable localId="36">
+              <position x="0" y="0" />
+              <connectionPointOut />
+              <expression>(xLevelLow AND xShortWash) AND NOT Drain_SvErr</expression>
+            </inVariable>
+            <transition localId="9">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="13" /></connectionPointIn>
+              <connectionPointOut />
+              <condition><connectionPointIn><connection refLocalId="36" /></connectionPointIn></condition>
+            </transition>
+            <inVariable localId="37">
+              <position x="0" y="0" />
+              <connectionPointOut />
+              <expression>Air.t &gt;= T#10S</expression>
+            </inVariable>
+            <transition localId="10">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="15" /></connectionPointIn>
+              <connectionPointOut />
+              <condition><connectionPointIn><connection refLocalId="37" /></connectionPointIn></condition>
+            </transition>
+            <inVariable localId="38">
+              <position x="0" y="0" />
+              <connectionPointOut />
+              <expression>xLevelHigh</expression>
+            </inVariable>
+            <transition localId="11">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="5" /></connectionPointIn>
+              <connectionPointOut />
+              <condition><connectionPointIn><connection refLocalId="38" /></connectionPointIn></condition>
+            </transition>
+            <inVariable localId="39">
+              <position x="0" y="0" />
+              <connectionPointOut />
+              <expression>xLevelHigh</expression>
+            </inVariable>
+            <transition localId="12">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="6" /></connectionPointIn>
+              <connectionPointOut />
+              <condition><connectionPointIn><connection refLocalId="39" /></connectionPointIn></condition>
+            </transition>
+            <selectionDivergence localId="13">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="2" /></connectionPointIn>
+              <connectionPointOut formalParameter="0" />
+              <connectionPointOut formalParameter="1" />
+            </selectionDivergence>
+            <simultaneousDivergence localId="14">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="8" /></connectionPointIn>
+              <connectionPointOut formalParameter="0" />
+              <connectionPointOut formalParameter="1" />
+            </simultaneousDivergence>
+            <simultaneousConvergence localId="15">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="3" /></connectionPointIn>
+              <connectionPointIn><connection refLocalId="4" /></connectionPointIn>
+              <connectionPointOut />
+            </simultaneousConvergence>
+            <selectionConvergence localId="16">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="10" /></connectionPointIn>
+              <connectionPointIn><connection refLocalId="11" /></connectionPointIn>
+              <connectionPointOut />
+            </selectionConvergence>
+            <jumpStep localId="40" targetName="Idle">
+              <position x="0" y="0" />
+              <connectionPointIn><connection refLocalId="12" /></connectionPointIn>
+            </jumpStep>
+          </SFC>
+        </body>
+        <addData>
+          <data name="http://www.3s-software.com/plcopenxml/sfcsettings" handleUnknown="implementation">
+            <SFCSettings>
+              <Flags>
+                <Init Declare="false" Use="true" />
+              </Flags>
+            </SFCSettings>
+          </data>
+        </addData>
+      </pou>
+      <pou name="FB_BackwashGraph" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="OFF_SQ">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Выключить последовательность</xhtml></documentation>
+            </variable>
+            <variable name="INIT_SQ">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Начальное состояние</xhtml></documentation>
+            </variable>
+            <variable name="ACK_EF">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Квитирование ошибок контроля</xhtml></documentation>
+            </variable>
+            <variable name="xStart">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Пуск промывки</xhtml></documentation>
+            </variable>
+            <variable name="xLevelLow">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Уровень ниже сливного</xhtml></documentation>
+            </variable>
+            <variable name="xLevelHigh">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Фильтр заполнен</xhtml></documentation>
+            </variable>
+            <variable name="xShortWash">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Короткая промывка (без продувки)</xhtml></documentation>
+            </variable>
+            <variable name="xPumpOk">
+              <type><BOOL /></type>
+              <initialValue><simpleValue value="TRUE" /></initialValue>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Насос промывки исправен</xhtml></documentation>
+            </variable>
+            <variable name="xValveFault">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Неисправность сливной задвижки</xhtml></documentation>
+            </variable>
+          </inputVars>
+          <outputVars>
+            <variable name="ERR_FLT">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Ошибка контроля (до квитирования)</xhtml></documentation>
+            </variable>
+            <variable name="xReady">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Готов к промывке</xhtml></documentation>
+            </variable>
+            <variable name="xDrainValve">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Сливная задвижка</xhtml></documentation>
+            </variable>
+            <variable name="xBlower">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Воздуходувка</xhtml></documentation>
+            </variable>
+            <variable name="xAirValve">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Задвижка воздуха</xhtml></documentation>
+            </variable>
+            <variable name="xWashPump">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Насос промывки</xhtml></documentation>
+            </variable>
+            <variable name="xInletValve">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Задвижка подачи</xhtml></documentation>
+            </variable>
+            <variable name="xWashActive">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Промывка идёт</xhtml></documentation>
+            </variable>
+            <variable name="xValvesBusy">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Задвижки в работе</xhtml></documentation>
+            </variable>
+            <variable name="iWashCount">
+              <type><INT /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">Число промывок</xhtml></documentation>
+            </variable>
+          </outputVars>
+          <localVars>
+            <variable name="fbSfc">
+              <type><derived name="FB_BackwashGraph_Sfc" /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">последовательность SFC</xhtml></documentation>
+            </variable>
+            <variable name="Drain_SvErr">
+              <type><BOOL /></type>
+              <documentation><xhtml xmlns="http://www.w3.org/1999/xhtml">шаг S2: ошибка контроля</xhtml></documentation>
+            </variable>
+          </localVars>
+        </interface>
+        <body>
+          <ST><xhtml xmlns="http://www.w3.org/1999/xhtml">// Сгенерировано s7conv из samples/lang/FB_BackwashGraph.xml (S7-GRAPH, стратегия sfc): SFC FB_BackwashGraph_Sfc и обёртка FB_BackwashGraph.
+// Квитирование ошибок контроля (ACK_EF) и INIT_SQ — до вызова SFC: в этом цикле переход возможен
+IF ACK_EF OR INIT_SQ THEN
+    Drain_SvErr := FALSE;
+END_IF
+fbSfc(SFCInit := INIT_SQ, xStart := xStart, xLevelLow := xLevelLow, xLevelHigh := xLevelHigh, xShortWash := xShortWash, xPumpOk := xPumpOk, xValveFault := xValveFault, Drain_SvErr := Drain_SvErr);
+// Действия GRAPH по флагам IEC-действий SFC
+xReady := (fbSfc.xIdle_N1 OR INIT_SQ);
+xDrainValve := (fbSfc.xDrain_N1 AND NOT INIT_SQ);
+xBlower := (fbSfc.xAir_N1 AND NOT INIT_SQ);
+xAirValve := (fbSfc.xAir_D2 AND NOT INIT_SQ);
+xWashPump := (fbSfc.xRinse_N1 AND NOT INIT_SQ) AND (xPumpOk) OR (fbSfc.xQuickRinse_N1 AND NOT INIT_SQ);
+xInletValve := (fbSfc.xRefill_N1 AND NOT INIT_SQ);
+IF (fbSfc.xDrain_S2 AND NOT INIT_SQ) THEN // S2: S xWashActive
+    xWashActive := TRUE;
+END_IF
+IF (fbSfc.xDrain_P3 AND NOT INIT_SQ) THEN // S2: событие S1
+    iWashCount := iWashCount + 1;
+END_IF
+IF (fbSfc.xRefill_R2 AND NOT INIT_SQ) THEN // S6: R xWashActive
+    xWashActive := FALSE;
+END_IF
+// Контроль шагов: ошибка защёлкивается до ACK_EF
+IF (fbSfc.xDrain_Active AND NOT INIT_SQ) AND (xValveFault) THEN
+    Drain_SvErr := TRUE;
+END_IF
+ERR_FLT := Drain_SvErr;
+// Постоперация 1
+xValvesBusy := xDrainValve OR xInletValve;</xhtml></ST>
+        </body>
+      </pou>
+    </pous>
+  </types>
+  <instances><configurations /></instances>
+</project>

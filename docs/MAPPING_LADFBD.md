@@ -40,6 +40,9 @@ XSD SimaticML не ограничивает имена элементов `Part`
 | `PBox` | `edge` | P_TRIG: фронт RLO, бит памяти bit | H | lad-cookbook @ e131b25: MCPVerify_FB_LAD_v3.xml | явный бит памяти: `q := clk AND NOT m; m := clk;` | `test_pbox_uses_explicit_memory_bit` |
 | `PCoil` | `edge` | катушка P: импульс по фронту RLO | L | справка TIA, «-(P)-» | явный бит памяти: `q := clk AND NOT m; m := clk;` | `test_pbox_uses_explicit_memory_bit` |
 | `PContact` | `edge` | контакт P: фронт операнда, бит памяти bit | L | s7kop__b.pdf, §1.17 | явный бит памяти: `q := clk AND NOT m; m := clk;` | `test_pbox_uses_explicit_memory_bit` |
+| `IlCoil` | `graph_condition` | катушка блокировки шага GRAPH | L | образцы GRAPH без лицензии | ST-двойник: `xT<n>_Cond := rlo;` (контроль, блокировка — так же); SFC: выражение перехода | `test_graph_condition_coils_become_st_assignments`<br>`test_twin_and_reference_agree_on_scenarios_and_random_calls` |
+| `SvCoil` | `graph_condition` | катушка контроля шага GRAPH | L | образцы GRAPH без лицензии | ST-двойник: `xT<n>_Cond := rlo;` (контроль, блокировка — так же); SFC: выражение перехода | `test_graph_condition_coils_become_st_assignments`<br>`test_twin_and_reference_agree_on_scenarios_and_random_calls` |
+| `TrCoil` | `graph_condition` | катушка условия перехода GRAPH | L | образцы GRAPH без лицензии | ST-двойник: `xT<n>_Cond := rlo;` (контроль, блокировка — так же); SFC: выражение перехода | `test_graph_condition_coils_become_st_assignments`<br>`test_twin_and_reference_agree_on_scenarios_and_random_calls` |
 | `And` | `instruction` | AND слов | L | справка TIA, AND | функция SCL (LIMIT, SEL, NORM_X → F_NormX, SCALE_X → F_ScaleX, SHL/SHR, MIN/MAX) | `test_limit_counter_return_and_calculate_boxes` |
 | `Limit` | `instruction` | LIMIT | L | справка TIA, LIMIT | функция SCL (LIMIT, SEL, NORM_X → F_NormX, SCALE_X → F_ScaleX, SHL/SHR, MIN/MAX) | `test_limit_counter_return_and_calculate_boxes` |
 | `Max` | `instruction` | MAX | L | справка TIA, MAX | функция SCL (LIMIT, SEL, NORM_X → F_NormX, SCALE_X → F_ScaleX, SHL/SHR, MIN/MAX) | `test_limit_counter_return_and_calculate_boxes` |
@@ -70,8 +73,8 @@ XSD SimaticML не ограничивает имена элементов `Part`
 | `TON` | `timer` | TON (экземпляр) | H | lad-cookbook @ e131b25: MCPVerify_FB_LAD_v3.xml | вызов экземпляра `inst(IN := …, PT := …)`, выходы `inst.Q/ET`; TON_TIME → TON или FB_S7Ton | `test_language_corpus_suites_pass_in_simulation`<br>`test_document_header_interface_and_units` |
 | `TP` | `timer` | TP (экземпляр) | L | по аналогии с TON | вызов экземпляра `inst(IN := …, PT := …)`, выходы `inst.Q/ET`; TON_TIME → TON или FB_S7Ton | `test_language_corpus_suites_pass_in_simulation`<br>`test_document_header_interface_and_units` |
 
-Элементов в словаре: 57; подтверждены открытым экспортом (H): 21, по руководству
-(L): 36.
+Элементов в словаре: 60; подтверждены открытым экспортом (H): 21, по руководству
+(L): 39.
 
 ## Ловушки, которые перевод учитывает явно
 

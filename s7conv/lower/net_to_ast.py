@@ -109,6 +109,11 @@ PARTS: dict[str, PartRule] = {
     "Jump": PartRule("jump", "прыжок JMP к метке", "L", "XSD LADFBD_v5: Labels; экспорта нет"),
     "JumpNot": PartRule("jump", "прыжок JMPN к метке", "L", "XSD LADFBD_v5: Labels; экспорта нет"),
     "Return": PartRule("return", "RET", "L", "справка TIA, RET"),
+    # GRAPH: катушки условий (переход, контроль, блокировка). Имена — по описанию формата GRAPH в открытых
+    # образцах без лицензии (не используются): уровень L, docs/ASSUMPTIONS.md, запись L17
+    "TrCoil": PartRule("graph_condition", "катушка условия перехода GRAPH", "L", "образцы GRAPH без лицензии"),
+    "SvCoil": PartRule("graph_condition", "катушка контроля шага GRAPH", "L", "образцы GRAPH без лицензии"),
+    "IlCoil": PartRule("graph_condition", "катушка блокировки шага GRAPH", "L", "образцы GRAPH без лицензии"),
 }
 COMBINATIONAL = frozenset({"Contact", "Not", "O", "A", "X", "Eq", "Ne", "Gt", "Ge", "Lt", "Le", "InRange", "OutRange"})
 _COMPARE = {"Eq": "=", "Ne": "<>", "Gt": ">", "Ge": ">=", "Lt": "<", "Le": "<="}
@@ -142,6 +147,7 @@ class NetLowerer:
         self.status: dict[int, tuple[str, str]] = {}
         self.jump: tuple[str, str, bool] | None = None
         self.lines: list[LLine] = []
+        self.cond_target: str | None = None  # GRAPH: куда записать условие катушки TrCoil/SvCoil/IlCoil
 
     # -- служебное -------------------------------------------------------------------
     def trace(self, uid: int | None = None) -> str:
@@ -280,6 +286,8 @@ class NetLowerer:
         handler = getattr(self, f"do_{part.name.lower()}", None)
         if part.name in ("Coil", "SCoil", "RCoil"):
             self.do_coil(uid, part)
+        elif part.name in ("TrCoil", "SvCoil", "IlCoil"):
+            self.do_cond_coil(uid, part)
         elif part.name in ("PBox", "NBox"):
             self.do_edge_box(uid, part)
         elif part.name in ("PContact", "NContact"):
@@ -363,6 +371,13 @@ class NetLowerer:
                 self.line(f"   {opnd} := {const};", uid)
                 self.line("END_IF;", uid)
         self.memo[(uid, "out")] = en
+
+    def do_cond_coil(self, uid: int, part: NPart) -> None:
+        """Катушка условия GRAPH: значение входа — условие перехода, контроля или блокировки шага."""
+        value = self.value(uid, "in", FALSE) or FALSE
+        target = self.cond_target or "#xGraphCondition"
+        self.mark(uid, AUTO, self.rule("graph_condition"))
+        self.line(f"{target} := {value[0]};", uid, self.vocab_notes(uid, part))
 
     def edge_memory_notes(self, uid: int, bit: str | None) -> list[LowerNote]:
         if bit is not None and self.bl.member_section(bit) == "Temp":
