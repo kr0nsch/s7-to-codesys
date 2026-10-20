@@ -1,0 +1,10 @@
+coUnit.TEST('CountDownStopsAtZero');
+F_S5CounterSet(stCounter := stCounter, xRlo := TRUE, wBcd := 16#0002);
+AssertEquals_INT(Expected := 1, Actual := F_S5CountDown(stCounter := stCounter, xRlo := TRUE), Message := 'edge 1');
+AssertTrue(Condition := F_S5CounterQ(stCounter := stCounter), Message := 'value 1: Q');
+F_S5CountDown(stCounter := stCounter, xRlo := FALSE);
+AssertEquals_INT(Expected := 0, Actual := F_S5CountDown(stCounter := stCounter, xRlo := TRUE), Message := 'edge 2');
+AssertFalse(Condition := F_S5CounterQ(stCounter := stCounter), Message := 'value 0: Q');
+F_S5CountDown(stCounter := stCounter, xRlo := FALSE);
+AssertEquals_INT(Expected := 0, Actual := F_S5CountDown(stCounter := stCounter, xRlo := TRUE), Message := 'stays 0');
+coUnit.TEST_FINISHED();

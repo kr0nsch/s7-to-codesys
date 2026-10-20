@@ -1,0 +1,11 @@
+coUnit.TEST('EnableRetriggersEdges');
+AssertEquals_INT(Expected := 1, Actual := F_S5CountUp(stCounter := stCounter, xRlo := TRUE), Message := 'edge 1');
+AssertEquals_INT(Expected := 1, Actual := F_S5CountUp(stCounter := stCounter, xRlo := TRUE), Message := 'held');
+F_S5CounterEnable(stCounter := stCounter, xRlo := TRUE);
+AssertEquals_INT(Expected := 2, Actual := F_S5CountUp(stCounter := stCounter, xRlo := TRUE), Message := 'FR edge');
+F_S5CounterEnable(stCounter := stCounter, xRlo := TRUE);
+AssertEquals_INT(Expected := 2, Actual := F_S5CountUp(stCounter := stCounter, xRlo := TRUE), Message := 'FR held');
+F_S5CounterEnable(stCounter := stCounter, xRlo := FALSE);
+F_S5CounterEnable(stCounter := stCounter, xRlo := TRUE);
+AssertEquals_INT(Expected := 3, Actual := F_S5CountUp(stCounter := stCounter, xRlo := TRUE), Message := 'FR edge 2');
+coUnit.TEST_FINISHED();

@@ -74,6 +74,18 @@ id = "PLCOPEN-L17"
 file = "src/POUs/S7Compat/FB_S7T*/FB_S7T*.impl.st"
 reason = "Таймеры S7Compat: без ветки «иначе» выходы и момент отсчёта сохраняют значение (так и задумано семантикой TON/TOF/TP)"
 
+[[allow]]
+id = "PLCOPEN-L17"
+file = "src/POUs/S7Compat/F_S5*/F_S5*.impl.st"
+reason = "Таймеры и счётчики S5 S7Compat: без ветки «иначе» слово таймера или счётчика сохраняет состояние (пуск и счёт по фронту RLO, сброс по уровню — семантика S5)"
+
+[[allow]]
+id = "UnusedVariable"
+file = "src/POUs/S7Compat/F_S5*/F_S5*.decl.st"
+match = "variable: (STTIMER|STCOUNTER)$"
+checker = "v0.4"
+reason = "Ложное срабатывание iec_checker 0.4: параметр-структура слова S5 (stTimer, stCounter) используется доступом к полям (stTimer.xQ) и как аргумент вложенного вызова — это v0.4 не считает использованием"
+
 # --- Тесты ---------------------------------------------------------------------------------------------
 
 [[allow]]

@@ -1,0 +1,10 @@
+coUnit.TEST('TimeWordPicksSmallestBase');
+AssertEquals_WORD(Expected := 16#0200, Actual := F_S5TimeWord(T#2S), Message := 'S5T#2S');
+AssertEquals_WORD(Expected := 16#0200, Actual := F_S5TimeWord(T#2S5MS), Message := 'S5T#2S5MS truncated');
+AssertEquals_WORD(Expected := 16#0999, Actual := F_S5TimeWord(T#9S990MS), Message := 'S5T#9S990MS');
+AssertEquals_WORD(Expected := 16#1100, Actual := F_S5TimeWord(T#10S), Message := 'S5T#10S');
+AssertEquals_WORD(Expected := 16#2100, Actual := F_S5TimeWord(T#100S), Message := 'S5T#100S');
+AssertEquals_WORD(Expected := 16#3360, Actual := F_S5TimeWord(T#1H), Message := 'S5T#1H');
+AssertEquals_WORD(Expected := 16#3999, Actual := F_S5TimeWord(T#2H46M30S), Message := 'S5T#2H46M30S');
+AssertEquals_WORD(Expected := 16#3999, Actual := F_S5TimeWord(T#3H), Message := 'over range: 999 x 10 s');
+coUnit.TEST_FINISHED();

@@ -18,6 +18,7 @@ CODESYS: результат симуляции — предварительна�
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 import struct
@@ -447,9 +448,12 @@ class Sim:
         self.run_body(body, Frame(self, inst, values, types))
 
     def call_function(self, pou: PouDef, args: Sequence[Any], fr: Frame) -> Any:
+        """Вызов функции; VAR_IN_OUT — по ссылке: структура и массив передаются тем же объектом, скаляр
+        записывается обратно в фактический параметр после вызова (как в CODESYS)."""
         values: dict[str, Any] = {}
         types: dict[str, TypeSpec] = {}
         inputs: list[str] = []
+        in_out: set[str] = set()
         for d in pou.decls:
             spec = self.type_of(d.type_text)
             for n in d.name_list:
@@ -457,14 +461,28 @@ class Sim:
                 values[n.lower()] = self.initial(d.init_text, spec, None) if d.init_text else self.default(spec)
                 if d.section.startswith("VAR_INPUT"):
                     inputs.append(n.lower())
+                elif d.section.startswith("VAR_IN_OUT"):
+                    inputs.append(n.lower())
+                    in_out.add(n.lower())
         ret = pou.name.lower()
         assert pou.return_type is not None
         types[ret] = self.type_of(pou.return_type)
         values[ret] = self.default(types[ret])
+        write_back: list[tuple[Expr, str]] = []
         for pos, a in enumerate(args):
             key = a.name.lower() if a.name else inputs[pos]
-            values[key] = coerce(self.eval(a.value, fr), types[key])
+            value = self.eval(a.value, fr)
+            if key in in_out:
+                if isinstance(value, Obj | Arr):
+                    values[key] = value  # ссылка: функция меняет фактический параметр
+                    continue
+                write_back.append((a.value, key))
+            elif isinstance(value, Obj | Arr):
+                value = copy.deepcopy(value)  # VAR_INPUT структуры — копия
+            values[key] = coerce(value, types[key])
         self.run_body(pou.body, Frame(self, None, values, types))
+        for target, key in write_back:
+            fr.assign(target, values[key])
         return values[ret]
 
     def builtin_fb(self, inst: Obj) -> None:
@@ -706,6 +724,8 @@ class Frame:
             container[key] = coerce((word | mask) if value else (word & ~mask), spec)
             return
         container, key, spec = self._slot(target)
+        if isinstance(value, Obj | Arr):
+            value = copy.deepcopy(value)  # присваивание структуры или массива копирует значение
         container[key] = coerce(value, spec)
 
 
@@ -856,6 +876,10 @@ def builtin(sim: Sim, name: str, args: list[Any]) -> Any:
         return abs(args[0])
     if upper == "SQRT":
         return math.sqrt(args[0])
+    if upper in ("SHL", "SHR"):
+        # ширину задаёт тип цели присваивания (coerce); сдвиг беззнаковый, как у ANY_BIT
+        value, count = int(args[0]), int(args[1])
+        return value << count if upper == "SHL" else value >> count
     if "_TO_" in upper:
         dst = upper.split("_TO_", 1)[1]
         value = args[0]
