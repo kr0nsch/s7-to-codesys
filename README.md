@@ -15,7 +15,7 @@
   <a href="https://github.com/kr0nsch/s7-to-codesys/releases"><img alt="Выпуск" src="https://img.shields.io/github/v/release/kr0nsch/s7-to-codesys?style=flat-square&label=release&color=3A4B60&labelColor=1B2736"></a>
   <img alt="Языки S7: SCL, LAD, FBD, STL, GRAPH" src="https://img.shields.io/badge/S7-SCL%20%C2%B7%20LAD%20%C2%B7%20FBD%20%C2%B7%20STL%20%C2%B7%20GRAPH-3A4B60?style=flat-square&labelColor=1B2736">
   <img alt="Цели: ОВЕН ПЛК210, REGUL R500" src="https://img.shields.io/badge/%D1%86%D0%B5%D0%BB%D0%B8-%D0%9E%D0%92%D0%95%D0%9D%20%D0%9F%D0%9B%D0%9A210%20%C2%B7%20REGUL%20R500-3A4B60?style=flat-square&labelColor=1B2736">
-  <a href="#тесты-и-качество"><img alt="Тесты: 161 из 161 в CODESYS Control Win, вариант SFC 5 из 5, pytest 1191" src="https://img.shields.io/badge/tests-CODESYS%20161%2F161%20%C2%B7%20SFC%205%2F5%20%C2%B7%20pytest%201191-3A4B60?style=flat-square&labelColor=1B2736"></a>
+  <a href="#тесты-и-качество"><img alt="Тесты: 161 из 161 в CODESYS Control Win, вариант SFC 5 из 5, pytest 1250 в CI" src="https://img.shields.io/badge/tests-CODESYS%20161%2F161%20%C2%B7%20SFC%205%2F5%20%C2%B7%20pytest%201250-3A4B60?style=flat-square&labelColor=1B2736"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/Python-3.11%2B-3A4B60?style=flat-square&logo=python&logoColor=white&labelColor=1B2736">
 </p>
 
@@ -544,7 +544,7 @@ S5TIME → TIME (7), стартовая информация OB, `Initial_Call` 
 | Проверка | Итог |
 |---|---|
 | ruff, `ruff format --check`, mypy (strict, 109 файлов) | без замечаний |
-| pytest (около двух минут) | 1191 тестов: разбор SCL и SimaticML, понижение LAD/FBD/STL/GRAPH, вариант SFC, эмиттер, генератор тестов, снапшоты, эталон S7 и `equiv`, сверка S5 с awlsim, XSD V21 и открытые экспорты, RuSTy и iec_checker по всему `src/` и `tests/` (если инструмент установлен), `stsim` — те же наборы coUnit против сконвертированного кода |
+| pytest (около двух минут) | 1250 тестов в CI (Linux: 1243 пройдено, 7 пропущено — без RuSTy; локально в Windows собирается 1191): разбор SCL и SimaticML, понижение LAD/FBD/STL/GRAPH, вариант SFC, эмиттер, генератор тестов, снапшоты, эталон S7 и `equiv`, сверка S5 с awlsim, XSD V21 и открытые экспорты, RuSTy и iec_checker по всему `src/` и `tests/` (если инструмент установлен), `stsim` — те же наборы coUnit против сконвертированного кода |
 | `s7conv equiv` (CI) | 7 блоков, сценарии и 500 случайных вызовов, переходы STL `structured` и `pc` — расхождений нет |
 | `s7conv build-corpus --check`, `gen-tests --check`, `build_xml.py --check` | сгенерированное, включая вариант SFC, совпадает побайтно |
 | `st_lint --strict` | 526 файлов, 0 замечаний |
