@@ -580,11 +580,14 @@ class StlLifter:
             if section in ("Output",):
                 args.append(f"{name} => {operand}")
                 self.invalidate(ins, operand)
-            elif section == "Return":
+            elif section == "Return" or name.upper() == "RET_VAL":
                 ret = operand
             else:
                 args.append(f"{name} := {operand}")
-        if call.kind == "Instruction" or call.kind == "FB":
+        if call.kind == "Instruction" and not call.instance:
+            # инструкция-функция (NORM_X, SCALE_X, LIMIT ...): результат — параметр Ret_Val
+            callee = call.name
+        elif call.kind in ("Instruction", "FB"):
             if not call.instance:
                 self.todo(ins, "stl.call", f"CALL {call.name} без экземпляра")
                 return

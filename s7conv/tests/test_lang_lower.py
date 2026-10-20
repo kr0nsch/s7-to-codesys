@@ -448,3 +448,80 @@ def test_scl_network_from_xml_gives_same_st_as_scl_source() -> None:
 
 def test_corpus_xml_is_reproducible(capsys: pytest.CaptureFixture[str]) -> None:
     assert B.main(["--check"]) == 0, capsys.readouterr().out
+
+
+def test_limit_counter_return_and_calculate_boxes() -> None:
+    n = B.Net("limit")
+    lim = n.part("Limit")
+    n.wire("rail", (lim, "en"))
+    n.operand_in(lim, "mn", "0")
+    n.operand_in(lim, "in", "#i1")
+    n.operand_in(lim, "mx", "100")
+    n.operand_out(lim, "out", "#iOut")
+    c = B.Net("ctu")
+    ctu = c.part("CTU", instance="#ctuCount")
+    c.wire(c.contact("rail", "#a"), (ctu, "CU"))
+    c.operand_in(ctu, "R", "#b")
+    c.operand_in(ctu, "PV", "10")
+    c.coil((ctu, "Q"), "#q")
+    calc = B.Net("calc")
+    cl = calc.part("Calculate", equation="IN1 + IN2 * 2")
+    calc.wire("rail", (cl, "en"))
+    calc.operand_in(cl, "in1", "#i1")
+    calc.operand_in(cl, "in2", "#i2")
+    calc.operand_out(cl, "out", "#iOut")
+    r = B.Net("ret")
+    ret = r.part("Return")
+    r.wire(r.contact("rail", "#c"), (ret, "in"))
+    members = BOOLS + INTS + [B.Member("ctuCount", "CTU_INT")]
+    lines = body(lower(fb("FB_X", [B.lad_unit(x) for x in (n, c, calc, r)], members)))
+    assert lines == [
+        "#iOut := LIMIT(MN := 0, IN := #i1, MX := 100);",
+        "#ctuCount(CU := #a, R := #b, PV := 10);",
+        "#q := #ctuCount.Q;",
+        "#iOut := #i1 + #i2 * 2;",
+        "IF #c THEN",
+        "RETURN;",
+        "END_IF;",
+    ]
+
+
+def test_stl_block_end_instructions() -> None:
+    s = B.Stl("x").op("A", "#a").op("BEC").op("SET").op("Assign", "#q").op("BEU").op("CLR").op("Assign", "#q")
+    assert body(lower(stl_fb(s))) == ["IF #a THEN", "RETURN;", "END_IF;", "#q := TRUE;", "RETURN;", "#q := FALSE;"]
+
+
+def test_stl_int_arithmetic_on_dint_reads_low_word_only() -> None:
+    members = [B.Member("di", "DInt"), B.Member("i", "Int")]
+    s = B.Stl("x").op("L", "#di").op("L", "#i").op("ADD_I").op("T", "#i")
+    assert "stl.accu_high" in lower_rules(stl_fb(s, members=members))
+
+
+def test_stl_edge_memory_in_temp_is_flagged() -> None:
+    s = B.Stl("x").op("A", "#a").op("Rise", "#tmpBit").op("Assign", "#q")
+    blk = B.Block(
+        "FB",
+        "FB_S",
+        1,
+        lang="STL",
+        layout="Standard",
+        sections=[B.Section("Static", BOOLS), B.Section("Temp", [B.Member("tmpBit", "Bool")])],
+        units=[B.stl_unit(s)],
+    )
+    assert "stl.edge_memory" in lower_rules(blk)
+
+
+def test_stl_dint_real_arithmetic_and_compare() -> None:
+    members = [B.Member(n, "DInt") for n in ("d1", "d2", "dOut")] + [B.Member(n, "Real") for n in ("r1", "r2", "rOut")]
+    members += [B.Member("q", "Bool")]
+    s = B.Stl("x")
+    s.op("L", "#d1").op("L", "#d2").op("MUL_D").op("T", "#dOut")
+    s.op("L", "#r1").op("L", "#r2").op("DIV_R").op("T", "#rOut")
+    s.op("L", "#d1").op("L", "#d2").op("MOD_D").op("T", "#dOut")
+    s.op("L", "#r1").op("L", "#r2").op("GE_R").op("Assign", "#q")
+    assert body(lower(stl_fb(s, members=members))) == [
+        "#dOut := #d1 * #d2;",
+        "#rOut := #r1 / #r2;",
+        "#dOut := #d1 MOD #d2;",
+        "#q := #r1 >= #r2;",
+    ]

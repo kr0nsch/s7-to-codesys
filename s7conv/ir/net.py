@@ -117,9 +117,14 @@ class Network:
             src = w.source
             if src.kind == IDENT and src.uid not in self.accesses:
                 self.issues.append(f"провод UId {w.uid}: операнд UId {src.uid} не найден")
+                continue
             if src.kind == PIN and src.uid not in self.parts:
                 self.issues.append(f"провод UId {w.uid}: элемент UId {src.uid} не найден")
+                continue
             for sink in w.sinks:
+                if sink.kind == IDENT and sink.uid not in self.accesses:
+                    self.issues.append(f"провод UId {w.uid}: операнд UId {sink.uid} не найден")
+                    continue
                 if sink.kind == PIN:
                     if sink.uid not in self.parts:
                         self.issues.append(f"провод UId {w.uid}: элемент UId {sink.uid} не найден")

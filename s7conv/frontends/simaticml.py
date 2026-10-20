@@ -149,6 +149,11 @@ def child(el: ET.Element | None, name: str) -> ET.Element | None:
     return next((c for c in el if local(c.tag) == name), None)
 
 
+def _first(*items: ET.Element | None) -> ET.Element | None:
+    """Первый не None (у Element без детей bool() ложен — `or` для элементов не годится)."""
+    return next((x for x in items if x is not None), None)
+
+
 def children(el: ET.Element | None, name: str) -> list[ET.Element]:
     if el is None:
         return []
@@ -489,7 +494,7 @@ def _scl_piece(c: ET.Element) -> str:
     if name == "Text":
         return c.text or ""
     if name == "Access":
-        call = child(c, "CallInfo") or child(c, "Instruction")
+        call = _first(child(c, "CallInfo"), child(c, "Instruction"))
         if call is not None:
             return _call_text(call)
         return access_text(c)

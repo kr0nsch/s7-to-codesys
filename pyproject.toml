@@ -68,6 +68,11 @@ exclude = [
     '^tools/tests/fixtures/',
 ]
 
+[[tool.mypy.overrides]]
+# lxml (только тесты: проверка XSD корпуса SimaticML) не поставляет аннотаций типов
+module = ["lxml", "lxml.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 # scenarios/reference, scenarios/lang/reference — эталонные модели сценариев; samples — матрицы покрытия корпусов;
 # tools_project — проверки настроек репозитория проекта (st_lint.toml, config.json)

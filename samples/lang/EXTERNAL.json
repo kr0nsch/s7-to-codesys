@@ -1,0 +1,88 @@
+{
+  "_doc": [
+    "Внешние файлы корпуса всех языков: схемы XSD SimaticML и открытые экспорты TIA Portal для приёмки разборщика.",
+    "Ничего отсюда не коммитится: тесты (s7conv/tests/test_lang_external.py) скачивают файлы в .cache/lang/ и сверяют SHA-256; без сети — skip с сообщением.",
+    "XSD — © Siemens AG (в git не кладутся). Образцы — под указанной лицензией, с атрибуцией. Репозитории без лицензии и siemens/tia-portal-openness-code-snippets не используются.",
+    "expect — ожидаемый итог конвертации образца: блоков RawBlock 0, правила MIGRATION-TODO и MIGRATION-CHECK — только перечисленные."
+  ],
+  "xsd": {
+    "repo": "dotnetprojects/DotNetSiemensPLCToolBoxLibrary",
+    "commit": "bbe5beccbadcf7497408e92883e260cc5024a874",
+    "license": "© Siemens AG — только загрузка в .cache/, в git не кладётся",
+    "store": "cache",
+    "versions": {
+      "V21": {
+        "path": "externalDlls/siemens/V21/Schemas",
+        "namespaces": {
+          "Interface": "Interface/v5",
+          "FlgNet": "NetworkSource/FlgNet/v5",
+          "StatementList": "NetworkSource/StatementList/v5",
+          "StructuredText": "NetworkSource/StructuredText/v4"
+        },
+        "schemas": {
+          "Sections": "SW.InterfaceSections_v5.xsd",
+          "FlgNet": "SW.PlcBlocks.LADFBD_v5.xsd",
+          "StatementList": "SW.PlcBlocks.STL_v5.xsd",
+          "StructuredText": "SW.PlcBlocks.SCL_v4.xsd",
+          "Graph": "SW.PlcBlocks.Graph_v6.xsd"
+        },
+        "files": {
+          "SW.Common_v3.xsd": "f4d9aa76f9a49bfe14b4268d79ba8cdc9f5f2aeeed505017bd01cdcfee587655",
+          "SW.InterfaceSections_v5.xsd": "c3b4735c1acbd29690afdaa13d11586ac7973ffa96d8f6fbe20d4f3b4490be56",
+          "SW.PlcBlocks.Access_v5.xsd": "7d814f8ce7225d06d7764d3bdf6bfaf2fa179121c45a3e0f1334b65314562932",
+          "SW.PlcBlocks.CompileUnitCommon_v5.xsd": "a55583fd2c5e26f65a4a9a8bc47d54c620c3820c9e9aecdc12dfc724e01642c0",
+          "SW.PlcBlocks.Graph_v6.xsd": "49e3f5589e30b7bcef3c66e9a322b85d6cc4408a5d2b24e0db50d519df0390d1",
+          "SW.PlcBlocks.LADFBD_v5.xsd": "223f0a318e035ede17e4147eae598fea1785696e89df374dab5edc67db2cf2cd",
+          "SW.PlcBlocks.SCL_v4.xsd": "7fd1ec64f230b2d6adde2d70131077d6589b34479f5fecdf16d39dad848412e4",
+          "SW.PlcBlocks.STL_v5.xsd": "f870e11c49a2e5b34e5252abbfacc0f8c5ac0d87fa23fc2526213b3cbf617a20"
+        }
+      }
+    }
+  },
+  "samples": [
+    {
+      "id": "lad-cookbook",
+      "title": "LAD V21: контакты, катушки S/R, O, Not, PBox, сравнения, Move, Add…Mod, Convert, TON",
+      "repo": "bulaofen0036-coder/TIA_Portal_Openness_MCP",
+      "commit": "e131b2570c75c323bc330e9793c293e4b5f231c6",
+      "path": "tools/tiaportal-mcp/skill/lad-cookbook",
+      "license": "MIT",
+      "store": "cache",
+      "tia": "V21",
+      "files": {
+        "MCPVerify_FB_LAD_v3.xml": "1cc15fa26a5f899c9a80cbb305cef750564bd21af758d21a5798c52838282bab",
+        "MCPVerify_FC_LAD.xml": "f376ab136fc72edbaeef447706eed2fd52d7e63d5de6c077b11e8742c1ac3988",
+        "MCPVerify_FC_LAD_v2.xml": "d04e92d669201979e283f970e6563f0aac160b58a3cbbc91877c821aec5b6a70",
+        "MCPVerify_FC_LAD_v3.xml": "7f527954ebdc74bf7557c7522aa0e1c1b1d53f836b90f456d9c7a607c54f2923"
+      },
+      "expect": {
+        "raw_blocks": 0,
+        "todo": [],
+        "check": ["expr.div_int", "lad.div_zero", "lad.edge_memory"]
+      }
+    },
+    {
+      "id": "smart-factory-stl",
+      "title": "STL V18 (StatementList/v4): A, =, FP, FN, CALL NORM_X/SCALE_X; глобальные DB",
+      "repo": "asier-vega-gutierrez/Smart_Factory",
+      "commit": "a2fdad2cd4643facb8d175d04ff896fc42c29ad7",
+      "path": "src/ProgramBlocks",
+      "license": "Apache-2.0",
+      "store": "cache",
+      "tia": "V18",
+      "files": {
+        "I_Q/FC_DI.xml": "43cc4380338ebcf6fde0560c5f617c7f1f1af970365b522060ca796e9076742d",
+        "I_Q/FC_AI.xml": "721caab3c598fe827eeedcc1e3a1f3b1ea3eb5cc274ae91c80afd6d7e4a450d1",
+        "I_Q/DB_DI.xml": "f23250d50bf03530e6039ef09bbdacc5942a8e7090670ed4f8b554a450562443",
+        "I_Q/DB_AI.xml": "6caebde15605344af5f9f432a429b096c85b667f73163362851870f6168581fa",
+        "Standar_blocks/FCs/FC_AnalogInCoverter.xml": "0ed4f520d6e05f71374eb873947ed0bbc7ba4acd110223bcb41f841a30b81407",
+        "Standar_blocks/DBs/Data.xml": "b373705214ecdacc1e65d7f391af819ddb7f1c38d8ec37b83034db9173d812eb"
+      },
+      "expect": {
+        "raw_blocks": 0,
+        "todo": [],
+        "check": ["block.non_optimized", "db.retain_standard", "stl.call_registers_1500", "sym.unknown", "sym.unknown_decl", "type.unknown"]
+      }
+    }
+  ]
+}

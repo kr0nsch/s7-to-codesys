@@ -53,3 +53,6 @@ htmlcov/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Внешние образцы и схемы (samples/lang/EXTERNAL.json): скачиваются тестами, в git не кладутся
+.cache/

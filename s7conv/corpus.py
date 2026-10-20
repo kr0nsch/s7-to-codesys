@@ -291,6 +291,9 @@ def _build_lang(root: Path, built: CorpusBuild) -> None:
         source = TG.ScenarioSource(lang_scenarios, lang_result, TG.load_aliases(lang_scenarios))
         built.lang_tests = TG.generate_lang(source, "tests", root)
         lang_files.update(_object_files(built.lang_tests.objects, "tests"))
+    from s7conv import docs_gen
+
+    lang_files.update(docs_gen.write_all(root))
     built.lang_result = lang_result
     built.lang_html = R.render_html(lang_result, [LANG_CORPUS_REL])
     built.lang_files = lang_files

@@ -13,7 +13,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
-from s7conv.frontends.simaticml import access_text, child, children, local, symbol_text, text_of
+from s7conv.frontends.simaticml import _first, access_text, child, children, local, symbol_text, text_of
 
 
 @dataclass
@@ -109,7 +109,7 @@ def add_statement_list(block: StlBlock, el: ET.Element, number: int, title: str 
         acc = child(st, "Access")
         if acc is not None:
             ins.operand_scope = acc.get("Scope", "")
-            call = child(acc, "CallInfo") or child(acc, "Instruction")
+            call = _first(child(acc, "CallInfo"), child(acc, "Instruction"))
             if call is not None:
                 ins.call = _call(call)
                 ins.operand = ins.call.name

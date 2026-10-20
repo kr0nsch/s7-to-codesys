@@ -113,8 +113,8 @@ jobs:
         run: python tools/check/run_iec_checker.py --tests
 
       # Конвертер s7conv: корпус разбирается без ошибок; закоммиченный результат build-corpus
-      # (src/*/Converted, docs/CONVERSION_REPORT.md, задачи в tools/codesys/config.json, тесты сценариев
-      # tests/POUs/Scenarios и PRG_Tests) воспроизводится из корпуса и сценариев побайтно.
+      # (src/*/Converted и src/*/Lang/Converted, отчёты, задачи в tools/codesys/config.json, тесты сценариев
+      # tests/POUs/Scenarios, ScenariosLang и PRG_Tests) воспроизводится из корпусов и сценариев побайтно.
       - name: s7conv — корпус SCL
         id: s7conv
         if: ${{ !cancelled() }}
@@ -125,6 +125,20 @@ jobs:
           python -m s7conv convert samples/scl --out build/converted --timers s7compat --emit-support \
             --report-html build/report.html -q
           python tools/assemble.py --root build/converted --check-only
+
+      # Корпус всех языков (SimaticML LAD/FBD/STL/SCL, samples/lang): XML воспроизводится из blocks.py,
+      # сценарии — из моделей, эталон S7 и интерпретатор ST согласны на сценариях и случайных входах
+      # (переходы STL structured и pc). Проверка XSD V21 и приёмка открытых экспортов — в pytest
+      # (test_lang_external.py: XSD и образцы скачиваются по samples/lang/EXTERNAL.json с проверкой SHA-256).
+      - name: s7conv — корпус всех языков
+        id: s7conv_lang
+        if: ${{ !cancelled() }}
+        run: |
+          python -m s7conv check samples/lang
+          python samples/lang/build_xml.py --check
+          python scenarios/lang/reference/generate_lang_csv.py --check
+          python -m s7conv equiv samples/lang --scenarios scenarios/lang --random 500 --seed 20261019
+          python -m s7conv equiv samples/lang --scenarios scenarios/lang --random 200 --seed 20261019             --stl-jumps pc -q
 
       - name: Сводка
         if: ${{ !cancelled() }}
@@ -137,6 +151,7 @@ jobs:
           R_ST_LINT: ${{ steps.st_lint.outcome }}
           R_IEC_CHECKER: ${{ steps.iec_checker.outcome }}
           R_S7CONV: ${{ steps.s7conv.outcome }}
+          R_S7CONV_LANG: ${{ steps.s7conv_lang.outcome }}
         run: |
           status() {
             case "$1" in
@@ -159,6 +174,7 @@ jobs:
             echo "| st_lint --strict | $(status "$R_ST_LINT") |"
             echo "| iec_checker $IEC_CHECKER_VERSION | $(status "$R_IEC_CHECKER") |"
             echo "| s7conv: корпус SCL (build-corpus --check) | $(status "$R_S7CONV") |"
+            echo "| s7conv: корпус всех языков (build_xml --check, equiv) | $(status "$R_S7CONV_LANG") |"
             echo ""
             echo "Отчёты — в артефакте \`build-reports\`. Находки iec_checker разбираются в \`docs/STATIC_ANALYSIS.md\`."
             # Без раздела обоснованных находок: он может превысить предел сводки GitHub (1024k), и тогда

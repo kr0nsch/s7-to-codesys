@@ -56,6 +56,17 @@
   эталоном (перевод SCL — с эталоном LAD). Первое расхождение — с трассой до сети и UId или строки STL, код 1.
   На корпусе: сценарии и 500 случайных вызовов на блок, переходы STL `structured` и `pc` — расхождений нет.
 - `s7conv ir <файл> --format json` — NetIR и StlIR с трассой до сети, UId и строки.
+- `samples/lang/EXTERNAL.json`: XSD SimaticML V21 (dotnetprojects/DotNetSiemensPLCToolBoxLibrary @ bbe5bec, SHA-256
+  каждого файла) и открытые экспорты TIA — lad-cookbook (MIT, LAD V21) и Smart_Factory (Apache-2.0, STL V18).
+  Тесты скачивают их в `.cache/` (в git не кладутся): фрагменты корпуса (`Sections`, `FlgNet`, `StatementList`,
+  `StructuredText`) валидны по XSD V21; образцы конвертируются без `RawBlock` и без `MIGRATION-TODO`. Порча
+  XML (удалённый провод или операнд, повтор UId, неизвестный элемент, обрезанный файл) не роняет разбор.
+- Генерируемые справочники `docs/MAPPING_LADFBD.md` (словарь элементов с уровнем подтверждения и источником
+  строки) и `docs/MAPPING_STL.md` (172 из 172 токенов XSD V21 с классом, правилом и тестами); матрица
+  «правило → тест» `samples/rules_matrix.py` падает, если у правила выпуска нет теста.
+- CI: шаг «корпус всех языков» — `check samples/lang`, `build_xml.py --check`, `generate_lang_csv.py --check`,
+  `equiv` со сценариями и 500 случайными вызовами (и в режиме переходов `pc`); `lxml` — в
+  `requirements-dev.txt` для проверки XSD.
 - Тесты эквивалентности: случайные цепочки STL со скобками до 7 уровней и случайные сети LAD (hypothesis) —
   эталон против понижения; мутации «старое SR→SR», «ENO = EN» и «знаковое расширение вместо дополнения
   нулями» ловятся.
